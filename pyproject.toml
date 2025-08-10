@@ -6,7 +6,11 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "torch",
-    "torchvision"
+    "torchvision",
+    "pandas",
+    "numpy",
+    "matplotlib",
+    "seaborn",
 ]
 
 [tool.uv.sources]
