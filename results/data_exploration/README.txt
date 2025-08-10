@@ -1,10 +1,28 @@
 Stage summary (counts, seconds, hours, proportion)
               count  total_seconds  proportion        hours
 stage_label                                                
-N1           991598        3966324    0.509306  1101.756667
-N2           808739        3234885    0.415386   898.579167
-N3           114958         459828    0.059045   127.730000
-REM           31664         126651    0.016263    35.180833
+NREM         808739        3234885    0.422253   898.579167
+REM          114958         459828    0.060021   127.730000
+Wake         991598        3966324    0.517726  1101.756667
+
+Stage mapping (numeric->label):
+  1 -> Wake
+  2 -> NREM
+  3 -> REM
+  4 -> Artifact
+
+Bout statistics (first 10 rows):
+   subject  stage stage_label  mean_bout_length_s  median_bout_length_s  bouts_per_hour
+0  sub-001      2        NREM           82.558333                  60.0       16.451224
+1  sub-001      3         REM           55.719512                  40.0        4.996298
+2  sub-001      1        Wake          126.244858                   8.0       15.552500
+3  sub-002      1        Wake          142.072860                  12.0       15.504642
+4  sub-002      2        NREM           81.927667                  60.0       15.617609
+5  sub-002      3         REM           64.612403                  56.0        1.821584
+6  sub-003      2        NREM          116.171190                  84.0       13.401153
+7  sub-003      3         REM           64.453608                  56.0        4.070705
+8  sub-003      1        Wake          136.298715                   4.0       13.065424
+9  sub-004      2        NREM           83.656081                  64.0       18.805307
 
 Recording meta (first 10)
    subject  n_rows  total_duration_s  recording_hours

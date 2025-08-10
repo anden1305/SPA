@@ -29,14 +29,12 @@ DATA_ROOT = Path("data") / "ds006366"
 OUTPUT_DIR = Path("results") / "data_exploration"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-# Mapping numeric stage codes (guessed from typical sleep staging) – adjust if needed
+# Use explicit mapping from task-sleep_events.json
 STAGE_MAP = {
-    0: "Unknown",
-    1: "N1",
-    2: "N2",
-    3: "N3",
-    4: "REM",
-    5: "Wake",  # If wake present (not seen yet)
+    1: "Wake",
+    2: "NREM",
+    3: "REM",
+    4: "Artifact"
 }
 
 
@@ -93,14 +91,19 @@ def compute_transition_matrix(stages: list[int]) -> pd.DataFrame:
     return probs.fillna(0)
 
 
-def stage_labelize(series: pd.Series) -> pd.Series:
-    return series.map(STAGE_MAP).fillna(series.astype(str))
+
+# No need for heuristic mapping, use STAGE_MAP directly
+
+
+def stage_labelize(series: pd.Series, mapping: dict[int, str]) -> pd.Series:
+    return series.map(lambda x: mapping.get(x, str(x)))
 
 
 def plot_participant_distribution(participants: pd.DataFrame):
     fig, ax = plt.subplots(figsize=(6,4))
     order = participants["lab"].value_counts().index
-    sns.countplot(data=participants, x="lab", order=order, ax=ax, palette="viridis")
+    # Added hue=x and legend suppression to satisfy upcoming seaborn API (palette without hue deprecated)
+    sns.countplot(data=participants, x="lab", hue="lab", order=order, ax=ax, palette="viridis", legend=False)
     ax.set_title("Participants per lab")
     ax.set_ylabel("Count")
     for p in ax.patches:
@@ -113,7 +116,7 @@ def plot_participant_distribution(participants: pd.DataFrame):
 def plot_stage_distribution(stage_df: pd.DataFrame):
     fig, ax = plt.subplots(figsize=(6,4))
     order = stage_df["stage_label"].value_counts().index
-    sns.countplot(data=stage_df, x="stage_label", order=order, ax=ax, palette="magma")
+    sns.countplot(data=stage_df, x="stage_label", hue="stage_label", order=order, ax=ax, palette="magma", legend=False)
     ax.set_title("Micro-epoch stage counts (all subjects)")
     ax.set_ylabel("Count")
     fig.tight_layout()
@@ -130,20 +133,21 @@ def plot_stage_distribution(stage_df: pd.DataFrame):
     plt.close(fig)
 
 
-def plot_hypnogram(example_epochs: pd.DataFrame, subject: str):
+def plot_hypnogram(example_epochs: pd.DataFrame, subject: str, mapping: dict[int, str]):
     fig, ax = plt.subplots(figsize=(10,3))
     ax.step(example_epochs["onset"] / 3600, example_epochs["stage"], where="post")
     ax.set_xlabel("Hours from lights off")
     ax.set_ylabel("Stage (code)")
     ax.set_title(f"Hypnogram (30 s epochs) {subject}")
-    ax.set_yticks(sorted(STAGE_MAP.keys()))
-    ax.set_yticklabels([STAGE_MAP[k] for k in sorted(STAGE_MAP.keys())])
+    stage_codes = sorted([k for k in mapping.keys() if mapping[k] != "Artifact"])
+    ax.set_yticks(stage_codes)
+    ax.set_yticklabels([mapping[k] for k in stage_codes])
     fig.tight_layout()
     fig.savefig(OUTPUT_DIR / f"hypnogram_{subject}.png", dpi=150)
     plt.close(fig)
 
 
-def plot_episode_lengths(stage_df: pd.DataFrame):
+def plot_episode_lengths(stage_df: pd.DataFrame, mapping: dict[int, str]):
     # Define episodes: consecutive identical stage codes within same subject
     records = []
     for (subj), df_sub in stage_df.groupby("subject"):
@@ -173,7 +177,7 @@ def plot_episode_lengths(stage_df: pd.DataFrame):
                 "duration": run_len,
             })
     ep_df = pd.DataFrame(records)
-    ep_df["stage_label"] = stage_labelize(ep_df["stage"])
+    ep_df["stage_label"] = stage_labelize(ep_df["stage"], mapping)
     fig, ax = plt.subplots(figsize=(8,5))
     sns.boxplot(data=ep_df, x="stage_label", y="duration", ax=ax)
     ax.set_title("Episode duration distribution by stage (micro-epochs aggregated)")
@@ -193,16 +197,127 @@ def plot_episode_lengths(stage_df: pd.DataFrame):
     plt.close(fig)
 
 
-def plot_transition_matrix(df_epochs: pd.DataFrame):
+def plot_transition_matrix(df_epochs: pd.DataFrame, mapping: dict[int, str]):
     tm = compute_transition_matrix(df_epochs["stage"].tolist())
+    # Remove Artifact from matrix
+    valid_codes = [k for k in mapping.keys() if mapping[k] != "Artifact"]
+    tm = tm.loc[valid_codes, valid_codes]
     tm_lbl = tm.copy()
-    tm_lbl.index = [STAGE_MAP.get(i, str(i)) for i in tm.index]
-    tm_lbl.columns = [STAGE_MAP.get(i, str(i)) for i in tm.columns]
+    tm_lbl.index = [mapping.get(i, str(i)) for i in tm.index]
+    tm_lbl.columns = [mapping.get(i, str(i)) for i in tm.columns]
     fig, ax = plt.subplots(figsize=(6,5))
     sns.heatmap(tm_lbl, annot=True, fmt=".2f", cmap="Blues", ax=ax)
     ax.set_title("Stage transition matrix (probabilities)")
     fig.tight_layout()
     fig.savefig(OUTPUT_DIR / "transition_matrix.png", dpi=150)
+    plt.close(fig)
+
+
+def plot_bout_metrics(bout_stats: pd.DataFrame):
+    # Mean bout length per stage
+    agg = bout_stats.groupby("stage_label").agg(
+        mean_bout_length_s=("mean_bout_length_s", "mean"),
+        sem_bout_length_s=("mean_bout_length_s", lambda x: x.std(ddof=1)/math.sqrt(len(x))),
+        bouts_per_hour=("bouts_per_hour", "mean"),
+    ).reset_index()
+    # Bout length
+    fig, ax = plt.subplots(figsize=(6,4))
+    # Add hue for future seaborn compatibility (palette without hue deprecation)
+    sns.barplot(data=agg, x="stage_label", y="mean_bout_length_s", hue="stage_label", ax=ax, palette="cubehelix", legend=False)
+    ax.set_title("Mean bout length per stage (subject avg)")
+    ax.set_ylabel("Seconds")
+    fig.tight_layout()
+    fig.savefig(OUTPUT_DIR / "mean_bout_length_per_stage.png", dpi=150)
+    plt.close(fig)
+
+    # Bouts per hour
+    fig, ax = plt.subplots(figsize=(6,4))
+    sns.barplot(data=agg, x="stage_label", y="bouts_per_hour", hue="stage_label", ax=ax, palette="viridis", legend=False)
+    ax.set_ylabel("Bouts / hour")
+    ax.set_title("Fragmentation (bouts per hour)")
+    fig.tight_layout()
+    fig.savefig(OUTPUT_DIR / "bouts_per_hour_per_stage.png", dpi=150)
+    plt.close(fig)
+
+
+def compute_bout_stats(stage_df: pd.DataFrame, mapping: dict[int, str]) -> pd.DataFrame:
+    records = []
+    for subject, df_sub in stage_df.groupby("subject"):
+        df_sub = df_sub.sort_values("onset")
+        total_hours = df_sub["duration"].sum() / 3600
+        # Identify episodes
+        episodes = []
+        prev_stage = None
+        run_len = 0
+        for row in df_sub.itertuples():
+            if row.stage != prev_stage:
+                if prev_stage is not None:
+                    episodes.append((prev_stage, run_len))
+                prev_stage = row.stage
+                run_len = row.duration
+            else:
+                run_len += row.duration
+        if prev_stage is not None:
+            episodes.append((prev_stage, run_len))
+        # per stage metrics
+        by_stage = {}
+        for st, dur in episodes:
+            by_stage.setdefault(st, []).append(dur)
+        for st, durs in by_stage.items():
+            arr = np.array(durs)
+            records.append({
+                "subject": subject,
+                "stage": st,
+                "stage_label": mapping.get(st, str(st)),
+                "mean_bout_length_s": arr.mean(),
+                "median_bout_length_s": np.median(arr),
+                "bouts_per_hour": len(arr)/total_hours if total_hours>0 else np.nan,
+            })
+    return pd.DataFrame(records)
+
+
+def plot_bout_size_distribution(stage_df: pd.DataFrame, mapping: dict[int, str]):
+    # Episode extraction
+    episodes = []
+    for subj, df_sub in stage_df.groupby("subject"):
+        df_sub = df_sub.sort_values("onset")
+        prev_stage = None
+        run_len = 0
+        for row in df_sub.itertuples():
+            if row.stage != prev_stage:
+                if prev_stage is not None:
+                    episodes.append({"subject": subj, "stage": prev_stage, "duration": run_len})
+                prev_stage = row.stage
+                run_len = row.duration
+            else:
+                run_len += row.duration
+        if prev_stage is not None:
+            episodes.append({"subject": subj, "stage": prev_stage, "duration": run_len})
+    ep_df = pd.DataFrame(episodes)
+    if ep_df.empty:
+        return
+    bins = [0,4,32,60,300,1e9]
+    labels = ["4s","4-32s","32-60s","60-300s","300s+"]
+    ep_df["bin"] = pd.cut(ep_df["duration"], bins=bins, labels=labels, right=False)
+    ep_df["stage_label"] = ep_df["stage"].map(lambda x: mapping.get(x, str(x)))
+    # Compute proportions per stage using an explicit intermediate to avoid reset_index duplication error
+    counts = ep_df.groupby(["stage_label","bin"]).size().reset_index(name="count")
+    counts["proportion"] = counts.groupby("stage_label")["count"].transform(lambda x: x / x.sum())
+    prop = counts.drop(columns=["count"])
+    fig, ax = plt.subplots(figsize=(8,4))
+    # stacked bar
+    stages = prop["stage_label"].unique()
+    bottom = np.zeros(len(stages))
+    stage_index = {st:i for i, st in enumerate(stages)}
+    for b in labels:
+        vals = [prop[(prop.stage_label==st)&(prop.bin==b)]["proportion"].values[0] if not prop[(prop.stage_label==st)&(prop.bin==b)].empty else 0 for st in stages]
+        ax.bar(stages, vals, bottom=bottom, label=b)
+        bottom += vals
+    ax.set_ylabel("Proportion of episodes")
+    ax.set_title("Bout size distribution per stage")
+    ax.legend(title="Bout length bin", bbox_to_anchor=(1.05,1), loc="upper left")
+    fig.tight_layout()
+    fig.savefig(OUTPUT_DIR / "bout_size_distribution.png", dpi=150)
     plt.close(fig)
 
 
@@ -214,6 +329,7 @@ def plot_recording_durations(meta_df: pd.DataFrame):
     fig.tight_layout()
     fig.savefig(OUTPUT_DIR / "recording_duration_hist.png", dpi=150)
     plt.close(fig)
+
 
 
 def main():
@@ -248,7 +364,12 @@ def main():
         return
 
     stage_df = stage_df.merge(participants.rename(columns={"participant_id": "subject"}), on="subject", how="left")
-    stage_df["stage_label"] = stage_labelize(stage_df["stage"])
+    # Use explicit mapping
+    mapping = STAGE_MAP
+    # Remove Artifact from all stats/plots
+    valid_mask = stage_df["stage"].isin([k for k,v in mapping.items() if v != "Artifact"])
+    stage_df = stage_df[valid_mask].copy()
+    stage_df["stage_label"] = stage_labelize(stage_df["stage"], mapping)
 
     # Summary statistics table
     summary_stats = stage_df.groupby("stage_label").agg(
@@ -265,19 +386,32 @@ def main():
 
     # Plots
     plot_stage_distribution(stage_df)
-    plot_episode_lengths(stage_df)
+    plot_episode_lengths(stage_df, mapping)
     # Example hypnogram (first subject with most data)
     first_subj = meta_df.sort_values("n_rows", ascending=False).iloc[0]["subject"]
     example_df = stage_df[stage_df["subject"] == first_subj][["onset", "duration", "stage"]].sort_values("onset")
     epochs_30s = aggregate_events(example_df)
-    plot_hypnogram(epochs_30s, first_subj)
-    plot_transition_matrix(epochs_30s)
+    plot_hypnogram(epochs_30s, first_subj, mapping)
+    plot_transition_matrix(epochs_30s, mapping)
     plot_recording_durations(meta_df)
+
+    # Bout metrics & fragmentation
+    bout_stats = compute_bout_stats(stage_df, mapping)
+    if not bout_stats.empty:
+        bout_stats.to_csv(OUTPUT_DIR / "bout_stats.csv", index=False)
+        plot_bout_metrics(bout_stats)
+        plot_bout_size_distribution(stage_df, mapping)
 
     # Basic textual report
     with open(OUTPUT_DIR / "README.txt", "w") as f:
         f.write("Stage summary (counts, seconds, hours, proportion)\n")
         f.write(summary_stats.to_string())
+        f.write("\n\nStage mapping (numeric->label):\n")
+        for k,v in mapping.items():
+            f.write(f"  {k} -> {v}\n")
+        if 'bout_stats' in locals():
+            f.write("\nBout statistics (first 10 rows):\n")
+            f.write(bout_stats.head(10).to_string())
         f.write("\n\nRecording meta (first 10)\n")
         f.write(meta_df.head(10).to_string())
     print("Exploration complete. Outputs in", OUTPUT_DIR)
