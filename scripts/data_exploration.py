@@ -30,6 +30,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 DATA_ROOT = Path("data") / "ds006366"
+PROCESSED_ROOT = Path("data") / "ds006366_processed"
 OUTPUT_DIR = Path("results") / "data_exploration"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -346,6 +347,75 @@ def plot_recording_durations(meta_df: pd.DataFrame):
     plt.close(fig)
 
 
+# ------------------ Simple processed data amplitude analysis (single run) ------------------ #
+def analyze_single_run_amplitude(subject: str = "sub-087", run: str = "1", channel: str = "EEG1") -> dict:
+    """Load one processed run (e.g. data/ds006366_processed/sub-087/1/EEG1.npy) and compute epoch-level amplitude statistics.
+
+    Returns a dictionary with arrays and summary stats.
+    """
+    run_dir = PROCESSED_ROOT / subject / run
+    eeg_path = run_dir / f"{channel}.npy"
+    labels_path = run_dir / "labels.npy"
+    if not eeg_path.exists():
+        raise FileNotFoundError(f"EEG file not found: {eeg_path}")
+    if not labels_path.exists():
+        raise FileNotFoundError(f"labels.npy not found: {labels_path}")
+    eeg = np.load(eeg_path)
+    labels = np.load(labels_path)
+    n_epochs = len(labels)
+    if eeg.ndim == 2 and eeg.shape[0] < 10:  # channels x samples
+        eeg_sig = eeg[0]
+    else:
+        eeg_sig = eeg
+    total_samples = eeg_sig.shape[-1]
+    samples_per_epoch = total_samples // n_epochs
+    if samples_per_epoch * n_epochs != total_samples:
+        raise ValueError("Samples do not divide evenly by number of epochs")
+    epochs = eeg_sig.reshape(n_epochs, samples_per_epoch)
+    epoch_std = epochs.std(axis=1)  # uV
+    epoch_ptp = (epochs.max(axis=1) - epochs.min(axis=1))  # peak-to-peak
+    stats = {
+        "subject": subject,
+        "run": run,
+        "channel": channel,
+        "n_epochs": n_epochs,
+        "samples_per_epoch": samples_per_epoch,
+        "mean_std_uV": float(epoch_std.mean()),
+        "median_std_uV": float(np.median(epoch_std)),
+        "std_of_std_uV": float(epoch_std.std(ddof=1)),
+        "min_std_uV": float(epoch_std.min()),
+        "max_std_uV": float(epoch_std.max()),
+        "p25_std_uV": float(np.percentile(epoch_std, 25)),
+        "p75_std_uV": float(np.percentile(epoch_std, 75)),
+        "mean_ptp_uV": float(epoch_ptp.mean()),
+        "median_ptp_uV": float(np.median(epoch_ptp)),
+    }
+    # Plot epoch std over epochs
+    fig, ax = plt.subplots(figsize=(10,4))
+    ax.plot(np.arange(n_epochs), epoch_std, lw=0.8)
+    ax.set_xlabel("Epoch index")
+    ax.set_ylabel("Amplitude (std, uV)")
+    ax.set_title(f"Epoch amplitude (std) {subject} {run} {channel}")
+    ax.grid(alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(OUTPUT_DIR / f"{subject}_{run}_{channel}_epoch_std.png", dpi=150)
+    plt.close(fig)
+    # Histogram of epoch std
+    fig, ax = plt.subplots(figsize=(6,4))
+    sns.histplot(epoch_std, bins=30, kde=True, ax=ax)
+    ax.set_xlabel("Epoch std (uV)")
+    ax.set_title(f"Distribution of epoch std {subject} {run} {channel}")
+    fig.tight_layout()
+    fig.savefig(OUTPUT_DIR / f"{subject}_{run}_{channel}_epoch_std_hist.png", dpi=150)
+    plt.close(fig)
+    # Save stats
+    with open(OUTPUT_DIR / f"{subject}_{run}_{channel}_amplitude_stats.txt", "w") as f:
+        for k,v in stats.items():
+            f.write(f"{k}: {v}\n")
+        f.write("Recommended base_amplitude (mean std uV): %.3f\n" % stats["mean_std_uV"])
+    return {"epoch_std": epoch_std, "epoch_ptp": epoch_ptp, "stats": stats}
+
+
 
 def main():
     participants = load_participants()
@@ -416,6 +486,13 @@ def main():
         bout_stats.to_csv(OUTPUT_DIR / "bout_stats.csv", index=False)
         plot_bout_metrics(bout_stats)
         plot_bout_size_distribution(stage_df, mapping)
+
+    # ---- Processed data: single-run amplitude analysis (sub-087 run 1) ---- #
+    try:
+        amplitude_result = analyze_single_run_amplitude(subject="sub-087", run="1", channel="EEG1")
+        print("Amplitude stats (uV):", amplitude_result["stats"])
+    except Exception as e:
+        print("Amplitude analysis skipped:", e)
 
     # Basic textual report
     with open(OUTPUT_DIR / "README.txt", "w") as f:

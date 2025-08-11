@@ -11,6 +11,8 @@ dependencies = [
     "numpy",
     "matplotlib",
     "seaborn",
+    "pyedflib>=0.1.42",
+    "scipy",
 ]
 
 [tool.uv.sources]
