@@ -1,4 +1,6 @@
 import numpy as np
+from pathlib import Path
+import numpy as np
 
 def _load_npy_1d(path, dtype=None):
     """Load a .npy file and return a 1D numpy array (raveled if needed)."""
@@ -184,7 +186,8 @@ def _normalize_curve(y: np.ndarray, f: np.ndarray, mode: str) -> np.ndarray:
     if mode is None or mode == "none":
         return y
     if mode == "area":
-        area = np.trapz(y, f)
+        # Use newer numpy integration function (trapz deprecated)
+        area = np.trapezoid(y, f)
         return y / area if area > 0 else y
     if mode == "max":
         m = np.max(y)
@@ -204,6 +207,7 @@ def plot_stage_psd_comparison(
     annotate_bands: bool = True,   # draw canonical EEG band boundaries
     save_path: Optional[str] = None,
     show: bool = True,
+    close: bool = False,
 ):
     """
     Plot multiple averaged PSDs for different sleep stages.
@@ -247,7 +251,7 @@ def plot_stage_psd_comparison(
     if fmin >= fmax:
         raise ValueError("band must satisfy fmin < fmax.")
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(12, 5))
 
     for item in spectra:
         if not all(k in item for k in ("name", "f", "psd_avg")):
@@ -320,6 +324,8 @@ def plot_stage_psd_comparison(
         fig.savefig(save_path, bbox_inches="tight", dpi=150)
     if show:
         plt.show()
+    if close:
+        plt.close(fig)
 
     return fig, ax
 
@@ -388,7 +394,7 @@ def _band_integral_linear_psd(f: np.ndarray, psd: np.ndarray, a: float, b: float
             fi2[-1] = bb
             pi2[-1] = p_bb
 
-    return float(np.trapz(pi2, fi2))
+    return float(np.trapezoid(pi2, fi2))
 
 def _bandpowers_from_psd(
     f: np.ndarray,
@@ -415,6 +421,7 @@ def plot_stage_bandpowers(
     title: Optional[str] = "Bandpower by Sleep Stage",
     save_path: Optional[str] = None,
     show: bool = True,
+    close: bool = False,
 ):
     """
     Compute and plot (relative or absolute) bandpowers per sleep stage from spectra.
@@ -466,7 +473,7 @@ def plot_stage_bandpowers(
     x = np.arange(n_bands)
     width = 0.8 / max(1, n_stages)
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(12, 5))
     for i in range(n_stages):
         ax.bar(x + i * width, M[i], width=width, label=stage_names[i])
 
@@ -483,37 +490,102 @@ def plot_stage_bandpowers(
         fig.savefig(save_path, bbox_inches="tight", dpi=150)
     if show:
         plt.show()
+    if close:
+        plt.close(fig)
 
     return fig, ax, values
 
 
 
 if __name__ == "__main__":
-    
-    segments_by_label,indices_by_label = split_eeg_by_label(
-        eeg_path="data/ds006366_processed/sub-001/1/EEG1.npy",
-        labels_path="data/ds006366_processed/sub-001/1/labels.npy",
-    )
-    
+    # Mapping from numeric stage codes to human-readable names
     NAME_MAP = {
         1: 'Wake',
         2: 'NREM',
         3: 'REM'
     }
-    
-    stage_frequency_map = []
-    for stage in segments_by_label:
-        if stage == 4:
-            continue
-        f, psd_avg = average_psd(signals=segments_by_label[stage], fs=128, n_fft=128)
-        stage_frequency_map.append(
-            {
-                "name": NAME_MAP[stage],
-                "f": f,
-                "psd_avg": psd_avg
-            }
-        )
-    
-    plot_stage_psd_comparison(spectra=stage_frequency_map)
-    
-    plot_stage_bandpowers(spectra=stage_frequency_map)
+
+    # Root directory for subjectwise outputs
+    subjectwise_root = Path("results/data_exploration/subjectwise")
+    subjectwise_root.mkdir(parents=True, exist_ok=True)
+
+    base = Path("data") / "ds006366_processed"
+    for subj_dir in sorted(base.glob("sub-*")):
+        subj_id = subj_dir.name
+        subject_dir = subjectwise_root / subj_id
+        runs_dir = subject_dir / "runs"
+        runs_dir.mkdir(parents=True, exist_ok=True)
+
+        per_stage_segments_agg = {}
+
+        # Iterate runs for this subject
+        for run_dir in sorted(subj_dir.glob("*")):
+            if not run_dir.is_dir():
+                continue
+            eeg_file = run_dir / "EEG1.npy"
+            labels_file = run_dir / "labels.npy"
+            if not eeg_file.exists() or not labels_file.exists():
+                continue
+            try:
+                segs, _ = split_eeg_by_label(eeg_file, labels_file, as_lists=False)
+            except Exception as e:
+                print(f"Skipping {run_dir} due to error: {e}")
+                continue
+            # Build per-run stage frequency map
+            run_stage_frequency_map = []
+            for stage_code, seg_list in segs.items():
+                if stage_code == 4 or not seg_list:  # skip Artifact
+                    continue
+                per_stage_segments_agg.setdefault(stage_code, []).extend(seg_list)
+                f_run, psd_run = average_psd(signals=seg_list, fs=128, n_fft=512)
+                run_stage_frequency_map.append({
+                    "name": NAME_MAP.get(stage_code, f"Stage{stage_code}"),
+                    "f": f_run,
+                    "psd_avg": psd_run
+                })
+            if run_stage_frequency_map:
+                plot_stage_psd_comparison(
+                    spectra=run_stage_frequency_map,
+                    save_path=str(runs_dir / f"{subj_id}_{run_dir.name}_psd.png"),
+                    title=f"Sleep Stage Spectra ({subj_id} run {run_dir.name})",
+                    show=False,
+                    close=True
+                )
+                plot_stage_bandpowers(
+                    spectra=run_stage_frequency_map,
+                    save_path=str(runs_dir / f"{subj_id}_{run_dir.name}_bandpowers.png"),
+                    title=f"Bandpower by Sleep Stage ({subj_id} run {run_dir.name})",
+                    show=False,
+                    close=True
+                )
+
+        # Aggregated subject plots
+        if per_stage_segments_agg:
+            subj_stage_frequency_map = []
+            for stage_code, seg_list in per_stage_segments_agg.items():
+                if not seg_list:
+                    continue
+                f_agg, psd_agg = average_psd(signals=seg_list, fs=128, n_fft=512)
+                subj_stage_frequency_map.append({
+                    "name": NAME_MAP.get(stage_code, f"Stage{stage_code}"),
+                    "f": f_agg,
+                    "psd_avg": psd_agg
+                })
+            if subj_stage_frequency_map:
+                plot_stage_psd_comparison(
+                    spectra=subj_stage_frequency_map,
+                    save_path=str(subject_dir / f"{subj_id}_aggregated_psd.png"),
+                    title=f"Sleep Stage Spectra ({subj_id} aggregated)",
+                    show=False,
+                    close=True
+                )
+                plot_stage_bandpowers(
+                    spectra=subj_stage_frequency_map,
+                    save_path=str(subject_dir / f"{subj_id}_aggregated_bandpowers.png"),
+                    title=f"Bandpower by Sleep Stage ({subj_id} aggregated)",
+                    show=False,
+                    close=True
+                )
+        else:
+            print(f"No valid segments for {subj_id}; skipping aggregated plots.")
+
