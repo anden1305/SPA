@@ -22,6 +22,14 @@ STAGE_MAP = {
     4: "Artifact"
 }
 
+LAB_EEG_PLACEMENTS = {
+    'lab_1': ['EEG IFPD'],
+    'lab_2': ['EEG P', 'EEG P', 'EEG F', 'EEG F'],
+    'lab_3': ['EEG P', 'EEG F'],
+    'lab_4': ['EEG PFCF'],
+    'lab_5': ['EEG P', 'EEG F']
+}
+
 def get_participant_data():
     participants_path = DATA_ROOT / "participants.tsv"
     participants_df = pd.read_csv(participants_path, sep="\t")
@@ -164,6 +172,10 @@ def extract_data(participant_data: pd.DataFrame):
         eeg3 = pd.notna(participant['EEG3'])
         eeg4 = pd.notna(participant['EEG4'])
         emg = pd.notna(participant['EMG'])
+        eeg_type_1 = LAB_EEG_PLACEMENTS[lab][0] if eeg1 else None
+        eeg_type_2 = LAB_EEG_PLACEMENTS[lab][1] if eeg2 else None
+        eeg_type_3 = LAB_EEG_PLACEMENTS[lab][2] if eeg3 else None
+        eeg_type_4 = LAB_EEG_PLACEMENTS[lab][3] if eeg4 else None
         for i in range(num_runs):
             run = i+1
             new_path = NEW_DATA_DIR / participant_id / str(run)
@@ -194,6 +206,10 @@ def extract_data(participant_data: pd.DataFrame):
                     'EEG3': eeg3,
                     'EEG4': eeg4,
                     'EMG': emg,
+                    'EEG1_TYPE': eeg_type_1,
+                    'EEG2_TYPE': eeg_type_2,
+                    'EEG3_TYPE': eeg_type_3,
+                    'EEG4_TYPE': eeg_type_4,
                     'path': str(new_path),
                 }
             )

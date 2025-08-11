@@ -1,0 +1,14 @@
+Metric,Value,Description
+Sampling Interval,4 seconds,Temporal resolution of downsampled labels for transition analysis
+Total Transitions,"184,445.0",Total number of time points analyzed (4-second intervals)
+Total Stage Changes,"9,328.0",Number of actual stage transitions (excluding self-transitions)
+Change Rate,5.06%,Percentage of time points with stage changes
+Recordings Analyzed,13,Number of recordings included in analysis
+Awake Stability,0.966,Probability of staying in Awake stage
+Awake → Most Likely,NREM (0.707),Most likely transition from Awake when change occurs
+NREM Stability,0.957,Probability of staying in NREM stage
+NREM → Most Likely,Awake (0.498),Most likely transition from NREM when change occurs
+REM Stability,0.929,Probability of staying in REM stage
+REM → Most Likely,Awake (0.680),Most likely transition from REM when change occurs
+Artifact Stability,0.663,Probability of staying in Artifact stage
+Artifact → Most Likely,NREM (0.496),Most likely transition from Artifact when change occurs
