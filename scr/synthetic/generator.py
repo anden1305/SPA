@@ -65,6 +65,29 @@ from pathlib import Path
 import json
 import numpy as np
 
+"""
+HOW IT WORKS:
+Here's how the raw EEG is created:
+
+For each epoch, the code generates a signal by summing multiple sinusoids 
+(based on n_components_per_epoch), each sinusoid having a frequency sampled 
+from a chosen frequency bin (defined in frequency_bins), and a random phase.
+
+So each component picks 1 bin (based on the frequency_bins) and uniformly samples a
+frequency within that bin. It also samples a random phase so that the sinusoids start 
+at different points in time.
+
+The signal is then scaled based on the band power (weight) for that stage and 
+the base_amplitude.
+
+Then, the final signal is obtained by summing all the individual components.
+Normalisation occurs after this step, based on the chosen normalization_mode.
+
+Each epoch is synthesized independently, which makes it have hard boundaries between epochs.
+This means that transitions between stages (e.g., from NREM to REM) are not gradual but rather abrupt, 
+reflecting the discrete nature of sleep stage changes.
+"""
+
 # --------------------------- Default Config ---------------------------------- #
 DEFAULT_CONFIG: Dict[str, Any] = {
     # Match paper: resampled to 128 Hz, 4-s epochs
@@ -89,15 +112,27 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         [40.0, 50.0], # gamma mid
         [50.0, 60.0], # gamma high (note: mains artifact separately at 50 Hz)
     ],
-    # Relative band power prototypes per stage (unnormalized weights ok).
-    # Based on qualitative description: REM high theta, low delta; WAKE high gamma; NREM stronger in mid/high frequencies but low in high-beta / gamma extremes per note.
-    "stage_band_powers": {
-    # delta, theta, alpha, sigma, betaL, betaH, gL, gM, gH
-    # Similar to a weighting
-    # Make it automatically grab these numbers from EEG_fine_grained_band_power.csv 
-    "AWAKE": [0.76, 0.484, 0.168, 0.0344, 0.0344, 0.0344, 0.00263, 0.0026, 0.0026],
+    # stage_band_powers now represent RELATIVE AMPLITUDE PROTOTYPES per stage (NOT probabilities).
+    # A separate optional mapping 'stage_bin_selection_probs' can provide sampling probabilities over bins.
+    # If 'stage_bin_selection_probs' is absent, probabilities are inferred by normalizing these amplitudes (backward compatible).
+    "stage_band_powers": {  # amplitude prototypes per bin: delta..gammaH
+        "AWAKE": [0.76, 0.484, 0.168, 0.0344, 0.0344, 0.0344, 0.00263, 0.0026, 0.0026],
         "NREM": [0.035, 0.0178, 0.0078, 0.00139, 0.00139, 0.00139, 0.000088, 0.000088, 0.000088],
         "REM":  [0.017, 0.032, 0.0132, 0.00246, 0.00246, 0.00246, 0.0001, 0.0001, 0.0001],
+    },
+    # Optional explicit per-stage selection probabilities (same length as frequency_bins). Uncomment & fill to override.
+    # Below we provide a concrete default separating selection probability from amplitude:
+    # - AWAKE: softer (sqrt-based) distribution to keep some diversity while reflecting amplitude trend.
+    # - NREM: mirrored (strong delta dominance) to emphasize slow waves.
+    # - REM: mirrored to highlight theta dominance.
+    # Each list corresponds to bins: [delta, theta, alpha, sigma, betaL, betaH, gammaL, gammaM, gammaH].
+    "stage_bin_selection_probs": {
+        # AWAKE probs (derived ~ sqrt(amplitudes) then normalized)
+        "AWAKE": [0.324, 0.259, 0.153, 0.069, 0.069, 0.069, 0.019, 0.019, 0.019],
+        # NREM probs (directly proportional to amplitudes)
+        "NREM":  [0.538, 0.274, 0.120, 0.021, 0.021, 0.021, 0.001, 0.001, 0.001],
+        # REM probs (directly proportional to amplitudes)
+        "REM":   [0.243, 0.458, 0.189, 0.035, 0.035, 0.035, 0.001, 0.001, 0.001],
     },
     # How many sinusoids to generate per epoch - number of bands clearly represented in an epoch
     # - 1-2 would be unreasonably simple and 15+ would be very complex
@@ -108,6 +143,8 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     #   'global'   -> scale entire sequence once (preserves relative epoch differences)
     #   'none'     -> no normalization (raw mixture amplitudes)
     "normalization_mode": "global",  # 'per_epoch'|'global'|'none'
+    # Generation mode: 'epoch' (independent epochs, random phases) | 'continuous' (phase continuity across epochs)
+    "generation_mode": "epoch", # 'continuous'
     # Post-synthesis preprocessing (disabled by default). Enable by setting bandpass and/or median_iqr_scale True.
     "preprocess": {
         "bandpass": None,        # e.g. [0.3, 35.0]
@@ -189,16 +226,37 @@ class SyntheticSleepGenerator:
         self.transition_matrix = tm
         self.frequency_bins: List[Tuple[float, float]] = [tuple(b) for b in self.config["frequency_bins"]]
         self.n_bins = len(self.frequency_bins)
-        self.stage_band_powers: Dict[str, np.ndarray] = {}
-        for stage, weights in self.config["stage_band_powers"].items():
+        # Amplitude prototypes (non-normalized) per stage
+        self.stage_band_amplitudes: Dict[str, np.ndarray] = {}
+        raw_amp_cfg = self.config.get("stage_band_powers", {})  # keep key name for backward compatibility
+        for stage, amps in raw_amp_cfg.items():
             if stage not in self.stage_to_int:
                 raise ValueError(f"Stage {stage} in stage_band_powers not in stages list")
-            if len(weights) != self.n_bins:
-                raise ValueError(f"Stage {stage} has {len(weights)} weights but expected {self.n_bins}")
-            self.stage_band_powers[stage] = _normalize(weights)
+            if len(amps) != self.n_bins:
+                raise ValueError(f"Stage {stage} has {len(amps)} amplitudes but expected {self.n_bins}")
+            arr = np.asarray(amps, dtype=float)
+            if np.any(arr < 0):
+                raise ValueError("Amplitude prototypes must be non-negative")
+            if not np.any(arr > 0):
+                raise ValueError("At least one amplitude per stage must be > 0")
+            self.stage_band_amplitudes[stage] = arr
+        # Selection probabilities (explicit or inferred by normalizing amplitudes)
+        self.stage_bin_selection_probs: Dict[str, np.ndarray] = {}
+        explicit_sel = self.config.get("stage_bin_selection_probs")
+        if explicit_sel is not None:
+            for stage, probs in explicit_sel.items():
+                if stage not in self.stage_to_int:
+                    raise ValueError(f"Stage {stage} in stage_bin_selection_probs not in stages list")
+                if len(probs) != self.n_bins:
+                    raise ValueError(f"Stage {stage} selection probs length {len(probs)} != {self.n_bins}")
+                self.stage_bin_selection_probs[stage] = _normalize(probs)
+        else:
+            for stage, arr in self.stage_band_amplitudes.items():
+                self.stage_bin_selection_probs[stage] = _normalize(arr)
         self.n_components = int(self.config.get("n_components_per_epoch", 6))
         self.base_amplitude = float(self.config.get("base_amplitude", 10.0))
         self.normalization_mode = self.config.get("normalization_mode", "global")
+        self.generation_mode = self.config.get("generation_mode", "epoch")
         self.noise_cfg = self.config.get("noise", {})
         self.emg_cfg = self.config.get("emg", {})
         self.mains_cfg = self.config.get("mains_artifact", {})
@@ -246,10 +304,21 @@ class SyntheticSleepGenerator:
             exists in the configured stage list; if not present it falls back
             to a uniform random initial stage (previous behaviour).
         """
+        # Dispatch if continuous mode requested
+        if getattr(self, "generation_mode", "epoch") == "continuous":
+            return self._generate_continuous_phase(
+                epochs=epochs,
+                initial_stage=initial_stage,
+                clean=clean,
+                save=save,
+                save_dir=save_dir,
+                prefix=prefix,
+            )
+
         labels = self._sample_state_sequence(epochs, initial_stage)
         # Optionally force a clean generation (no noise, no artifact, no EMG)
         if clean:
-            prev_noise_enabled = self.noise_cfg.get("enabled", True)
+            prev_noise_enabled = self.noise_cfg.get("enabled", False)
             prev_mains_enabled = self.mains_cfg.get("enabled", False)
             prev_emg_enabled = self.emg_cfg.get("enabled", False)
             self.noise_cfg["enabled"] = False
@@ -261,6 +330,7 @@ class SyntheticSleepGenerator:
         emg = np.zeros_like(eeg) if self.emg_cfg.get("enabled", False) else None
         t = np.arange(self.samples_per_epoch) / self.sampling_rate
         raw_epochs = []  # store for possible global normalization
+
         for i, state_idx in enumerate(labels):
             stage = self.stages[state_idx]
             epoch_sig = self._synthesize_epoch(stage, t)
@@ -283,7 +353,13 @@ class SyntheticSleepGenerator:
             self.noise_cfg["enabled"] = prev_noise_enabled
             self.mains_cfg["enabled"] = prev_mains_enabled
             self.emg_cfg["enabled"] = prev_emg_enabled
+        # Epoch-wise matrix (epochs, samples) kept for higher-level feature extraction.
         out = {"eeg": eeg, "labels": labels}
+        # Additionally create a continuous flattened raw signal that can directly feed a
+        # sample-level HMM (obs_dim = 1). We provide both 1D and 2D variants.
+        continuous = eeg.reshape(-1)  # (epochs * samples_per_epoch,)
+        out["eeg_raw"] = continuous
+        out["eeg_raw_2d"] = continuous[:, None]  # (T,1)
         if emg is not None:
             out["emg"] = emg
         out["metadata"] = {
@@ -297,9 +373,9 @@ class SyntheticSleepGenerator:
             save_path.mkdir(parents=True, exist_ok=True)
             np.save(save_path / f"{prefix}_eeg.npy", eeg)
             np.save(save_path / f"{prefix}_labels.npy", labels)
+            np.save(save_path / f"{prefix}_eeg_raw.npy", continuous)
             # metadata JSON (ensure serializable)
             meta = out["metadata"].copy()
-            # Remove potentially large objects or non-serializable entries
             with open(save_path / f"{prefix}_metadata.json", "w") as f:
                 json.dump(meta, f, indent=2)
         return out
@@ -339,16 +415,18 @@ class SyntheticSleepGenerator:
 
     def _synthesize_epoch(self, stage: str, t: np.ndarray) -> np.ndarray:
         # Sum of sinusoids sampled from stage-specific band distribution.
-        weights = self.stage_band_powers[stage]
+        sel_probs = self.stage_bin_selection_probs[stage]
+        amp_proto = self.stage_band_amplitudes[stage]
+        max_amp = amp_proto.max() if amp_proto.size else 1.0
         signal = np.zeros_like(t)
         for _ in range(self.n_components):
-            bin_idx = self.rng.choice(self.n_bins, p=weights)
+            bin_idx = self.rng.choice(self.n_bins, p=sel_probs)
             f_low, f_high = self.frequency_bins[bin_idx]
             freq = self.rng.uniform(f_low, f_high)
             phase = self.rng.uniform(0, 2 * np.pi)
-            # Amplitude scaling: base * (weight percentile-ish) + jitter
-            amp_scale = weights[bin_idx] / weights.max()
-            amplitude = self.base_amplitude * (0.6 + 0.4 * amp_scale) * self.rng.uniform(0.8, 1.2)
+            # Amplitude purely from prototype (relative to max) * jitter * base_amplitude
+            amp_scale = (amp_proto[bin_idx] / max_amp) if max_amp > 0 else 0.0
+            amplitude = self.base_amplitude * amp_scale * self.rng.uniform(0.8, 1.2)
             signal += amplitude * np.sin(2 * np.pi * freq * t + phase)
         # Optional noise components
         if self.noise_cfg.get("enabled", True):
@@ -410,6 +488,125 @@ class SyntheticSleepGenerator:
             else:
                 eeg = eeg - med
         return eeg
+
+    # ---------------- Continuous Generation ----------------- #
+    def _generate_continuous_phase(
+        self,
+        epochs: int,
+        initial_stage: str | None,
+        clean: bool,
+        save: bool,
+        save_dir: str | Path,
+        prefix: str,
+    ) -> Dict[str, Any]:
+        """Generate continuous signal with phase continuity across epochs.
+
+        Approach:
+          - Sample state sequence (epochs).
+          - Maintain persistent phases for each of n_components oscillators.
+          - For each epoch, each component samples a bin (selection probs) and a frequency inside it.
+          - Phase offset for each component carried over for continuity.
+          - Noise (colored + white) added over entire sequence (unless clean).
+        """
+        """Phase continuity explanation:
+        Each oscillator/component keeps a running phase value stored in the 'phases' array.
+        For an epoch of duration T_epoch with sampled frequency f_c, the phase increment is
+            Δφ_c = 2π f_c * T_epoch.
+        After synthesizing the samples for that epoch we advance phases[c] by Δφ_c (mod 2π).
+        The next epoch's sinusoid for that component starts at this updated phase, so the
+        instantaneous value at the boundary equals the final value of the previous epoch,
+        preventing discontinuities. If frequency changes between epochs the waveform's
+        instantaneous phase is still continuous; only its instantaneous frequency (slope
+        of phase) changes at the boundary. This mimics natural gradual drifts while
+        avoiding artificial hard resets present in independent-epoch synthesis.
+        """
+        labels = self._sample_state_sequence(epochs, initial_stage)
+        if clean:
+            prev_noise_enabled = self.noise_cfg.get("enabled", False)
+            prev_mains_enabled = self.mains_cfg.get("enabled", False)
+            prev_emg_enabled = self.emg_cfg.get("enabled", False)
+            self.noise_cfg["enabled"] = False
+            self.mains_cfg["enabled"] = False
+            self.emg_cfg["enabled"] = False
+        else:
+            prev_noise_enabled = prev_mains_enabled = prev_emg_enabled = None
+        total_samples = epochs * self.samples_per_epoch
+        t_global = np.arange(total_samples) / self.sampling_rate
+        signal = np.zeros(total_samples)
+        phases = self.rng.uniform(0, 2 * np.pi, size=self.n_components)
+        epoch_duration = self.epoch_length_s
+        emg = np.zeros((epochs, self.samples_per_epoch), dtype=float) if self.emg_cfg.get("enabled", False) else None
+        for e in range(epochs):
+            stage = self.stages[labels[e]]
+            sel_probs = self.stage_bin_selection_probs[stage]
+            amp_proto = self.stage_band_amplitudes[stage]
+            max_amp = amp_proto.max() if amp_proto.size else 1.0
+            start = e * self.samples_per_epoch
+            end = start + self.samples_per_epoch
+            t_seg = t_global[start:end]
+            bin_indices = self.rng.choice(self.n_bins, size=self.n_components, p=sel_probs, replace=True)
+            freqs = np.array([
+                self.rng.uniform(self.frequency_bins[b][0], self.frequency_bins[b][1]) for b in bin_indices
+            ])
+            amp_scales = np.where(max_amp > 0, amp_proto[bin_indices] / max_amp, 0.0)
+            amplitudes = self.base_amplitude * amp_scales * self.rng.uniform(0.8, 1.2, size=self.n_components)
+            for c in range(self.n_components):
+                signal[start:end] += amplitudes[c] * np.sin(2 * np.pi * freqs[c] * t_seg + phases[c])
+                phases[c] = (phases[c] + 2 * np.pi * freqs[c] * epoch_duration) % (2 * np.pi)
+            if emg is not None:
+                emg[e] = self._synthesize_emg(stage)
+        if self.noise_cfg.get("enabled", True):
+            beta = float(self.noise_cfg.get("colored_beta", 1.0))
+            colored = _colored_noise(total_samples, beta, self.rng)
+            colored *= float(self.noise_cfg.get("colored_scale", 1.0))
+            white = self.rng.normal(0, float(self.noise_cfg.get("gaussian_std", 1.0)), size=total_samples)
+            signal += colored + white
+        if self.mains_cfg.get("enabled", False):
+            mains_freq = float(self.mains_cfg.get("frequency", 50.0))
+            mains_amp = float(self.mains_cfg.get("amplitude", 5.0))
+            signal += mains_amp * np.sin(2 * np.pi * mains_freq * t_global)
+        if self.normalization_mode == "per_epoch":
+            eeg_epochs = signal.reshape(epochs, self.samples_per_epoch).copy()
+            for e in range(epochs):
+                std = eeg_epochs[e].std()
+                if std > 0:
+                    eeg_epochs[e] = eeg_epochs[e] / std * self.base_amplitude
+            signal = eeg_epochs.reshape(-1)
+        elif self.normalization_mode == "global":
+            std = signal.std()
+            if std > 0:
+                signal = signal / std * self.base_amplitude
+        eeg_epochs = signal.reshape(epochs, self.samples_per_epoch)
+        eeg_epochs = self._postprocess(eeg_epochs)
+        continuous = eeg_epochs.reshape(-1)
+        out = {
+            "eeg": eeg_epochs,
+            "labels": labels,
+            "eeg_raw": continuous,
+            "eeg_raw_2d": continuous[:, None],
+            "metadata": {
+                "stages": self.stages,
+                "frequency_bins": self.frequency_bins,
+                "mode": "continuous",
+                "config_used": self.config,
+            },
+        }
+        if emg is not None:
+            out["emg"] = emg
+        if clean:
+            self.noise_cfg["enabled"] = prev_noise_enabled
+            self.mains_cfg["enabled"] = prev_mains_enabled
+            self.emg_cfg["enabled"] = prev_emg_enabled
+        if save:
+            save_path = Path(save_dir)
+            save_path.mkdir(parents=True, exist_ok=True)
+            np.save(save_path / f"{prefix}_eeg.npy", eeg_epochs)
+            np.save(save_path / f"{prefix}_labels.npy", labels)
+            np.save(save_path / f"{prefix}_eeg_raw.npy", continuous)
+            meta = out["metadata"].copy()
+            with open(save_path / f"{prefix}_metadata.json", "w") as f:
+                json.dump(meta, f, indent=2)
+        return out
 
 
 __all__ = ["SyntheticSleepGenerator", "DEFAULT_CONFIG"]
