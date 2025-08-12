@@ -127,16 +127,13 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     # - REM: mirrored to highlight theta dominance.
     # Each list corresponds to bins: [delta, theta, alpha, sigma, betaL, betaH, gammaL, gammaM, gammaH].
     "stage_bin_selection_probs": {
-        # AWAKE probs (derived ~ sqrt(amplitudes) then normalized)
-        "AWAKE": [0.324, 0.259, 0.153, 0.069, 0.069, 0.069, 0.019, 0.019, 0.019],
-        # NREM probs (directly proportional to amplitudes)
-        "NREM":  [0.538, 0.274, 0.120, 0.021, 0.021, 0.021, 0.001, 0.001, 0.001],
-        # REM probs (directly proportional to amplitudes)
-        "REM":   [0.243, 0.458, 0.189, 0.035, 0.035, 0.035, 0.001, 0.001, 0.001],
+        "AWAKE": [1/9] * 9,
+        "NREM":  [1/9] * 9,
+        "REM":   [1/9] * 9,
     },
     # How many sinusoids to generate per epoch - number of bands clearly represented in an epoch
     # - 1-2 would be unreasonably simple and 15+ would be very complex
-    "n_components_per_epoch": 5,
+    "n_components_per_epoch": 20,
     "base_amplitude": 1.0,  # Target global std in microvolts (before scaling)
     # How to normalize amplitudes after synthesis:
     #   'per_epoch' -> each epoch individually scaled to have std ~= base_amplitude (old behavior)
@@ -613,6 +610,6 @@ __all__ = ["SyntheticSleepGenerator", "DEFAULT_CONFIG"]
 
 if __name__ == "__main__":  # Simple default generation & save
     gen = SyntheticSleepGenerator(DEFAULT_CONFIG, seed=42)
-    data = gen.generate(epochs=5000, save=True, prefix="synthetic_default", clean=False)
+    data = gen.generate(epochs=10000, save=True, prefix="synthetic_default", clean=False)
     print("Saved synthetic dataset (128 Hz, 4-s epochs, no preprocessing) to data/synthetic with prefix 'synthetic_default'.")
     print("EEG shape:", data["eeg"].shape, "Labels distribution:", {int(i):int((data['labels']==i).sum()) for i in np.unique(data['labels'])})
