@@ -70,7 +70,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     # Match paper: resampled to 128 Hz, 4-s epochs
     "sampling_rate_hz": 128,
     "epoch_length_s": 4,
-    "stages": ["WAKE", "NREM", "REM"],  # label integers will follow this order
+    "stages": ["AWAKE", "NREM", "REM"],  # label integers will follow this order
     # Simple example: strong self‑transitions (80%), equal prob to others (10%, 10%)
     "transition_matrix": [
         [0.80, 0.10, 0.10],  # WAKE -> (W, N, R)
@@ -92,16 +92,17 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     # Relative band power prototypes per stage (unnormalized weights ok).
     # Based on qualitative description: REM high theta, low delta; WAKE high gamma; NREM stronger in mid/high frequencies but low in high-beta / gamma extremes per note.
     "stage_band_powers": {
-        # delta, theta, alpha, sigma, betaL, betaH, gL, gM, gH
-        # Similar to a weighting
-        "WAKE": [3.6, 1.8, 2.2, 2.0, 2.4, 2.6, 3.0, 3.1, 3.2],
-        "NREM": [3.0, 2.0, 1.5, 1.6, 1.2, 1.0, 0.8, 0.7, 0.6],
-        "REM":  [0.8, 3.6, 2.0, 1.7, 1.4, 1.3, 1.2, 1.1, 1.0],
+    # delta, theta, alpha, sigma, betaL, betaH, gL, gM, gH
+    # Similar to a weighting
+    # Make it automatically grab these numbers from EEG_fine_grained_band_power.csv 
+    "AWAKE": [0.76, 0.484, 0.168, 0.0344, 0.0344, 0.0344, 0.00263, 0.0026, 0.0026],
+        "NREM": [0.035, 0.0178, 0.0078, 0.00139, 0.00139, 0.00139, 0.000088, 0.000088, 0.000088],
+        "REM":  [0.017, 0.032, 0.0132, 0.00246, 0.00246, 0.00246, 0.0001, 0.0001, 0.0001],
     },
     # How many sinusoids to generate per epoch - number of bands clearly represented in an epoch
     # - 1-2 would be unreasonably simple and 15+ would be very complex
     "n_components_per_epoch": 5,
-    "base_amplitude": 20.0,  # Target global std in microvolts (before scaling)
+    "base_amplitude": 1.0,  # Target global std in microvolts (before scaling)
     # How to normalize amplitudes after synthesis:
     #   'per_epoch' -> each epoch individually scaled to have std ~= base_amplitude (old behavior)
     #   'global'   -> scale entire sequence once (preserves relative epoch differences)
@@ -234,6 +235,16 @@ class SyntheticSleepGenerator:
           <save_dir>/<prefix>_eeg.npy
           <save_dir>/<prefix>_labels.npy
           <save_dir>/<prefix>_metadata.json
+        
+        Parameters
+        ----------
+        epochs : int
+            Number of epochs to synthesize.
+        initial_stage : str | None
+            Force the initial sleep stage. If None (default) the generator now
+            attempts to start in 'WAKE' (case-insensitive) when that stage
+            exists in the configured stage list; if not present it falls back
+            to a uniform random initial stage (previous behaviour).
         """
         labels = self._sample_state_sequence(epochs, initial_stage)
         # Optionally force a clean generation (no noise, no artifact, no EMG)
@@ -295,11 +306,30 @@ class SyntheticSleepGenerator:
 
     # --------------------- Internals ---------------------- #
     def _sample_state_sequence(self, epochs: int, initial_stage: str | None) -> np.ndarray:
+        # Resolve initial stage. If caller supplies one, accept case-insensitively.
+        # If none supplied, prefer 'WAKE' if available; else fall back to previous
+        # behaviour (uniform random start).
         if initial_stage is None:
-            # Start from stationary approx by uniform choice (simple) – can be improved.
-            current = self.rng.integers(0, len(self.stages))
+            start_key = None
+            for s in self.stages:
+                if s.lower() in ("wake", "awake"):
+                    start_key = s
+                    break
+            if start_key is not None:
+                current = self.stage_to_int[start_key]
+            else:
+                current = self.rng.integers(0, len(self.stages))
         else:
-            current = self.stage_to_int[initial_stage]
+            # Case-insensitive lookup
+            lowered = {s.lower(): s for s in self.stages}
+            lookup = str(initial_stage).lower()
+            # Accept 'wake' as alias for 'awake' for backward compatibility
+            if lookup == "wake" and "awake" in lowered:
+                lookup = "awake"
+            key = lowered.get(lookup)
+            if key is None:
+                raise ValueError(f"Initial stage '{initial_stage}' not found in stages {self.stages}")
+            current = self.stage_to_int[key]
         labels = np.empty(epochs, dtype=int)
         for i in range(epochs):
             labels[i] = current
@@ -339,9 +369,11 @@ class SyntheticSleepGenerator:
 
     def _synthesize_emg(self, stage: str) -> np.ndarray:
         std_map = {
-            "WAKE": float(self.emg_cfg.get("wake_std", 10.0)),
+            "AWAKE": float(self.emg_cfg.get("wake_std", 10.0)),  # key renamed from WAKE -> AWAKE
             "REM": float(self.emg_cfg.get("rem_std", 4.0)),
             "NREM": float(self.emg_cfg.get("nrem_std", 6.0)),
+            # Backward compatibility if someone passes 'WAKE' explicitly
+            "WAKE": float(self.emg_cfg.get("wake_std", 10.0)),
         }
         std = std_map.get(stage, 5.0)
         # EMG as high‑frequency noise bandpassed synthetic (simplified as white noise) + mains artifact if any.
@@ -384,6 +416,6 @@ __all__ = ["SyntheticSleepGenerator", "DEFAULT_CONFIG"]
 
 if __name__ == "__main__":  # Simple default generation & save
     gen = SyntheticSleepGenerator(DEFAULT_CONFIG, seed=42)
-    data = gen.generate(epochs=512, save=True, prefix="synthetic_default", clean=False)
+    data = gen.generate(epochs=5000, save=True, prefix="synthetic_default", clean=False)
     print("Saved synthetic dataset (128 Hz, 4-s epochs, no preprocessing) to data/synthetic with prefix 'synthetic_default'.")
     print("EEG shape:", data["eeg"].shape, "Labels distribution:", {int(i):int((data['labels']==i).sum()) for i in np.unique(data['labels'])})

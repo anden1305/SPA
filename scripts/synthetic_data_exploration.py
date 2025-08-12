@@ -12,6 +12,7 @@ import numpy as np
 from pathlib import Path
 import matplotlib.pyplot as plt
 import seaborn as sns
+from typing import Iterable, Tuple, Optional
 
 SAVE_DIR = Path("data") / "synthetic"
 RESULTS = Path("results") / "synthetic_exploration"
@@ -90,27 +91,154 @@ def epoch_std_distribution(eeg: np.ndarray):
     plt.close()
     np.savetxt(RESULTS / "epoch_std_summary.txt", [stds.mean(), np.median(stds), stds.min(), stds.max()], header="mean,median,min,max")
 
-def mean_power_spectrum(eeg: np.ndarray, labels: np.ndarray, meta: dict):
-    sr = meta.get("sampling_rate_hz", meta.get("config_used", {}).get("sampling_rate_hz", 1))
+def _compute_epoch_psd(eeg: np.ndarray, sr: float) -> Tuple[np.ndarray, np.ndarray]:
+    """Compute simple per-epoch power spectra using FFT (power = |FFT|^2).
+
+    Returns
+    -------
+    freqs : (F,) array
+        Frequency bins (Hz)
+    psds : (E, F) array
+        Power spectrum per epoch
+    """
     n = eeg.shape[1]
-    freqs = np.fft.rfftfreq(n, d=1/sr)
+    freqs = np.fft.rfftfreq(n, d=1 / sr)
+    fft_vals = np.fft.rfft(eeg, axis=1)
+    psd = (np.abs(fft_vals) ** 2) / n  # simple normalization
+    return freqs, psd
+
+
+def _spectral_confidence(psds: Iterable[np.ndarray], alpha: float = 0.05) -> Tuple[np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
+    """Compute mean and (1-alpha) confidence interval across a collection of PSD arrays.
+
+    Parameters
+    ----------
+    psds : iterable of (F,) arrays OR a 2D array (N,F)
+    alpha : float
+        Significance level (default 0.05 gives 95% CI)
+    """
+    psds_arr = np.asarray(psds)
+    if psds_arr.ndim == 1:
+        psds_arr = psds_arr[None, :]
+    mean = psds_arr.mean(axis=0)
+    n = psds_arr.shape[0]
+    if n < 2:
+        return mean, None, None
+    # Normal approximation
+    std = psds_arr.std(axis=0, ddof=1)
+    from math import sqrt
+    z = 1.96  # for ~95%
+    half_width = z * std / sqrt(n)
+    return mean, np.clip(mean - half_width, a_min=0, a_max=None), mean + half_width
+
+
+def mean_power_spectrum(eeg: np.ndarray, labels: np.ndarray, meta: dict):
+    """Create a detailed multi-panel PSD analysis with confidence intervals.
+
+    Panels:
+      (0,0) Log-scale PSD 0.5-50 Hz
+      (0,1) Linear 0.5-10 Hz detail
+      (1,0) Linear 10-50 Hz detail
+      (1,1) Normalized PSD 0.5-50 Hz
+    """
+    sr = meta.get("sampling_rate_hz", meta.get("config_used", {}).get("sampling_rate_hz", 1))
     stages = meta.get("stages", [])
-    plt.figure(figsize=(7,4))
+    if eeg.ndim != 2:
+        raise ValueError("Expected eeg shape (epochs, samples)")
+
+    freqs, all_psd = _compute_epoch_psd(eeg, sr)
+
+    # Collect per-stage psds
+    stage_psds = {}
     for idx, stage in enumerate(stages):
         mask = labels == idx
-        if not mask.any():
+        if mask.any():
+            stage_psds[stage] = all_psd[mask]
+
+    if not stage_psds:
+        print("No stage PSD data found; skipping detailed PSD plot")
+        return
+
+    fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+    fig.suptitle('Detailed Power Spectral Density by Sleep Stage (with 95% CI)', fontsize=16, fontweight='bold')
+
+    # Consistent ordering based on appearance in meta
+    ordered_stages = [s for s in stages if s in stage_psds]
+    palette = sns.color_palette("tab10", n_colors=len(ordered_stages))
+    colors = {s: c for s, c in zip(ordered_stages, palette)}
+
+    def _mask_range(lo, hi):
+        return (freqs >= lo) & (freqs <= hi)
+
+    # Plot 1: log-scale 0.5-50 Hz
+    ax = axes[0, 0]
+    freq_mask_main = _mask_range(0.5, 50)
+    for stage in ordered_stages:
+        mean_psd, ci_lo, ci_hi = _spectral_confidence(stage_psds[stage])
+        color = colors[stage]
+        ax.semilogy(freqs[freq_mask_main], mean_psd[freq_mask_main], label=stage, color=color, linewidth=2)
+        if ci_lo is not None:
+            ax.fill_between(freqs[freq_mask_main], ci_lo[freq_mask_main], ci_hi[freq_mask_main], color=color, alpha=0.2)
+    ax.set_xlabel('Frequency (Hz)')
+    ax.set_ylabel('Power Spectral Density (log)')
+    ax.set_title('Average PSD with 95% CI (0.5-50 Hz)', fontweight='bold')
+    ax.grid(True, alpha=0.3)
+    ax.legend()
+
+    # Plot 2: 0.5-10 Hz linear
+    ax = axes[0, 1]
+    freq_mask_low = _mask_range(0.5, 10)
+    for stage in ordered_stages:
+        mean_psd, ci_lo, ci_hi = _spectral_confidence(stage_psds[stage])
+        color = colors[stage]
+        ax.plot(freqs[freq_mask_low], mean_psd[freq_mask_low], label=stage, color=color, linewidth=2)
+        if ci_lo is not None:
+            ax.fill_between(freqs[freq_mask_low], ci_lo[freq_mask_low], ci_hi[freq_mask_low], color=color, alpha=0.2)
+    ax.set_xlabel('Frequency (Hz)')
+    ax.set_ylabel('Power Spectral Density')
+    ax.set_title('Low Frequency Detail 0.5-10 Hz (95% CI)', fontweight='bold')
+    ax.grid(True, alpha=0.3)
+
+    # Plot 3: 10-50 Hz linear
+    ax = axes[1, 0]
+    freq_mask_high = _mask_range(10, 50)
+    for stage in ordered_stages:
+        mean_psd, ci_lo, ci_hi = _spectral_confidence(stage_psds[stage])
+        color = colors[stage]
+        ax.plot(freqs[freq_mask_high], mean_psd[freq_mask_high], label=stage, color=color, linewidth=2)
+        if ci_lo is not None:
+            ax.fill_between(freqs[freq_mask_high], ci_lo[freq_mask_high], ci_hi[freq_mask_high], color=color, alpha=0.2)
+    ax.set_xlabel('Frequency (Hz)')
+    ax.set_ylabel('Power Spectral Density')
+    ax.set_title('High Frequency Detail 10-50 Hz (95% CI)', fontweight='bold')
+    ax.grid(True, alpha=0.3)
+
+    # Plot 4: Normalized PSD 0.5-50 Hz
+    ax = axes[1, 1]
+    norm_psds = {}
+    for stage in ordered_stages:
+        # Normalize each epoch within mask range
+        epoch_psds = stage_psds[stage][:, freq_mask_main]
+        totals = epoch_psds.sum(axis=1, keepdims=True)
+        valid = totals[:, 0] > 0
+        if not valid.any():
             continue
-        spec = np.abs(np.fft.rfft(eeg[mask], axis=1))**2
-        mean_spec = spec.mean(axis=0)
-        plt.plot(freqs, mean_spec, label=stage)
-    plt.xlim(0, 60)
-    plt.xlabel("Frequency (Hz)")
-    plt.ylabel("Power (a.u.)")
-    plt.title("Mean power spectrum per stage")
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(RESULTS / "mean_power_spectrum.png", dpi=150)
-    plt.close()
+        norm_psds[stage] = epoch_psds[valid] / totals[valid]
+        mean_norm, ci_lo, ci_hi = _spectral_confidence(norm_psds[stage])
+        color = colors[stage]
+        ax.plot(freqs[freq_mask_main], mean_norm, label=stage, color=color, linewidth=2)
+        if ci_lo is not None:
+            ax.fill_between(freqs[freq_mask_main], ci_lo, ci_hi, color=color, alpha=0.2)
+    ax.set_xlabel('Frequency (Hz)')
+    ax.set_ylabel('Normalized Power')
+    ax.set_title('Normalized PSD 0.5-50 Hz (95% CI)', fontweight='bold')
+    ax.grid(True, alpha=0.3)
+
+    plt.tight_layout(rect=[0, 0, 1, 0.97])
+    out_path = RESULTS / 'detailed_mean_power_spectrum.png'
+    plt.savefig(out_path, dpi=200)
+    plt.close(fig)
+    print(f"Detailed PSD figure saved to {out_path}")
 
 def main():
     eeg, labels, meta = load_run()
