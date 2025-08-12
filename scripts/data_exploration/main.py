@@ -1,59 +1,82 @@
-"""
-Main script for comprehensive data exploration of sleep EEG data.
-This script orchestrates all data exploration modules and generates
-a complete analysis of the dataset.
-"""
+"""Coordinator for sleep EEG data exploration analyses."""
 
 import sys
 import time
 from pathlib import Path
 
-# Add current directory to path for imports
-sys.path.append(str(Path(__file__).parent))
+# Ensure module path
+THIS_DIR = Path(__file__).parent
+if str(THIS_DIR) not in sys.path:
+    sys.path.insert(0, str(THIS_DIR))
 
-# Import exploration modules
+from eeg_placement_differences import analyze_eeg_placement_differences
+from interference_50hz import analyze_50hz_interference
+from stage_transitions import analyze_stage_transitions
+from stage_durations import analyze_stage_durations
+from artifact_characteristics import analyze_artifact_characteristics
+from lab_differences import analyze_lab_differences
 from stage_differences import analyze_stage_differences
+from participant_differences import analyze_participant_differences
+from dataset_overview import analyze_dataset_overview
+
 
 def main():
-    """
-    Main function to run complete data exploration.
-    """
     print("=" * 80)
     print("COMPREHENSIVE SLEEP EEG DATA EXPLORATION")
     print("=" * 80)
     print(f"Analysis started at: {time.strftime('%Y-%m-%d %H:%M:%S')}")
-    print()
-    
-    # Define output directory
-    output_dir = "results/data_exploration_2"
-    
+    output_dir = "results/data_exploration"
+
     try:
-        # 1. Analyze signal differences between sleep stages
-        print("📊 Starting Analysis 1: Signal Differences Between Sleep Stages")
+        # Overview (new)
+        print("\n" + "=" * 80)
+        print("📊 ANALYSIS 1/9: DATASET OVERVIEW")
+        print("=" * 80)
+        analyze_dataset_overview(output_dir)
+
+        # Example disabled analyses
         analyze_stage_differences(output_dir)
-        print("✅ Analysis 1 completed successfully!\n")
-        
-        # TODO: Add other analysis modules as they are implemented
-        # 2. analyze_participant_differences(output_dir)
-        # 3. analyze_lab_differences(output_dir)
-        # 4. analyze_eeg_placement_differences(output_dir)
-        # 5. analyze_50hz_interference(output_dir)
-        # 6. analyze_stage_transitions(output_dir)
-        # 7. analyze_stage_durations(output_dir)
-        
+        analyze_participant_differences(output_dir)
+        analyze_eeg_placement_differences(output_dir)
+        analyze_50hz_interference(output_dir=output_dir, exclude_lab1=False)
+
+        print("\n" + "=" * 80)
+        print("📊 ANALYSIS 5/9: LAB DIFFERENCES (incl. PSD)")
         print("=" * 80)
-        print("🎉 ALL DATA EXPLORATION COMPLETED SUCCESSFULLY!")
+        # Include lab_1 only for this analysis
+        analyze_lab_differences(output_dir=output_dir, participants_per_lab=10, exclude_lab1=False)
+
+        print("\n" + "=" * 80)
+        print("📊 ANALYSIS 6/9: STAGE TRANSITIONS")
         print("=" * 80)
-        print(f"Results saved to: {output_dir}")
-        print(f"Analysis completed at: {time.strftime('%Y-%m-%d %H:%M:%S')}")
-        
-    except Exception as e:
-        print(f"❌ Error during analysis: {e}")
+        analyze_stage_transitions(output_dir=output_dir, exclude_lab1=True)
+
+        print("\n" + "=" * 80)
+        print("📊 ANALYSIS 7/9: STAGE DURATIONS")
+        print("=" * 80)
+        analyze_stage_durations(output_dir=output_dir, exclude_lab1=True)
+
+        print("\n" + "=" * 80)
+        print("📊 ANALYSIS 8/9: ARTIFACT CHARACTERISTICS")
+        analyze_artifact_characteristics(output_dir=output_dir, exclude_lab1=True)
+
+        print("\n" + "=" * 80)
+        print("📊 ANALYSIS 9/9: (RESERVED / FUTURE)")
+        print("=" * 80)
+        # Placeholder for future analysis (kept for numbering consistency)
+    
+    except Exception as exc:
+        print(f"❌ Error during analysis: {exc}")
         print("Analysis terminated.")
         return 1
-    
+
+    print("=" * 80)
+    print("🎉 ALL DATA EXPLORATION COMPLETED SUCCESSFULLY!")
+    print("=" * 80)
+    print(f"Results saved to: {output_dir}")
+    print(f"Analysis completed at: {time.strftime('%Y-%m-%d %H:%M:%S')}")
     return 0
 
+
 if __name__ == "__main__":
-    exit_code = main()
-    sys.exit(exit_code)
+    raise SystemExit(main())

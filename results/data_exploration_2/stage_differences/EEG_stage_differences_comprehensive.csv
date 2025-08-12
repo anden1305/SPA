@@ -1,5 +1,0 @@
-,Mean Amplitude,Std Deviation,Variance,Skewness,Delta Power (abs),Theta Power (abs),Alpha Power (abs),Beta Power (abs),Gamma Power (abs),Delta Power (%),Theta Power (%),Alpha Power (%),Beta Power (%),Gamma Power (%),Total Power,Peak Frequency,Spectral Centroid,Spectral Bandwidth,50Hz Interference,60Hz Interference
-Awake,0.000161 ± 0.000885,0.000808,0.00001436,-0.2341,7.60e-01,4.84e-01,1.68e-01,3.44e-02,2.63e-03,0.2%,0.1%,0.0%,0.0%,0.0%,3.58e+02,3.08 Hz,7.42 Hz,8.41 Hz,2.13e-03,8.94e-04
-NREM,0.000157 ± 0.000860,0.000253,0.00000075,-0.0879,3.50e-02,1.78e-02,7.79e-03,1.39e-03,8.82e-05,0.2%,0.1%,0.0%,0.0%,0.0%,1.52e+01,1.72 Hz,5.92 Hz,6.42 Hz,4.02e-04,2.53e-05
-REM,0.000163 ± 0.000875,0.000200,0.00000061,-0.0405,1.69e-02,3.20e-02,1.32e-02,2.46e-03,1.00e-04,0.1%,0.1%,0.1%,0.0%,0.0%,1.73e+01,2.50 Hz,8.13 Hz,7.84 Hz,1.45e-04,5.34e-05
-Artifact,0.000909 ± 0.001825,0.002002,0.00001857,-0.3307,1.41e+00,4.90e-01,1.92e-01,3.71e-02,1.55e-03,0.3%,0.1%,0.0%,0.0%,0.0%,5.05e+02,0.31 Hz,3.93 Hz,5.00 Hz,1.30e-03,5.54e-04

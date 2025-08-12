@@ -1,0 +1,5 @@
+Sleep_Stage,Peak_Frequency_Band,Peak_Power,Total_Power_0_50Hz,Significant_Bands_Count,Significant_Bands
+Awake,1-2 Hz,9.064345e-03,2.562151e-02,5,"0-1 Hz, 1-2 Hz, 2-3 Hz, 3-4 Hz, 4-5 Hz"
+NREM,0-1 Hz,4.102585e-02,4.819858e-02,5,"0-1 Hz, 1-2 Hz, 2-3 Hz, 3-4 Hz, 4-5 Hz"
+REM,0-1 Hz,1.504711e-03,2.951690e-03,5,"0-1 Hz, 2-3 Hz, 6-7 Hz, 7-8 Hz, 8-9 Hz"
+Artifact,0-1 Hz,3.162364e-03,5.849408e-03,5,"0-1 Hz, 1-2 Hz, 2-3 Hz, 3-4 Hz, 4-5 Hz"

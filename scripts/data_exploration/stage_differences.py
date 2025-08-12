@@ -38,6 +38,11 @@ def analyze_stage_differences(output_dir="results/data_exploration_2"):
     
     # Load metadata to get representative samples
     metadata = load_metadata()
+    # Exclude lab_1 (outlier) from this analysis
+    initial_rows = metadata.shape[0]
+    metadata = metadata[metadata['lab'] != 'lab_1']
+    removed_rows = initial_rows - metadata.shape[0]
+    print(f"Excluded lab_1 from stage differences analysis (removed {removed_rows} records).")
     
     # Select representative participants from different labs for analysis
     selected_participants = []
@@ -108,6 +113,9 @@ def analyze_stage_differences(output_dir="results/data_exploration_2"):
     
     # Create detailed power spectral density analysis
     create_detailed_psd_analysis(all_eeg_stats, stage_output_dir)
+    
+    # Create fine-grained frequency band analysis (1 Hz bins)
+    create_fine_grained_band_analysis(all_eeg_stats, stage_output_dir)
     
     # Create transition matrix analysis
     create_transition_analysis(selected_participants, metadata, stage_output_dir)
@@ -236,7 +244,9 @@ def create_stage_difference_plots(stats_data, signal_type, output_dir):
     
     plt.tight_layout()
     plt.savefig(output_dir / f'{signal_type}_amplitude_characteristics.png', dpi=300, bbox_inches='tight')
-    plt.show()
+    plt.close()
+    # plt.close()
+    # plt.show()  # Disabled for automated analysis  # Disabled for automated analysis
 
 def create_frequency_domain_analysis(stats_data, output_dir):
     """
@@ -290,7 +300,9 @@ def create_frequency_domain_analysis(stats_data, output_dir):
     
     plt.tight_layout()
     plt.savefig(output_dir / 'EEG_absolute_power_bands.png', dpi=300, bbox_inches='tight')
-    plt.show()
+    plt.close()
+    # plt.close()
+    # plt.show()  # Disabled for automated analysis  # Disabled for automated analysis
     
     # 2. Relative Power Analysis
     fig, axes = plt.subplots(2, 3, figsize=(18, 12))
@@ -319,12 +331,16 @@ def create_frequency_domain_analysis(stats_data, output_dir):
     
     plt.tight_layout()
     plt.savefig(output_dir / 'EEG_relative_power_bands.png', dpi=300, bbox_inches='tight')
-    plt.show()
+    plt.close()
+    # plt.show()  # Disabled for automated analysis
     
-    # 3. Spectral Characteristics
+    # 4. Band Power Analysis
+    create_band_power_analysis(stats_data, output_dir)
+    
+    # 6. Spectral Characteristics
     create_spectral_characteristics_plot(stats_data, output_dir)
     
-    # 4. Interference Analysis
+    # 7. Interference Analysis
     create_interference_analysis(stats_data, output_dir)
 
 def create_combined_relative_power_plot(stats_data, ax):
@@ -362,6 +378,481 @@ def create_combined_relative_power_plot(stats_data, ax):
     ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     ax.grid(axis='y', alpha=0.3)
     ax.tick_params(axis='x', rotation=45)
+
+def create_band_power_analysis(stats_data, output_dir):
+    """
+    Create comprehensive band power analysis focusing on frequency band characteristics.
+    
+    Args:
+        stats_data (dict): Aggregated statistics data  
+        output_dir (Path): Output directory
+    """
+    if not stats_data:
+        return
+    
+    print("Creating comprehensive band power analysis...")
+    
+    # Use consistent stage ordering
+    stages = [stage for stage in STAGE_ORDER if stage in stats_data]
+    colors = [SLEEP_STAGE_COLORS[stage] for stage in stages]
+    
+    # Define frequency bands for analysis
+    bands = {
+        'Delta (0.5-4 Hz)': 'delta_power',
+        'Theta (4-8 Hz)': 'theta_power', 
+        'Alpha (8-12 Hz)': 'alpha_power',
+        'Beta (12-30 Hz)': 'beta_power',
+        'Gamma (30-100 Hz)': 'gamma_power'
+    }
+    
+    # 1. Band Power Distribution Overview
+    fig, axes = plt.subplots(2, 3, figsize=(18, 12))
+    fig.suptitle('EEG Band Power Analysis by Sleep Stage', fontsize=16, fontweight='bold')
+    
+    # Individual band power plots
+    for idx, (band_name, band_key) in enumerate(bands.items()):
+        row = idx // 3
+        col = idx % 3
+        ax = axes[row, col]
+        
+        if all(f'{band_key}_mean' in stats_data[stage] for stage in stages):
+            powers = [stats_data[stage][f'{band_key}_mean'] for stage in stages]
+            ci_lower = [stats_data[stage][f'{band_key}_ci_lower'] for stage in stages]
+            ci_upper = [stats_data[stage][f'{band_key}_ci_upper'] for stage in stages]
+            errors = [[powers[i] - ci_lower[i] for i in range(len(powers))],
+                     [ci_upper[i] - powers[i] for i in range(len(powers))]]
+            
+            bars = ax.bar(stages, powers, color=colors, alpha=0.8, edgecolor='black')
+            ax.errorbar(stages, powers, yerr=errors, fmt='none', color='black', capsize=5)
+            ax.set_title(f'{band_name} Power', fontweight='bold')
+            ax.set_ylabel('Band Power (µV²/Hz)')
+            ax.grid(axis='y', alpha=0.3)
+            ax.tick_params(axis='x', rotation=45)
+            
+            # Set y-axis to log scale for better visualization
+            ax.set_yscale('log')
+    
+    # Power ratios analysis
+    ax = axes[1, 2]
+    create_band_power_ratios_plot(stats_data, ax, stages, colors)
+    
+    plt.tight_layout()
+    plt.savefig(output_dir / 'EEG_band_power_analysis.png', dpi=300, bbox_inches='tight')
+    plt.close()
+    # plt.show()  # Disabled for automated analysis
+    
+    # 2. Band Power Comparisons
+    create_band_power_comparisons(stats_data, output_dir, stages, colors)
+    
+    # 3. Band Power Statistical Analysis
+    create_band_power_statistics(stats_data, output_dir, stages)
+
+def create_band_power_ratios_plot(stats_data, ax, stages, colors):
+    """Create analysis of band power ratios."""
+    # Calculate meaningful ratios
+    ratios = {}
+    ratio_names = []
+    
+    for stage in stages:
+        if all(f'{band}_mean' in stats_data[stage] for band in ['theta_power', 'delta_power', 'alpha_power', 'beta_power']):
+            # Common sleep research ratios
+            theta = stats_data[stage]['theta_power_mean']
+            delta = stats_data[stage]['delta_power_mean']
+            alpha = stats_data[stage]['alpha_power_mean'] 
+            beta = stats_data[stage]['beta_power_mean']
+            
+            if stage not in ratios:
+                ratios[stage] = []
+            
+            # Theta/Delta ratio (important for sleep staging)
+            ratios[stage].append(theta / delta if delta > 0 else 0)
+            
+            # Alpha/Theta ratio (arousal indicator)
+            ratios[stage].append(alpha / theta if theta > 0 else 0)
+            
+            # Beta/Alpha ratio (activation indicator)
+            ratios[stage].append(beta / alpha if alpha > 0 else 0)
+    
+    ratio_names = ['Theta/Delta', 'Alpha/Theta', 'Beta/Alpha']
+    
+    # Create grouped bar plot
+    x = np.arange(len(ratio_names))
+    width = 0.2
+    
+    for i, stage in enumerate(stages):
+        if stage in ratios:
+            ax.bar(x + i * width, ratios[stage], width, label=stage, 
+                  color=colors[i], alpha=0.8, edgecolor='black')
+    
+    ax.set_xlabel('Power Ratios')
+    ax.set_ylabel('Ratio Value')
+    ax.set_title('Band Power Ratios', fontweight='bold')
+    ax.set_xticks(x + width * (len(stages) - 1) / 2)
+    ax.set_xticklabels(ratio_names)
+    ax.legend()
+    ax.grid(axis='y', alpha=0.3)
+    ax.set_yscale('log')
+
+def create_band_power_comparisons(stats_data, output_dir, stages, colors):
+    """Create detailed band power comparison plots."""
+    fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+    fig.suptitle('Band Power Detailed Comparisons', fontsize=16, fontweight='bold')
+    
+    # 1. Low frequency bands (Delta vs Theta)
+    ax = axes[0, 0]
+    create_band_comparison_scatter(stats_data, ax, stages, colors, 
+                                  'delta_power', 'theta_power', 
+                                  'Delta Power', 'Theta Power')
+    
+    # 2. Mid frequency bands (Alpha vs Beta)
+    ax = axes[0, 1] 
+    create_band_comparison_scatter(stats_data, ax, stages, colors,
+                                  'alpha_power', 'beta_power',
+                                  'Alpha Power', 'Beta Power')
+    
+    # 3. Low vs High frequency (Delta vs Gamma)
+    ax = axes[1, 0]
+    create_band_comparison_scatter(stats_data, ax, stages, colors,
+                                  'delta_power', 'gamma_power', 
+                                  'Delta Power', 'Gamma Power')
+    
+    # 4. Band power distribution
+    ax = axes[1, 1]
+    create_band_power_distribution(stats_data, ax, stages, colors)
+    
+    plt.tight_layout()
+    plt.savefig(output_dir / 'EEG_band_power_comparisons.png', dpi=300, bbox_inches='tight')
+    plt.close()
+    # plt.show()  # Disabled for automated analysis
+
+def create_band_comparison_scatter(stats_data, ax, stages, colors, band1, band2, label1, label2):
+    """Create scatter plot comparing two frequency bands."""
+    for i, stage in enumerate(stages):
+        if f'{band1}_mean' in stats_data[stage] and f'{band2}_mean' in stats_data[stage]:
+            x_power = stats_data[stage][f'{band1}_mean']
+            y_power = stats_data[stage][f'{band2}_mean'] 
+            
+            # Use error bars from confidence intervals
+            x_err = stats_data[stage][f'{band1}_ci_upper'] - x_power
+            y_err = stats_data[stage][f'{band2}_ci_upper'] - y_power
+            
+            ax.errorbar(x_power, y_power, xerr=x_err, yerr=y_err,
+                       fmt='o', color=colors[i], label=stage, markersize=8,
+                       alpha=0.8, capsize=5)
+    
+    ax.set_xlabel(f'{label1} (µV²/Hz)')
+    ax.set_ylabel(f'{label2} (µV²/Hz)')
+    ax.set_title(f'{label1} vs {label2}', fontweight='bold')
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    ax.grid(True, alpha=0.3)
+    ax.legend()
+
+def create_band_power_distribution(stats_data, ax, stages, colors):
+    """Create normalized band power distribution plot."""
+    bands = ['delta_power', 'theta_power', 'alpha_power', 'beta_power', 'gamma_power']
+    band_labels = ['Delta', 'Theta', 'Alpha', 'Beta', 'Gamma']
+    
+    # Calculate total power for each stage
+    stage_totals = {}
+    for stage in stages:
+        if all(f'{band}_mean' in stats_data[stage] for band in bands):
+            total = sum(stats_data[stage][f'{band}_mean'] for band in bands)
+            stage_totals[stage] = total
+    
+    # Create normalized distribution
+    x = np.arange(len(stages))
+    width = 0.15
+    
+    for i, (band, label) in enumerate(zip(bands, band_labels)):
+        values = []
+        for stage in stages:
+            if stage in stage_totals and stage_totals[stage] > 0:
+                normalized_power = stats_data[stage][f'{band}_mean'] / stage_totals[stage] * 100
+                values.append(normalized_power)
+            else:
+                values.append(0)
+        
+        ax.bar(x + i * width, values, width, label=label, alpha=0.8)
+    
+    ax.set_xlabel('Sleep Stage')
+    ax.set_ylabel('Normalized Power Distribution (%)')
+    ax.set_title('Band Power Distribution by Stage', fontweight='bold')
+    ax.set_xticks(x + width * 2)
+    ax.set_xticklabels(stages)
+    ax.legend()
+    ax.grid(axis='y', alpha=0.3)
+
+def create_band_power_statistics(stats_data, output_dir, stages):
+    """Create comprehensive band power statistics table."""
+    print("Creating band power statistics...")
+    
+    bands = {
+        'Delta (0.5-4 Hz)': 'delta_power',
+        'Theta (4-8 Hz)': 'theta_power',
+        'Alpha (8-12 Hz)': 'alpha_power', 
+        'Beta (12-30 Hz)': 'beta_power',
+        'Gamma (30-100 Hz)': 'gamma_power'
+    }
+    
+    # Create comprehensive statistics table
+    stats_table = []
+    
+    for band_name, band_key in bands.items():
+        for stage in stages:
+            if f'{band_key}_mean' in stats_data[stage]:
+                stats_table.append({
+                    'Frequency_Band': band_name,
+                    'Sleep_Stage': stage,
+                    'Mean_Power': f"{stats_data[stage][f'{band_key}_mean']:.2e}",
+                    'Std_Power': f"{stats_data[stage][f'{band_key}_std']:.2e}",
+                    'CI_Lower': f"{stats_data[stage][f'{band_key}_ci_lower']:.2e}",
+                    'CI_Upper': f"{stats_data[stage][f'{band_key}_ci_upper']:.2e}",
+                    'Relative_Power': f"{stats_data[stage][f'{band_key}_rel_mean']*100:.2f}%"
+                })
+    
+    # Save to CSV
+    stats_df = pd.DataFrame(stats_table)
+    stats_df.to_csv(output_dir / 'EEG_band_power_statistics.csv', index=False)
+    print(f"Band power statistics saved to: {output_dir / 'EEG_band_power_statistics.csv'}")
+    
+    # Create summary statistics
+    create_band_power_summary(stats_data, output_dir, stages, bands)
+
+def create_band_power_summary(stats_data, output_dir, stages, bands):
+    """Create summary of key band power findings."""
+    summary = []
+    
+    # Overall band power ranking by stage
+    for stage in stages:
+        stage_powers = {}
+        for band_name, band_key in bands.items():
+            if f'{band_key}_mean' in stats_data[stage]:
+                stage_powers[band_name] = stats_data[stage][f'{band_key}_mean']
+        
+        # Find dominant band
+        if stage_powers:
+            dominant_band = max(stage_powers, key=stage_powers.get)
+            dominant_power = stage_powers[dominant_band]
+            
+            summary.append({
+                'Sleep_Stage': stage,
+                'Dominant_Band': dominant_band,
+                'Dominant_Power': f"{dominant_power:.2e}",
+                'Total_Power': f"{sum(stage_powers.values()):.2e}",
+                'Delta_Dominance': f"{stage_powers.get('Delta (0.5-4 Hz)', 0) / sum(stage_powers.values()) * 100:.1f}%",
+                'Theta_Dominance': f"{stage_powers.get('Theta (4-8 Hz)', 0) / sum(stage_powers.values()) * 100:.1f}%",
+                'Alpha_Dominance': f"{stage_powers.get('Alpha (8-12 Hz)', 0) / sum(stage_powers.values()) * 100:.1f}%",
+                'Beta_Dominance': f"{stage_powers.get('Beta (12-30 Hz)', 0) / sum(stage_powers.values()) * 100:.1f}%",
+                'Gamma_Dominance': f"{stage_powers.get('Gamma (30-100 Hz)', 0) / sum(stage_powers.values()) * 100:.1f}%"
+            })
+    
+    # Save summary
+    summary_df = pd.DataFrame(summary)
+    summary_df.to_csv(output_dir / 'EEG_band_power_summary.csv', index=False)
+    print(f"Band power summary saved to: {output_dir / 'EEG_band_power_summary.csv'}")
+
+def create_fine_grained_band_analysis(all_stats, output_dir):
+    """
+    Create fine-grained frequency band analysis with 1 Hz wide bands from 0-50 Hz.
+    
+    Args:
+        all_stats (dict): Raw statistics from all recordings containing PSD data
+        output_dir (Path): Output directory
+    """
+    print("Creating fine-grained frequency band analysis (1 Hz bands)...")
+    
+    # Collect PSD data for each stage
+    stage_psds = {}
+    stage_freqs = {}
+    
+    for recording_id, recording_stats in all_stats.items():
+        for stage, stage_stats in recording_stats.items():
+            if 'psd' in stage_stats and 'frequencies' in stage_stats:
+                if stage not in stage_psds:
+                    stage_psds[stage] = []
+                    stage_freqs[stage] = stage_stats['frequencies']
+                stage_psds[stage].append(stage_stats['psd'])
+    
+    if not stage_psds:
+        print("No PSD data available for fine-grained analysis.")
+        return
+    
+    # Use consistent stage ordering
+    stages = [stage for stage in STAGE_ORDER if stage in stage_psds]
+    colors = [SLEEP_STAGE_COLORS[stage] for stage in stages]
+    
+    # Define 1 Hz frequency bands from 0-50 Hz
+    freq_bands = [(i, i+1) for i in range(50)]  # [0-1], [1-2], ..., [49-50]
+    band_labels = [f"{i}-{i+1} Hz" for i in range(50)]
+    
+    # Calculate band power for each stage
+    stage_band_powers = {}
+    stage_band_errors = {}
+    
+    for stage in stages:
+        if stage in stage_psds:
+            # Calculate mean PSD and confidence intervals
+            psds = np.array(stage_psds[stage])
+            freqs = stage_freqs[stage]
+            
+            # Calculate band powers for each frequency band
+            band_powers = []
+            band_lower_ci = []
+            band_upper_ci = []
+            
+            for freq_min, freq_max in freq_bands:
+                # Find frequency indices for this band
+                freq_mask = (freqs >= freq_min) & (freqs < freq_max)
+                
+                if np.any(freq_mask):
+                    # Calculate band power for each recording
+                    band_power_values = []
+                    for psd in psds:
+                        band_power = np.mean(psd[freq_mask])
+                        band_power_values.append(band_power)
+                    
+                    # Calculate statistics
+                    mean_power = np.mean(band_power_values)
+                    std_power = np.std(band_power_values, ddof=1) if len(band_power_values) > 1 else 0
+                    
+                    # 95% confidence interval
+                    if len(band_power_values) > 1:
+                        t_stat = stats.t.ppf(0.975, len(band_power_values) - 1)
+                        margin_error = t_stat * std_power / np.sqrt(len(band_power_values))
+                        lower_ci = mean_power - margin_error
+                        upper_ci = mean_power + margin_error
+                    else:
+                        lower_ci = upper_ci = mean_power
+                    
+                    band_powers.append(mean_power)
+                    band_lower_ci.append(lower_ci)
+                    band_upper_ci.append(upper_ci)
+                else:
+                    # No data in this frequency range
+                    band_powers.append(0)
+                    band_lower_ci.append(0)
+                    band_upper_ci.append(0)
+            
+            stage_band_powers[stage] = band_powers
+            stage_band_errors[stage] = {
+                'lower': band_lower_ci,
+                'upper': band_upper_ci
+            }
+    
+    # Create the comprehensive plot
+    fig, ax = plt.subplots(1, 1, figsize=(20, 8))
+    fig.suptitle('Fine-Grained Frequency Band Power Analysis (1 Hz bands)', fontsize=16, fontweight='bold')
+    
+    # Set up the bar plot
+    x = np.arange(len(freq_bands))
+    width = 0.2
+    
+    for i, stage in enumerate(stages):
+        if stage in stage_band_powers:
+            powers = stage_band_powers[stage]
+            lower_ci = stage_band_errors[stage]['lower']
+            upper_ci = stage_band_errors[stage]['upper']
+            
+            # Calculate error bars
+            errors = [[powers[j] - lower_ci[j] for j in range(len(powers))],
+                     [upper_ci[j] - powers[j] for j in range(len(powers))]]
+            
+            # Create bars for this stage
+            bars = ax.bar(x + i * width, powers, width, label=stage, 
+                         color=colors[i], alpha=0.8, edgecolor='black', linewidth=0.5)
+            
+            # Add error bars
+            ax.errorbar(x + i * width, powers, yerr=errors, fmt='none', 
+                       color='black', capsize=2, linewidth=0.8, alpha=0.7)
+    
+    # Customize the plot
+    ax.set_xlabel('Frequency Band (Hz)', fontweight='bold')
+    ax.set_ylabel('Band Power (µV²/Hz)', fontweight='bold')
+    ax.set_title('Band Power Distribution Across 1 Hz Frequency Bands (0-50 Hz)', fontweight='bold')
+    ax.set_yscale('log')  # Log scale for better visualization
+    ax.grid(axis='y', alpha=0.3)
+    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    
+    # Set x-axis ticks and labels
+    tick_indices = range(0, 50, 5)  # Show every 5th frequency band
+    tick_labels = [f"{i}-{i+1}" for i in tick_indices]
+    ax.set_xticks([i + width * (len(stages) - 1) / 2 for i in tick_indices])
+    ax.set_xticklabels(tick_labels, rotation=45)
+    
+    # Add frequency range annotation
+    ax.text(0.02, 0.98, 'Frequency Range: 0-50 Hz (1 Hz bands)', 
+           transform=ax.transAxes, fontsize=10, verticalalignment='top',
+           bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+    
+    plt.tight_layout()
+    plt.savefig(output_dir / 'EEG_fine_grained_band_power_analysis.png', dpi=300, bbox_inches='tight')
+    plt.close()
+    # plt.show()  # Disabled for automated analysis
+    
+    # Save detailed results to CSV
+    create_fine_grained_band_csv(stage_band_powers, stage_band_errors, freq_bands, stages, output_dir)
+    
+    print(f"Fine-grained band analysis completed. Results saved to: {output_dir}")
+
+def create_fine_grained_band_csv(stage_band_powers, stage_band_errors, freq_bands, stages, output_dir):
+    """Save fine-grained band power results to CSV."""
+    print("Saving fine-grained band power results to CSV...")
+    
+    # Create comprehensive results table
+    results = []
+    
+    for i, (freq_min, freq_max) in enumerate(freq_bands):
+        band_name = f"{freq_min}-{freq_max} Hz"
+        
+        for stage in stages:
+            if stage in stage_band_powers:
+                results.append({
+                    'Frequency_Band': band_name,
+                    'Freq_Min_Hz': freq_min,
+                    'Freq_Max_Hz': freq_max,
+                    'Sleep_Stage': stage,
+                    'Mean_Power': f"{stage_band_powers[stage][i]:.6e}",
+                    'CI_Lower': f"{stage_band_errors[stage]['lower'][i]:.6e}",
+                    'CI_Upper': f"{stage_band_errors[stage]['upper'][i]:.6e}",
+                    'Power_uV2_Hz': stage_band_powers[stage][i]
+                })
+    
+    # Save to CSV
+    results_df = pd.DataFrame(results)
+    results_df.to_csv(output_dir / 'EEG_fine_grained_band_power_1Hz.csv', index=False)
+    print(f"Fine-grained band power results saved to: {output_dir / 'EEG_fine_grained_band_power_1Hz.csv'}")
+    
+    # Create summary statistics
+    summary_stats = []
+    for stage in stages:
+        if stage in stage_band_powers:
+            powers = stage_band_powers[stage]
+            # Find peak frequency band
+            max_power_idx = np.argmax(powers)
+            peak_freq_band = f"{max_power_idx}-{max_power_idx+1} Hz"
+            max_power = powers[max_power_idx]
+            
+            # Calculate total power across all bands
+            total_power = np.sum(powers)
+            
+            # Find frequency bands with significant power (top 10%)
+            power_threshold = np.percentile(powers, 90)
+            significant_bands = [i for i, p in enumerate(powers) if p >= power_threshold]
+            
+            summary_stats.append({
+                'Sleep_Stage': stage,
+                'Peak_Frequency_Band': peak_freq_band,
+                'Peak_Power': f"{max_power:.6e}",
+                'Total_Power_0_50Hz': f"{total_power:.6e}",
+                'Significant_Bands_Count': len(significant_bands),
+                'Significant_Bands': ', '.join([f"{i}-{i+1} Hz" for i in significant_bands[:5]])  # Show top 5
+            })
+    
+    # Save summary
+    summary_df = pd.DataFrame(summary_stats)
+    summary_df.to_csv(output_dir / 'EEG_fine_grained_band_power_summary.csv', index=False)
+    print(f"Fine-grained band power summary saved to: {output_dir / 'EEG_fine_grained_band_power_summary.csv'}")
 
 def create_spectral_characteristics_plot(stats_data, output_dir):
     """Create plots for spectral characteristics like peak frequency and centroid."""
@@ -412,7 +903,8 @@ def create_spectral_characteristics_plot(stats_data, output_dir):
     
     plt.tight_layout()
     plt.savefig(output_dir / 'EEG_spectral_characteristics.png', dpi=300, bbox_inches='tight')
-    plt.show()
+    plt.close()
+    # plt.show()  # Disabled for automated analysis
 
 def create_interference_analysis(stats_data, output_dir):
     """Create analysis of power line interference at 50Hz and 60Hz."""
@@ -450,7 +942,8 @@ def create_interference_analysis(stats_data, output_dir):
     
     plt.tight_layout()
     plt.savefig(output_dir / 'EEG_interference_analysis.png', dpi=300, bbox_inches='tight')
-    plt.show()
+    plt.close()
+    # plt.show()  # Disabled for automated analysis
 
 def create_detailed_psd_analysis(all_stats, output_dir):
     """
@@ -492,7 +985,7 @@ def create_detailed_psd_analysis(all_stats, output_dir):
             mean_psd, ci_lower, ci_upper = calculate_spectral_confidence_intervals(stage_psds[stage])
             freqs = stage_freqs[stage]
             # Limit to meaningful frequency range
-            freq_mask = (freqs >= 0.5) & (freqs <= 50)
+            freq_mask = (freqs >= 0.5) & (freqs <= 45)
             
             color = SLEEP_STAGE_COLORS[stage]
             ax.semilogy(freqs[freq_mask], mean_psd[freq_mask], 
@@ -505,7 +998,7 @@ def create_detailed_psd_analysis(all_stats, output_dir):
     
     ax.set_xlabel('Frequency (Hz)')
     ax.set_ylabel('Power Spectral Density (log scale)')
-    ax.set_title('Average PSD with 95% CI (0.5-50 Hz)', fontweight='bold')
+    ax.set_title('Average PSD with 95% CI (0.5-45 Hz)', fontweight='bold')
     ax.legend()
     ax.grid(True, alpha=0.3)
     
@@ -532,13 +1025,13 @@ def create_detailed_psd_analysis(all_stats, output_dir):
     ax.legend()
     ax.grid(True, alpha=0.3)
     
-    # Plot 3: High frequency detail (10-50 Hz) with confidence intervals
+    # Plot 3: High frequency detail (10-45 Hz) with confidence intervals
     ax = axes[1, 0]
     for stage in stages:
         if stage_psds[stage]:
             mean_psd, ci_lower, ci_upper = calculate_spectral_confidence_intervals(stage_psds[stage])
             freqs = stage_freqs[stage]
-            freq_mask = (freqs >= 10) & (freqs <= 50)
+            freq_mask = (freqs >= 10) & (freqs <= 45)
             
             color = SLEEP_STAGE_COLORS[stage]
             ax.plot(freqs[freq_mask], mean_psd[freq_mask], 
@@ -551,7 +1044,7 @@ def create_detailed_psd_analysis(all_stats, output_dir):
     
     ax.set_xlabel('Frequency (Hz)')
     ax.set_ylabel('Power Spectral Density')
-    ax.set_title('High Frequency Detail with 95% CI (10-50 Hz)', fontweight='bold')
+    ax.set_title('High Frequency Detail with 95% CI (10-45 Hz)', fontweight='bold')
     ax.legend()
     ax.grid(True, alpha=0.3)
     
@@ -563,7 +1056,7 @@ def create_detailed_psd_analysis(all_stats, output_dir):
             normalized_psds = []
             for psd in stage_psds[stage]:
                 freqs = stage_freqs[stage]
-                freq_mask = (freqs >= 0.5) & (freqs <= 50)
+                freq_mask = (freqs >= 0.5) & (freqs <= 45)
                 total_power = np.sum(psd[freq_mask])
                 if total_power > 0:
                     normalized_psds.append(psd[freq_mask] / total_power)
@@ -581,13 +1074,14 @@ def create_detailed_psd_analysis(all_stats, output_dir):
     
     ax.set_xlabel('Frequency (Hz)')
     ax.set_ylabel('Normalized Power Spectral Density')
-    ax.set_title('Normalized PSD with 95% CI (0.5-50 Hz)', fontweight='bold')
+    ax.set_title('Normalized PSD with 95% CI (0.5-45 Hz)', fontweight='bold')
     ax.legend()
     ax.grid(True, alpha=0.3)
     
     plt.tight_layout()
     plt.savefig(output_dir / 'EEG_detailed_psd_analysis_with_CI.png', dpi=300, bbox_inches='tight')
-    plt.show()
+    plt.close()
+    # plt.show()  # Disabled for automated analysis
 
 def create_comprehensive_summary_tables(eeg_stats, emg_stats, output_dir):
     """
@@ -836,7 +1330,8 @@ def create_transition_matrix_plots(transition_data, output_dir):
     
     plt.tight_layout()
     plt.savefig(output_dir / 'sleep_stage_transition_matrices.png', dpi=300, bbox_inches='tight')
-    plt.show()
+    plt.close()
+    # plt.show()  # Disabled for automated analysis
 
 def create_transition_statistics(transition_data, output_dir):
     """
