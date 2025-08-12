@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 import torch.nn as nn
 from torch import Tensor
+import torch
 
 
 class BaseLoss(ABC):

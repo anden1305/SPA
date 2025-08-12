@@ -7,16 +7,15 @@ from torch import Tensor
 
 
 class BaseModel(nn.Module, ABC):
-    """Documentation
-    
-    Abstract class for all models that are needed for this codebase.
+    """Common base class for models.
+
+    Currently only enforces that subclasses implement `forward`.
+    A concrete `__init__` is provided so calling `super().__init__()` is safe.
     """
-    
-    @abstractmethod
-    def __init__(self):
+
+    def __init__(self) -> None:  # not abstract; allow safe super() chain
         super().__init__()
-        raise NotImplementedError('This method has to be implemented.')
-    
+
     @abstractmethod
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor) -> Tensor:  # pragma: no cover - interface
         raise NotImplementedError('This method has to be implemented.')
