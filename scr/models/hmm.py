@@ -201,7 +201,7 @@ class HMM(BaseModel):
             data = data.unsqueeze(0)  # (1,T,D) for transition estimation
         else:
             raise ValueError("data must have shape (T,D) or (B,T,D)")
-
+        
         # K-means init
         idx = torch.randperm(flat.size(0), device=self.device)[:S]
         means = flat[idx].clone()
