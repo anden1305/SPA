@@ -356,7 +356,6 @@ class SyntheticSleepGenerator:
         # sample-level HMM (obs_dim = 1). We provide both 1D and 2D variants.
         continuous = eeg.reshape(-1)  # (epochs * samples_per_epoch,)
         out["eeg_raw"] = continuous
-        out["eeg_raw_2d"] = continuous[:, None]  # (T,1)
         if emg is not None:
             out["emg"] = emg
         out["metadata"] = {
@@ -580,7 +579,6 @@ class SyntheticSleepGenerator:
             "eeg": eeg_epochs,
             "labels": labels,
             "eeg_raw": continuous,
-            "eeg_raw_2d": continuous[:, None],
             "metadata": {
                 "stages": self.stages,
                 "frequency_bins": self.frequency_bins,

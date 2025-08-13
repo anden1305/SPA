@@ -179,74 +179,67 @@ class HMM(BaseModel):
         kmeans_iters: int = 15,
         estimate_transitions: bool = True,
     ) -> None:
-        """Data-driven (k-means) reinitialization.
+        """K-means based reinit of emissions (+ optional empirical pi/A).
 
-        Parameters
-        ----------
-        data : Tensor
-            Shape (T,D) or (B,T,D). Used to initialize means, variances, and (optionally) transitions.
-        kmeans_iters : int
-            Number of refinement iterations for the simple k-means.
-        estimate_transitions : bool
-            If True and data has temporal order, build empirical pi and A from cluster sequence.
+        data: (T,D) or (B,T,D)
+        kmeans_iters: refinement steps (0 -> only random init)
+        estimate_transitions: if True, build pi/A from cluster path(s)
         """
-        S, D = self.num_states, self.obs_dim
-        if data.dim() == 3:  # (B,T,D)
-            B, T, _ = data.shape
-            flat = data.reshape(-1, D).to(self.device)
-        elif data.dim() == 2:  # (T,D)
-            T = data.shape[0]
-            flat = data.to(self.device)
-            B = 1
-            data = data.unsqueeze(0)  # (1,T,D) for transition estimation
-        else:
+        if data.dim() == 2:  # (T,D)
+            data = data.unsqueeze(0)
+        if data.dim() != 3:
             raise ValueError("data must have shape (T,D) or (B,T,D)")
-        
-        # K-means init
-        idx = torch.randperm(flat.size(0), device=self.device)[:S]
-        means = flat[idx].clone()
-        for _ in range(max(1, kmeans_iters)):
-            d2 = (flat[:, None, :] - means[None, :, :]).pow(2).sum(-1)
-            assign = d2.argmin(dim=1)
-            for s in range(S):
-                mask = assign == s
-                if mask.any():
-                    means[s] = flat[mask].mean(0)
+        B, T, D = data.shape
+        S = self.num_states
+        if D != self.obs_dim:
+            raise ValueError("obs_dim mismatch")
+        device = self.device
+        flat = data.reshape(-1, D).to(device)
 
-        # Variance (shared across states -> replicate)
-        d2_final = (flat - means[assign]).pow(2)
-        var = d2_final.mean(0).clamp_min(1e-6)  # (D,)
+        # -------- K-means (simple, vectorized) --------
+        perm = torch.randperm(flat.size(0), device=device)
+        means = flat[perm[:S]].clone()
+        iters = max(0, int(kmeans_iters))
+        for _ in range(iters):
+            # assignment
+            assign = torch.cdist(flat, means).argmin(-1)  # (N,)
+            # update means (scatter-add then divide by counts)
+            counts = torch.bincount(assign, minlength=S).clamp_min(1)
+            new_means = torch.zeros_like(means)
+            new_means.scatter_add_(0, assign.unsqueeze(1).expand(-1, D), flat)
+            means = new_means / counts.unsqueeze(1)
+        if iters == 0:
+            # still need assignments for variance
+            assign = torch.cdist(flat, means).argmin(-1)
+
+        # shared variance, then replicate
+        resid = flat - means[assign]
+        var = resid.pow(2).mean(0).clamp_min(1e-6)  # (D,)
         self.emission_mean.copy_(means)
         self.emission_logvar.copy_(var.log().expand(S, D))
 
-        # Transitions / initial distribution
+        # -------- Transitions / initial --------
         if estimate_transitions:
-            # Recompute assignment respecting time order per sequence
-            # For efficiency, reuse means: assign each time step to nearest mean
-            with torch.no_grad():
-                data_bt = data.to(self.device)  # (B,T,D)
-                d2_bt = (data_bt.unsqueeze(2) - means.unsqueeze(0).unsqueeze(0)).pow(2).sum(-1)  # (B,T,S)
-                z = d2_bt.argmin(dim=-1)  # (B,T)
-            # Initial distribution
+            # per time-step assignment (B,T)
+            d2_bt = (data.to(device).unsqueeze(2) - means.view(1, 1, S, D)).pow(2).sum(-1)  # (B,T,S)
+            z = d2_bt.argmin(-1)  # (B,T)
+            # initial distribution
             pi_counts = torch.bincount(z[:, 0], minlength=S).float() + 1e-3
             pi = pi_counts / pi_counts.sum()
-            # Transition counts
-            trans_counts = torch.zeros(S, S, device=self.device)
-            for b in range(B):
-                prev = z[b, :-1]
-                nxt = z[b, 1:]
-                trans_counts.index_put_((prev, nxt), torch.ones_like(prev, dtype=trans_counts.dtype), accumulate=True)
-            trans_counts += 1e-3  # smoothing
+            # transitions (vectorized pair counting)
+            prev = z[:, :-1].reshape(-1)
+            nxt = z[:, 1:].reshape(-1)
+            joint_idx = prev * S + nxt
+            trans_counts = torch.bincount(joint_idx, minlength=S * S).float().reshape(S, S) + 1e-3
             A = trans_counts / trans_counts.sum(-1, keepdim=True)
         else:
-            pi = torch.full((S,), 1.0 / S, device=self.device)
-            A = torch.full((S, S), 1.0 / S, device=self.device)
+            pi = torch.full((S,), 1.0 / S, device=device)
+            A = torch.full((S, S), 1.0 / S, device=device)
 
         self.initial_logits.copy_(pi.clamp_min(1e-12).log())
         self.transition_logits.copy_(A.clamp_min(1e-12).log())
 
-        # Clear any stale grads
-        for p in self.parameters():
+        for p in self.parameters():  # clear stale grads
             if p.grad is not None:
                 p.grad.zero_()
 

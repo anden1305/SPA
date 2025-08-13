@@ -131,9 +131,9 @@ class BaseTrainer:
 				avg_loss = total_loss / max(1, total_samples)
 				if num_batches:
 					pct = (i / num_batches) * 100
-					print(f"  [Batch {i}/{num_batches} ({pct:5.1f}%)] loss={loss.item():.4f} avg={avg_loss:.4f}")
+					print(f"  [Batch {i}/{num_batches} ({pct:5.1f}%)] loss={loss.item():.6f} avg={avg_loss:.4f}")
 				else:
-					print(f"  [Batch {i}] loss={loss.item():.4f}")
+					print(f"  [Batch {i}] loss={loss.item():.6f}")
 
 		elapsed = time.time() - start_time
 		metrics = {
