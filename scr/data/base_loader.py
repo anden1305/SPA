@@ -32,6 +32,5 @@ class BaseLoader(ABC, Iterator):
     
     @abstractmethod
     def __next__(self) -> np.ndarray:
-        """Loads, preprocesses and returns the next batch of data."""
+        """Loads, transforms and returns the next batch of data."""
         raise NotImplementedError('This method has to be implemented.')
-
