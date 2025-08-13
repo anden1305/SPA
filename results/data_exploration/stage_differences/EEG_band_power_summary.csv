@@ -1,0 +1,5 @@
+Sleep_Stage,Dominant_Band,Dominant_Power,Total_Power,Delta_Dominance,Theta_Dominance,Alpha_Dominance,Beta_Dominance,Gamma_Dominance
+Awake,Delta (0.5-4 Hz),5.47e-03,6.25e-03,87.5%,9.3%,2.1%,0.4%,0.7%
+NREM,Delta (0.5-4 Hz),4.49e-03,4.97e-03,90.4%,6.6%,2.2%,0.5%,0.3%
+REM,Theta (4-8 Hz),1.40e-04,3.38e-04,32.0%,41.3%,23.0%,3.5%,0.3%
+Artifact,Delta (0.5-4 Hz),9.50e-04,1.16e-03,82.0%,13.2%,3.9%,1.0%,0.0%

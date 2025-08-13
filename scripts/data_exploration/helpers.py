@@ -184,8 +184,8 @@ def calculate_comprehensive_frequency_stats(signal, sampling_rate=128):
     freq_stats['beta_power'] = np.mean(avg_psd[(freqs >= 12) & (freqs <= 30)])
     freq_stats['gamma_power'] = np.mean(avg_psd[(freqs >= 30) & (freqs <= 100)])
     
-    # Specific interference frequencies
-    freq_stats['power_50hz'] = np.mean(avg_psd[(freqs >= 49) & (freqs <= 51)])
+    # Specific interference frequencies (narrow 50 Hz band per refined spec)
+    freq_stats['power_50hz'] = np.mean(avg_psd[(freqs >= 49.5) & (freqs <= 50.5)])
     freq_stats['power_60hz'] = np.mean(avg_psd[(freqs >= 59) & (freqs <= 61)])
     
     # Relative power (normalized by total power)
@@ -261,7 +261,7 @@ def plot_signal_statistics_comparison(stats_data, metric='mean', title_prefix='S
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         print(f"Plot saved to: {save_path}")
     
-    plt.show()
+    plt.close()  # Disabled for automated analysis
 
 def create_summary_table(stats_data, metrics=['mean', 'std', 'median'], save_path=None):
     """
@@ -409,7 +409,7 @@ def calculate_stage_transitions(labels):
         'total_changes': np.sum(change_only_counts)
     }
 
-def ensure_output_directory(output_dir="results/data_exploration_2"):
+def ensure_output_directory(output_dir="results/data_exploration"):
     """Ensure output directory exists."""
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     return output_dir
