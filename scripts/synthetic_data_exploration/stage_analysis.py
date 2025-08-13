@@ -239,7 +239,7 @@ def plot_episode_lengths(labels: np.ndarray, stages: list[str], out_dir: Path, e
 
 
 def plot_raw_eeg(eeg: np.ndarray, fs: int, stages: list[str], labels: np.ndarray, out_dir: Path,
-                 seconds: int = 40, show_labels: bool = True):
+                 seconds: int = 80, epoch_len_s: float | int = 4, show_labels: bool = True):
     """Plot a raw EEG excerpt with color-coded sleep stage backgrounds.
 
     Parameters
@@ -266,7 +266,7 @@ def plot_raw_eeg(eeg: np.ndarray, fs: int, stages: list[str], labels: np.ndarray
     ax.plot(time, sig, linewidth=0.8, color='black')
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Amplitude (µV)')
-    ax.set_title(f'Raw Synthetic EEG Excerpt ({seconds}s)')
+    ax.set_title(f'Raw Synthetic EEG Labelled Excerpt ({seconds}s)')
 
     ep_samples = len(eeg) // len(labels) if len(labels) else samples
     epoch_len_s = ep_samples / fs if ep_samples else 0
@@ -296,9 +296,56 @@ def plot_raw_eeg(eeg: np.ndarray, fs: int, stages: list[str], labels: np.ndarray
         ax.legend(handles=handles, loc='upper right', framealpha=0.85, title='Stage')
 
     ax.set_xlim(0, seconds)
+    # Epoch-based x ticks & vertical dotted lines (e.g., 4, 8, 12, ... seconds) if epoch length known
+    if epoch_len_s:
+        # Start ticks at one epoch length (exclude 0 as per request) up to the displayed seconds
+        max_tick = seconds + 1e-9  # numerical stability
+        tick_positions = np.arange(epoch_len_s, max_tick, epoch_len_s)
+        if len(tick_positions):
+            ax.set_xticks(tick_positions)
+            # Optional: ensure clean integer labels when appropriate
+            ax.set_xticklabels([f"{int(t)}" if float(t).is_integer() else f"{t:g}" for t in tick_positions])
+            for xt in tick_positions:
+                ax.axvline(xt, color='k', linestyle=':', linewidth=0.6, alpha=0.6)
     ax.grid(alpha=0.25, axis='y')
     fig.tight_layout()
     fig.savefig(out_dir / 'raw_eeg_excerpt.png', dpi=300)
+
+
+def plot_raw_eeg_clean(eeg: np.ndarray, fs: int, out_dir: Path, seconds: int = 80, epoch_len_s: float | int | None = None):
+    """Plot a raw EEG excerpt without any stage coloring or annotations.
+
+    Parameters
+    ----------
+    eeg : np.ndarray
+        Flattened 1-D EEG signal.
+    fs : int
+        Sampling frequency.
+    out_dir : Path
+        Output directory.
+    seconds : int, default 80
+        Duration to display from the start of the signal.
+    epoch_len_s : float | int | None
+        If provided, sets x-axis ticks every epoch length (e.g. 4 s) starting at that epoch length.
+    """
+    samples = seconds * fs
+    sig = eeg[:samples]
+    time = np.arange(samples) / fs
+    fig, ax = plt.subplots(figsize=(14, 3.5))
+    ax.plot(time, sig, linewidth=0.8, color='black')
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Amplitude (µV)')
+    ax.set_title(f'Raw Synthetic EEG Excerpt({seconds}s)')
+    ax.set_xlim(0, seconds)
+    if epoch_len_s and epoch_len_s > 0:
+        max_tick = seconds + 1e-9
+        tick_positions = np.arange(epoch_len_s, max_tick, epoch_len_s)
+        if len(tick_positions):
+            ax.set_xticks(tick_positions)
+            ax.set_xticklabels([f"{int(t)}" if float(t).is_integer() else f"{t:g}" for t in tick_positions])
+    ax.grid(alpha=0.25, axis='y')
+    fig.tight_layout()
+    fig.savefig(out_dir / 'raw_eeg_clean.png', dpi=300)
 
 
 def main():
@@ -355,7 +402,9 @@ def main():
     plot_transition_matrix(labels, stages, out_dir)
     plot_episode_lengths(labels, stages, out_dir, epoch_length_s)
     flat = eeg_epochs.reshape(-1)
-    plot_raw_eeg(flat, fs, stages, labels, out_dir)
+    plot_raw_eeg(flat, fs, stages, labels, out_dir, seconds=80, epoch_len_s=epoch_length_s, show_labels=False)
+    # Clean raw EEG (no stage backgrounds)
+    plot_raw_eeg_clean(flat, fs, out_dir, seconds=80, epoch_len_s=epoch_length_s)
 
     # Save summary JSON
     summary = {}

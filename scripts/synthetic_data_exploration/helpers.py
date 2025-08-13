@@ -10,7 +10,8 @@ plt.style.use('seaborn-v0_8')
 
 SYN_SLEEP_STAGE_COLORS = {
     'AWAKE': '#FF6B6B',
-    'NREM': '#4ECDC4',
+    # Changed to a more distinct green to increase contrast vs REM blue
+    'NREM': '#2E8B57',  # SeaGreen
     'REM': '#45B7D1',
 }
 STAGE_ORDER = ['AWAKE', 'NREM', 'REM']
