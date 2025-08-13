@@ -335,7 +335,7 @@ def plot_raw_eeg_clean(eeg: np.ndarray, fs: int, out_dir: Path, seconds: int = 8
     ax.plot(time, sig, linewidth=0.8, color='black')
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Amplitude (µV)')
-    ax.set_title(f'Raw Synthetic EEG Excerpt({seconds}s)')
+    ax.set_title(f'Raw Synthetic EEG Excerpt ({seconds}s)')
     ax.set_xlim(0, seconds)
     if epoch_len_s and epoch_len_s > 0:
         max_tick = seconds + 1e-9
