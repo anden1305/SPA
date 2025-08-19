@@ -6,7 +6,7 @@
 ##     REM often goes to Awake, smaller fractions to NREM.
 ##
 ## Generator stages order: 0=Awake, 1=NREM, 2=REM
-name: test
+name: realistic_sleep
 sampling_rate_hz: 128          # Close to dataset median (assumed 128 Hz)
 epoch_length_s: 4              # Standard PSG scoring epoch length
 n_epochs: 1000                   # ~3h20m of data (400*30s)
@@ -39,9 +39,9 @@ frequency_bins:
 # stage_band_powers: relative amplitude prototypes per stage per bin
 # Awake: higher alpha, some theta/beta. NREM: strong delta + sigma (spindles). REM: theta + some alpha, reduced delta.
 stage_band_powers:
-  - [0.10, 0.25, 0.10, 0.25, 0.30]   # Awake
-  - [0.60, 0.10, 0.15, 0.10, 0.05]   # NREM
-  - [0.10, 0.60, 0.10, 0.10, 0.10]   # REM
+  - [5.47e-03, 5.83e-04, 1.29e-04, 2.28e-05, 4.54e-05]   # Awake
+  - [4.49e-03, 3.29e-04, 1.10e-04, 2.24e-05, 1.65e-05]   # NREM
+  - [1.08e-04, 1.40e-04, 7.77e-05, 1.17e-05, 8.81e-07]   # REM
 
 # stage_bin_selection_probability: sampling probability for each frequency bin per stage (rows sum to 1)
 # Bias selection toward dominant bands per stage consistent with band powers.

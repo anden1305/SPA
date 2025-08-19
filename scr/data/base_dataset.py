@@ -20,5 +20,6 @@ class BaseDataset(ABC):
     @abstractmethod
     def __getitem__(self):
         """Loads and returns the next samples in the dataset."""
+        """Returns data as (x, y), where x is of shape (C, T) and y is of shape (T)"""
         raise NotImplementedError('This method has to be implemented.')
     

@@ -16,15 +16,27 @@ Config (YAML) required keys:
   transition_matrix: list[list[float]]  # n_stages x n_stages, rows sum to 1
   frequency_bins: list[[low, high]]     # Frequency bins (Hz)
   stage_band_powers: list[list[float]]  # shape (n_stages, n_bins) amplitude prototypes
-  stage_bin_selection_probability: list[list[float]] # shape (n_stages, n_bins) sampling probs per bin (rows sum to 1)
-  components_per_epoch: int      # Number of sinusoidal components per epoch
+    stage_bin_selection_probability: list[list[float]] # shape (n_stages, n_bins) sampling probs per bin (rows sum to 1)
+    components_per_epoch: int      # Number of sinusoidal components per epoch
+    stage_mean_amplitudes: list[float] (optional) # Per-stage mean (DC offset) added after synthesis & normalization
+    stage_rms_scales: list[float] (optional) # Per-stage scale applied after optional normalization
+    amplitude_jitter_range: [low, high] (optional, default [0.8,1.2])
+    normalize_epoch: bool (optional, default True) # If True, normalize each epoch to unit std before scaling
   seed: int (optional)           # Random seed
 
 Generation flow per epoch:
  1. Sample stage (uniform for first epoch, then Markov using transition_matrix)
  2. Sample bins for each component using stage-specific selection probability
  3. For each component sample a frequency uniformly in its bin, amplitude derived from stage_band_powers
- 4. Sum sinusoids to form epoch signal (phases continuous & signal value continuity enforced)
+ 4. Sum sinusoids to form epoch signal (phase continuity enforced across epochs)
+
+Optional continuity smoothing:
+    - To avoid visible value jumps between epochs without reintroducing DC drift,
+        we support a short linear fade ("de-click") at epoch boundaries controlled by overlap_s.
+        This linearly bridges the first samples of the new epoch to match the last value
+        of the previous epoch while preserving overall length.
+
+Note: Value-continuity shifting between epochs has been disabled to avoid baseline drift / DC offsets.
 
 Continuity:
   - We keep cumulative phase for each component index across epochs if the bin selected is the same.
@@ -62,6 +74,12 @@ class SimpleSyntheticEEGGenerator:
     stage_bin_probs: np.ndarray    # (S,B)
     components_per_epoch: int
     seed: int | None = None
+    jitter_low: float = 0.8
+    jitter_high: float = 1.2
+    stage_mean_offsets: np.ndarray | None = None  # (S,)
+    stage_rms_scales: np.ndarray | None = None    # (S,) per-stage post-normalization scale
+    normalize_epoch: bool = True                  # whether to normalize each epoch to unit std
+    overlap_samples: int = 0  # linear boundary smoothing window (samples); 0 disables
 
     def __post_init__(self):
         self.rng = np.random.default_rng(self.seed)
@@ -79,8 +97,18 @@ class SimpleSyntheticEEGGenerator:
             raise ValueError("Each row of stage_bin_selection_probability must sum to 1")
         if self.components_per_epoch <= 0:
             raise ValueError("components_per_epoch must be > 0")
+        if self.jitter_low <= 0 or self.jitter_high <= 0 or self.jitter_low > self.jitter_high:
+            raise ValueError("Invalid amplitude jitter range")
         self.samples_per_epoch = self.sampling_rate * self.epoch_length_s
         self.total_samples = self.samples_per_epoch * self.n_epochs
+        if self.stage_mean_offsets is None:
+            self.stage_mean_offsets = np.zeros(self.n_stages, dtype=float)
+        else:
+            if len(self.stage_mean_offsets) != self.n_stages:
+                raise ValueError("stage_mean_amplitudes length must equal n_stages")
+        if self.stage_rms_scales is not None:
+            if len(self.stage_rms_scales) != self.n_stages:
+                raise ValueError("stage_rms_scales length must equal n_stages")
 
         # For phase continuity we keep per-component phase and frequency arrays
         self._component_phases = np.zeros(self.components_per_epoch)
@@ -92,15 +120,23 @@ class SimpleSyntheticEEGGenerator:
         labels = self._sample_stage_sequence()
         eeg = np.zeros(self.total_samples, dtype=float)
         cursor = 0
-        prev_last_value = 0.0
+        # Value-continuity hard shift is disabled to avoid DC drift.
+        # Instead, apply a small linear smoothing at boundaries if configured.
+        prev_last_val = None
+        win_n = int(self.overlap_samples) if self.overlap_samples and self.overlap_samples > 0 else 0
         for epoch_idx, stage in enumerate(labels):
             epoch_sig = self._synthesize_epoch(stage)
-            # Shift entire epoch to ensure continuity of value
-            if epoch_idx > 0:
-                diff = prev_last_value - epoch_sig[0]
-                epoch_sig = epoch_sig + diff
+            if prev_last_val is not None and win_n > 0:
+                # Align first sample towards previous last sample and fade back to original over win_n samples
+                # Compute delta after normalization and mean-offset application (already inside _synthesize_epoch)
+                delta = float(epoch_sig[0] - prev_last_val)
+                # Create linear ramp from delta to 0 over win_n samples (endpoint=False keeps smooth transition to next sample)
+                ramp = np.linspace(delta, 0.0, win_n, endpoint=False, dtype=float)
+                n_avail = min(win_n, epoch_sig.shape[0])
+                epoch_sig[:n_avail] = epoch_sig[:n_avail] - ramp[:n_avail]
+            # Write epoch and update trackers
             eeg[cursor:cursor + self.samples_per_epoch] = epoch_sig
-            prev_last_value = epoch_sig[-1]
+            prev_last_val = float(epoch_sig[-1])
             cursor += self.samples_per_epoch
         return eeg, labels
 
@@ -177,7 +213,7 @@ class SimpleSyntheticEEGGenerator:
             # amplitude proportional to band power of bin divided over expected components
             amp = band_powers[b]
             # mild jitter
-            amp *= self.rng.uniform(0.8, 1.2)
+            amp *= self.rng.uniform(self.jitter_low, self.jitter_high)
             # component signal; phase evolves from stored phase
             phase0 = self._component_phases[c]
             component = amp * np.sin(2 * np.pi * new_f * t + phase0)
@@ -187,8 +223,13 @@ class SimpleSyntheticEEGGenerator:
             self._component_phases[c] = end_phase
         # Normalize epoch roughly (avoid huge amplitudes)
         std = np.std(epoch_sig)
-        if std > 0:
+        if self.normalize_epoch and std > 0:
             epoch_sig = epoch_sig / std
+        # Apply per-stage scaling (post-normalization)
+        if self.stage_rms_scales is not None:
+            epoch_sig = epoch_sig * float(self.stage_rms_scales[stage])
+        # Add per-stage mean (DC offset) if specified
+        epoch_sig = epoch_sig + float(self.stage_mean_offsets[stage])
         return epoch_sig
 
 # --------------------------- YAML Loader -------------------------------------
@@ -218,6 +259,35 @@ def build_generator(cfg: dict) -> SimpleSyntheticEEGGenerator:
     stage_bin_probs = np.asarray(cfg['stage_bin_selection_probability'], dtype=float)
     components = int(cfg['components_per_epoch'])
     seed = int(cfg.get('seed')) if 'seed' in cfg and cfg['seed'] is not None else None
+    jl, jh = 0.8, 1.2
+    if 'amplitude_jitter_range' in cfg:
+        rng_vals = cfg['amplitude_jitter_range']
+        if isinstance(rng_vals, (list, tuple)) and len(rng_vals) == 2:
+            jl, jh = float(rng_vals[0]), float(rng_vals[1])
+    mean_offsets = None
+    if 'stage_mean_amplitudes' in cfg:
+        mean_offsets = np.asarray(cfg['stage_mean_amplitudes'], dtype=float)
+    # Optional per-stage post-normalization scales
+    rms_scales = None
+    if 'stage_rms_scales' in cfg and cfg['stage_rms_scales'] is not None:
+        rms_scales = np.asarray(cfg['stage_rms_scales'], dtype=float)
+        if rms_scales.shape[0] != n_stages:
+            raise ValueError("stage_rms_scales length must equal n_stages")
+        if np.any(rms_scales < 0):
+            raise ValueError("stage_rms_scales must be non-negative")
+    # Normalization flag
+    normalize_epoch = bool(cfg.get('normalize_epoch', True))
+    # Optional linear fade window in seconds
+    overlap_samples = 0
+    if 'overlap_s' in cfg:
+        try:
+            overlap_s = float(cfg['overlap_s'])
+            if overlap_s > 0:
+                overlap_samples = int(round(overlap_s * sr))
+                # Cap to at most half an epoch to avoid excessive warping
+                overlap_samples = max(0, min(overlap_samples, (sr * epoch_len) // 2))
+        except Exception:
+            overlap_samples = 0
     return SimpleSyntheticEEGGenerator(
         name=name,
         sampling_rate=sr,
@@ -230,6 +300,12 @@ def build_generator(cfg: dict) -> SimpleSyntheticEEGGenerator:
         stage_bin_probs=stage_bin_probs,
         components_per_epoch=components,
         seed=seed,
+        jitter_low=jl,
+        jitter_high=jh,
+    stage_mean_offsets=mean_offsets,
+    stage_rms_scales=rms_scales,
+    normalize_epoch=normalize_epoch,
+        overlap_samples=overlap_samples,
     )
 
 # ----------------------------- CLI Entry -------------------------------------

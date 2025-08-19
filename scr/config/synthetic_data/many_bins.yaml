@@ -1,0 +1,111 @@
+## Realistic synthetic sleep config derived from real data exploration (excluding Artifact stage)
+## Source stats (approx):
+##   Stage proportions (mean): Awake ~45%, NREM ~49%, REM ~6%
+##   Transition high self-persistence (>99.99% per 30s epoch) so we reduce slightly for variability.
+##   Non-self transitions (normalized) suggest: Awake->NREM dominant, NREM->Awake dominant,
+##     REM often goes to Awake, smaller fractions to NREM.
+##
+## Generator stages order: 0=Awake, 1=NREM, 2=REM
+name: many_bins
+sampling_rate_hz: 128          # Close to dataset median (assumed 128 Hz)
+epoch_length_s: 4              # Standard PSG scoring epoch length
+n_epochs: 1000                   # ~3h20m of data (400*30s)
+n_stages: 3
+
+# Transition matrix (row i -> next state j). Rows sum to 1.
+# Derived by taking self-transition ~0.995 (less extreme than observed to allow variability)
+# and distributing remaining probability according to change-only probabilities (excluding Artifact) re-normalized.
+# change-only approximate ratios (from data, excluding Artifact column):
+#   Awake: to NREM ~0.9439, REM ~0.00207 -> renorm -> NREM 0.998, REM 0.002
+#   NREM: to Awake ~0.7798, REM ~0.2122 -> renorm -> Awake 0.786, REM 0.214
+#   REM: to Awake ~0.9356, NREM ~0.0569 -> renorm -> Awake 0.9427, NREM 0.0573
+# Remaining (1 - self) = 0.005 distributed by those ratios.
+transition_matrix:
+  # - [0.972, 0.028, 0.000]      # Awake row
+  # - [0.021, 0.969, 0.010]      # NREM row
+  # - [0.066, 0.004, 0.930]      # REM row
+  - [0.8, 0.1, 0.1]      # Awake row
+  - [0.1, 0.8, 0.1]      # NREM row
+  - [0.1, 0.1, 0.8]      # REM row
+
+# Fine 1 Hz frequency bins (0–50 Hz) and per-bin mean powers derived from EEG_fine_grained_band_power_1Hz.csv (Mean_Power column, Artifact excluded)
+frequency_bins:
+  - [0, 1]
+  - [1, 2]
+  - [2, 3]
+  - [3, 4]
+  - [4, 5]
+  - [5, 6]
+  - [6, 7]
+  - [7, 8]
+  - [8, 9]
+  - [9, 10]
+  - [10, 11]
+  - [11, 12]
+  - [12, 13]
+  - [13, 14]
+  - [14, 15]
+  - [15, 16]
+  - [16, 17]
+  - [17, 18]
+  - [18, 19]
+  - [19, 20]
+  - [20, 21]
+  - [21, 22]
+  - [22, 23]
+  - [23, 24]
+  - [24, 25]
+  - [25, 26]
+  - [26, 27]
+  - [27, 28]
+  - [28, 29]
+  - [29, 30]
+  - [30, 31]
+  - [31, 32]
+  - [32, 33]
+  - [33, 34]
+  - [34, 35]
+  - [35, 36]
+  - [36, 37]
+  - [37, 38]
+  - [38, 39]
+  - [39, 40]
+  - [40, 41]
+  - [41, 42]
+  - [42, 43]
+  - [43, 44]
+  - [44, 45]
+  - [45, 46]
+  - [46, 47]
+  - [47, 48]
+  - [48, 49]
+  - [49, 50]
+
+# stage_band_powers: per-stage mean power per 1 Hz bin
+stage_band_powers:
+  - [0.008356987, 0.009064345, 0.00309037, 0.001705571, 0.0009666046, 0.0006448435, 0.0004270309, 0.0002984019, 0.0002105652, 0.0001327437, 9.475653e-05, 7.823536e-05, 6.85309e-05, 5.053226e-05, 4.753988e-05, 3.343191e-05, 2.638574e-05, 2.107648e-05, 1.68812e-05, 1.506724e-05, 1.380066e-05, 1.202361e-05, 1.102071e-05, 1.01566e-05, 9.621187e-06, 8.303947e-06, 7.184036e-06, 6.623623e-06, 4.754897e-05, 5.402045e-06, 5.024756e-06, 4.560789e-06, 4.13862e-06, 4.063807e-06, 3.536773e-06, 3.353824e-06, 3.109881e-06, 2.851044e-06, 2.668785e-06, 2.461918e-06, 2.21388e-06, 1.935085e-06, 2.039649e-06, 1.751827e-06, 1.63734e-06, 1.464813e-06, 1.336564e-06, 1.342262e-06, 1.70947e-06, 8.8719e-05]
+  - [0.04102585, 0.00296532, 0.001025253, 0.0007106426, 0.0005109647, 0.0003598823, 0.0002522371, 0.0001939013, 0.0001460224, 0.0001191966, 9.806073e-05, 7.943077e-05, 6.42149e-05, 5.342768e-05, 4.423677e-05, 3.647739e-05, 3.200384e-05, 2.699025e-05, 2.388156e-05, 2.168313e-05, 1.702451e-05, 1.425279e-05, 1.230649e-05, 1.114519e-05, 9.212033e-06, 8.087632e-06, 6.536558e-06, 5.532649e-06, 1.298233e-05, 4.396887e-06, 3.989851e-06, 3.387694e-06, 3.077175e-06, 2.750766e-06, 2.518037e-06, 2.346154e-06, 2.023711e-06, 1.90171e-06, 1.810537e-06, 1.667316e-06, 1.606638e-06, 1.499858e-06, 1.337693e-06, 1.233581e-06, 1.203398e-06, 1.181007e-06, 1.124995e-06, 1.224127e-06, 1.94746e-06, 0.0002695834]
+  - [0.001504711, 9.046492e-05, 0.0001461029, 0.0001061616, 8.498866e-05, 8.895106e-05, 0.000171451, 0.0002132952, 0.0001449505, 7.850998e-05, 5.121487e-05, 3.677586e-05, 2.917759e-05, 2.415337e-05, 2.23945e-05, 2.015537e-05, 1.731262e-05, 1.487494e-05, 1.255714e-05, 1.153552e-05, 1.000294e-05, 8.683833e-06, 7.661566e-06, 6.846123e-06, 6.087246e-06, 5.233044e-06, 4.342343e-06, 3.697512e-06, 3.163369e-06, 2.779334e-06, 2.490309e-06, 2.231229e-06, 1.990101e-06, 1.772797e-06, 1.63803e-06, 1.479741e-06, 1.347567e-06, 1.220499e-06, 1.160308e-06, 1.0771e-06, 1.007786e-06, 9.613927e-07, 8.776842e-07, 8.147827e-07, 7.728211e-07, 6.936544e-07, 6.329802e-07, 5.443756e-07, 3.931704e-07, 3.472749e-07]
+
+# stage_bin_selection_probability: uniform (equal likelihood) across all 50 bins
+stage_bin_selection_probability:
+  - [0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02]
+  - [0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02]
+  - [0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02]
+
+components_per_epoch: 100        # Slightly richer spectral composition
+amplitude_jitter_range: [0.8, 1.2]   # Default jitter; adjust to widen or narrow variability
+stage_mean_amplitudes: [0.0, 0.0, 0.0]
+
+# Per-stage magnitude scaling applied after optional normalization (RMS differences)
+stage_rms_scales: [1.0, 1.0, 1.0]
+
+# Normalize each epoch to unit std before applying stage_rms_scales
+normalize_epoch: true
+
+# Linear boundary smoothing between epochs (seconds). Set 0 to disable.
+overlap_s: 0.25
+seed: 1234                      # Reproducibility
+
+# Optional stage names mapping for downstream visualization
+stage_names: [Awake, NREM, REM]

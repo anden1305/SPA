@@ -1,0 +1,70 @@
+## Example config for SimpleSyntheticEEGGenerator
+## Run: python -m scr.synthetic_data.synthetic_data_generator scr/config/synthetic_data/test.yaml
+## Produces: data/synthetic_data/demo_basic/{eeg.npy, labels.npy, config_copy.yml}
+
+# Directory name under data/synthetic_data/
+name: demo_basic
+
+# Sampling parameters
+sampling_rate_hz: 128          # Hz
+epoch_length_s: 4             # seconds per epoch
+n_epochs: 50                   # total epochs (50 * 30s = 1500 s ≈ 25 min)
+
+# Sleep stage model (5 synthetic stages: 0=W,1=N1,2=N2,3=N3,4=REM)
+n_stages: 5
+transition_matrix:             # Rows sum to 1; modest self-transition persistence
+  - [0.70, 0.10, 0.10, 0.05, 0.05]   # From W
+  - [0.15, 0.45, 0.25, 0.10, 0.05]   # From N1
+  - [0.05, 0.10, 0.55, 0.20, 0.10]   # From N2
+  - [0.02, 0.05, 0.25, 0.60, 0.08]   # From N3
+  - [0.12, 0.08, 0.20, 0.05, 0.55]   # From REM
+
+# Frequency bins (Hz) covering 0.5–35 Hz typical EEG bands
+frequency_bins:
+  - [0.5, 4.0]    # Delta
+  - [4.0, 8.0]    # Theta
+  - [8.0, 12.0]   # Alpha
+  - [12.0, 16.0]  # Sigma (spindles)
+  - [16.0, 25.0]  # Beta low
+  - [25.0, 35.0]  # Beta high
+
+# Relative band power prototypes per stage (shape: n_stages x n_bins)
+# Larger values => higher typical amplitude contribution for that band in that stage.
+stage_band_powers: #   Δ     Θ     α     σ     βL    βH
+  - [0.6, 0.8, 1.4, 0.6, 0.9, 0.7]   # W: alpha prominent, some theta
+  - [0.8, 1.0, 0.7, 0.5, 0.6, 0.4]   # N1: theta rising
+  - [0.9, 0.9, 0.5, 1.2, 0.5, 0.3]   # N2: sigma (spindles) stronger
+  - [1.4, 0.7, 0.3, 0.6, 0.4, 0.2]   # N3: delta dominant
+  - [0.7, 1.1, 0.9, 0.5, 0.8, 0.6]   # REM: theta + mixed
+
+# Bin selection probabilities per stage (rows sum to 1)
+stage_bin_selection_probability: #   Δ     Θ     α     σ     βL    βH
+  - [0.05, 0.15, 0.40, 0.10, 0.20, 0.10]  # W
+  - [0.10, 0.35, 0.20, 0.10, 0.15, 0.10]  # N1
+  - [0.15, 0.20, 0.10, 0.25, 0.20, 0.10]  # N2
+  - [0.35, 0.20, 0.05, 0.15, 0.15, 0.10]  # N3
+  - [0.10, 0.30, 0.20, 0.10, 0.20, 0.10]  # REM
+
+# Number of sinusoidal components mixed per epoch
+components_per_epoch: 8
+
+# Amplitude jitter range (multiplicative) applied per component each epoch
+amplitude_jitter_range: [0.8, 1.2]
+
+# Per-stage mean amplitudes (DC offsets) after normalization
+stage_mean_amplitudes: [0.0, 0.0, 0.0, 0.0, 0.0]
+
+# Per-stage magnitude scaling applied after optional normalization (RMS differences)
+stage_rms_scales: [1.0, 1.0, 1.0, 1.0, 1.0]
+
+# Normalize each epoch to unit std before applying stage_rms_scales
+normalize_epoch: true
+
+# Linear boundary smoothing between epochs (seconds). Set 0 to disable.
+overlap_s: 0.25
+
+# Optional reproducibility seed
+seed: 42
+
+# (Optional) You may add a stage_names mapping for your own reference (not used by the generator):
+# stage_names: [Wake, N1, N2, N3, REM]
