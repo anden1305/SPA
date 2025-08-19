@@ -1,11 +1,14 @@
-"""Minimal HMM training on synthetic sleep EEG.
+"""Train HMM on precomputed synthetic data (unsupervised, single sequence).
 
-Usage (standalone):
-	python scripts/train_hmm.py --epochs 5 --num-states 4
-Or module form (preferred):
-	python -m scripts.train_hmm --epochs 5
+Usage:
+	python scripts/train_hmm.py --data-path data/synthetic_data/test --epochs 5 --num-states 4
 
-Focus: brevity + clarity. Supports seeding, val split, save path.
+Assumes folder contains:
+	eeg.npy              (shape: C x T or T, or (T,C) after loading we arrange)
+	labels.npy           (ignored for unsupervised training)
+	config_copy.yml      (meta)
+
+No validation / splitting (pure unsupervised). The entire sequence is one batch.
 """
 
 from __future__ import annotations
@@ -13,28 +16,76 @@ from __future__ import annotations
 import sys, pathlib, argparse, random
 import numpy as np
 import torch
-
+# use the data loader
 # Ensure project root (parent of scripts/) is on sys.path for `import scr`.
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
 	sys.path.insert(0, str(PROJECT_ROOT))
+from scr.data.synthetic_loader import SyntheticLoader
+from scr.data.synthetic_dataset import SyntheticDataset
+from scr.preprocessing.collapse_dimensions import CollapseDimensions
+from scr.preprocessing.fft import FFT
+import numpy as np
+import matplotlib.pyplot as plt    
 
-from scr.synthetic.generator import SyntheticSleepGenerator, DEFAULT_CONFIG
-from scr.data.raw_sequence_dataset import RawEEGSequenceDataset
+
+from scr.data.synthetic_dataset import SyntheticDataset
 from scr.models.hmm import HMM
-from scr.training.base_trainer import BaseTrainer
-from torch.utils.data import DataLoader, random_split
+
+
+def _normalized_mutual_info(preds: np.ndarray, labels: np.ndarray, eps: float = 1e-12) -> float:
+	"""Compute NMI (arithmetic mean version like sklearn) between two integer labelings.
+
+	NMI = 2 * I(U;V) / (H(U)+H(V)), where I is mutual information and H are entropies.
+	"""
+	preds = np.asarray(preds).ravel()
+	labels = np.asarray(labels).ravel()
+	if preds.shape[0] != labels.shape[0]:
+		return float('nan')
+	# Relabel to contiguous 0..K-1 for stability
+	def _reindex(x):
+		uniq, inv = np.unique(x, return_inverse=True)
+		return inv, uniq.size
+	p_int, k1 = _reindex(preds)
+	l_int, k2 = _reindex(labels)
+	# Contingency
+	cont = np.zeros((k1, k2), dtype=np.float64)
+	for i in range(p_int.size):
+		cont[p_int[i], l_int[i]] += 1.0
+	N = cont.sum()
+	if N == 0:
+		return float('nan')
+	p_ij = cont / N
+	p_i = p_ij.sum(axis=1, keepdims=True)
+	p_j = p_ij.sum(axis=0, keepdims=True)
+	# Mutual information
+	with np.errstate(divide='ignore', invalid='ignore'):
+		rat = p_ij / (p_i @ p_j)
+		mask = p_ij > 0
+		I = (p_ij[mask] * np.log(rat[mask] + eps)).sum()
+	# Entropies
+	H1 = - (p_i[p_i>0] * np.log(p_i[p_i>0])).sum()
+	H2 = - (p_j[p_j>0] * np.log(p_j[p_j>0])).sum()
+	den = H1 + H2
+	if den <= eps:
+		return 0.0
+	return float(2 * I / den)
 
 
 def parse_args():
 	P = argparse.ArgumentParser(description="Train HMM on synthetic EEG")
-	P.add_argument("--epochs", type=int, default=5)
-	P.add_argument("--num-states", type=int, default=3)
-	P.add_argument("--lr", type=float, default=1e-3)
-	P.add_argument("--batch-size", type=int, default=1)
-	P.add_argument("--val-split", type=float, default=0.0, help="Fraction for validation")
+	P.add_argument("--data-path", type=pathlib.Path, required=True, default="data\\synthetic_data\\test", help="Synthetic dataset directory (contains eeg.npy, labels.npy, config_copy.yml)")
+	P.add_argument("--epochs", type=int, default=15000)
+	P.add_argument("--num-states", type=int, default=4)
+	P.add_argument("--lr", type=float, default=1e-2)
 	P.add_argument("--seed", type=int, default=0)
-	P.add_argument("--save", type=pathlib.Path, default=None, help="File to save model (.pt)")
+	P.add_argument("--save", type=pathlib.Path, default=None, help="Output file (.pt)")
+	P.add_argument("--normalize", action="store_true", help="Per-feature z-score over time")
+	P.add_argument("--grad-clip", type=float, default=None, help="Gradient norm clip (optional)")
+	P.add_argument("--save-pred", type=pathlib.Path, default=None, help="Optional .npy path to save decoded Viterbi state sequence")
+	P.add_argument("--init", choices=["default","kmeans"], default="kmeans", help="Parameter init: default uniform/zeros or kmeans data-driven")
+	P.add_argument("--kmeans-iters", type=int, default=15, help="K-means refinement iterations when --init kmeans")
+	P.add_argument("--no-estimate-transitions", action="store_true", help="When using kmeans init, do not estimate pi/transition from clusters")
 	return P.parse_args()
 
 
@@ -49,36 +100,89 @@ def seed_all(seed: int):
 def main():
 	args = parse_args()
 	seed_all(args.seed)
-
-	gen = SyntheticSleepGenerator(DEFAULT_CONFIG, seed=args.seed)
-	data = gen.generate(epochs=100)  # contains 'eeg_raw'
-	ds = RawEEGSequenceDataset(data["eeg_raw"], normalize=True)
-
-	if 0 < args.val_split < 0.5 and len(ds) > 1:
-		val_len = max(1, int(len(ds) * args.val_split))
-		train_len = len(ds) - val_len
-		train_ds, val_ds = random_split(ds, [train_len, val_len], generator=torch.Generator().manual_seed(args.seed))
-		val_loader = DataLoader(val_ds, batch_size=args.batch_size)
-	else:
-		train_ds, val_loader = ds, None
-
-	train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=len(train_ds) > 1)
-
-	model = HMM(num_states=args.num_states, obs_dim=1, normalize_time=True)
-	opt = torch.optim.Adam(model.parameters(), lr=args.lr)
+	
+	dataset = SyntheticDataset('data/synthetic_data/test')  # TODO: consider using args.data_path
+	# Keep a handle to the transform to access window_size for plotting
+	fft_transform = FFT({'window_size': 512})
+	dimension_transform = CollapseDimensions({})
+	
+	dataloader = SyntheticLoader(
+        dataset=dataset,
+        batch_size=5120,
+        shuffle=False,
+        transforms=[
+            fft_transform,
+            dimension_transform
+        ]
+    )
+	
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-	print(f"Device: {device}")
+	# Grab (and cache) the single (full) batch produced by the synthetic loader + transforms
+	# Loader yields a single tuple (X, Y) where X shape (T, D) after FFT+collapse.
+	batch_x_np, batch_y_np = next(iter(dataloader))  # (T,D), (T,) (labels unused for unsupervised)
+	
+	# Determine final feature dimension after transforms (not the raw channel count)
+	obs_dim = batch_x_np.shape[1] if batch_x_np.ndim == 2 else batch_x_np.shape[-1]
+	model = HMM(num_states=dataset.n_stages, obs_dim=obs_dim, normalize_time=True, device=device)
+	# Convert to torch tensor once; HMM forward can accept (T,D) and will add batch dim internally.
+	batch_x = torch.from_numpy(batch_x_np).float()
 
-	trainer = BaseTrainer(model, opt, train_loader, val_loader=val_loader, device=device, log_interval=10, verbose=True)
-	history = trainer.fit(epochs=args.epochs)
-	final = history[-1]
-	print(f"Final train loss: {final['train_loss']:.4f}")
-	if val_loader and 'val_loss' in final:
-		print(f"Final val loss: {final['val_loss']:.4f}")
+	# Optional improved initialization
+	if args.init == "kmeans":
+		print(f"[Init] K-means (iters={args.kmeans_iters}, estimate_transitions={not args.no_estimate_transitions})")
+		model.reset_parameters(batch_x, kmeans_iters=args.kmeans_iters, estimate_transitions=not args.no_estimate_transitions)
+	else:
+		print("[Init] Default uniform/zero initialization")
+
+	optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+
+	losses = []
+	for epoch in range(1, args.epochs + 1):
+		model.train()
+		optimizer.zero_grad()
+		logp = model(batch_x)
+		loss = -logp.mean()
+		loss.backward()
+		if args.grad_clip is not None:
+			torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
+		optimizer.step()
+		print(f"Epoch {epoch}/{args.epochs} | negNLL={loss.item():.4f}")
+		losses.append(loss.item())
+
+	# Plot loss curve
+	plt.figure(figsize=(6,3))
+	plt.plot(losses, linewidth=1.0)
+	plt.xlabel('Epoch')
+	plt.ylabel('negNLL')
+	plt.title('Training Loss')
+	plt.tight_layout()
+	# i want the synthetic_data name in the save file
+	plt.savefig(f"results/training/loss_curve_HMM_{args.data_path.name}_{args.epochs}.png")
+	plt.show()
+
+	# Decode and print only the predicted state sequence (nothing else)
+	with torch.no_grad():
+		preds_tensor = model.decode_viterbi(batch_x).squeeze(0).cpu()
+	preds = preds_tensor.tolist()
+	print(f"Predicted state sequence: {preds}")
+	print(f"Batch Y (labels): {batch_y_np}")
+	# NMI
+	nmi = _normalized_mutual_info(preds_tensor.numpy(), batch_y_np)
+	print(f"NMI: {nmi:.6f}")
+
+	# Optional silent saves
+	if args.save_pred:
+		args.save_pred.parent.mkdir(parents=True, exist_ok=True)
+		np.save(args.save_pred, np.array(preds, dtype=int))
 	if args.save:
 		args.save.parent.mkdir(parents=True, exist_ok=True)
-		torch.save({"model_state": model.state_dict(), "args": vars(args)}, args.save)
-		print(f"Saved model -> {args.save}")
+		torch.save({
+			"model_state": model.state_dict(),
+			"args": vars(args),
+			"obs_dim": dataset.n_features,
+			"sequence_length": dataset.n_timesteps,
+			"viterbi_path": preds,
+		}, args.save)
 
 
 if __name__ == "__main__":

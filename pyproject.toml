@@ -13,6 +13,7 @@ dependencies = [
     "seaborn",
     "pyedflib>=0.1.42",
     "scipy",
+    "pyyaml>=6.0.2",
 ]
 
 [tool.uv.sources]

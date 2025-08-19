@@ -19,6 +19,7 @@ class SyntheticDataset(BaseDataset):
         if self.data.ndim == 1:
             self.data = self.data[np.newaxis, :]
         self.n_features = self.data.shape[0]
+        self.n_timesteps = self.data.shape[1]
         self.raw_labels: np.ndarray = np.load(self.path + "/labels.npy")
         self.labels: np.ndarray = np.repeat(self.raw_labels, self.sampling_rate * self.epoch_length, axis=0)
 

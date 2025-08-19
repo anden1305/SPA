@@ -1,4 +1,4 @@
-"""Hidden Markov Model (Gaussian emissions w/ diagonal covariance).
+"""Hidden Markov Model (Gaussian emissions; mean-only / diag / full covariance).
 
 Design goals:
     * Small, readable, minimal dependencies.
@@ -7,10 +7,24 @@ Design goals:
 
 Current scope / simplifications:
     * All sequences assumed same length (no padding mask logic yet).
-    * Diagonal Gaussian emissions (state-specific mean + log-variance).
+    * Gaussian emissions: covariance type in {meanonly (I), diag, full}.
     * Uniform prior / transitions at init (logits=0) unless modified.
 
 Forward(x) returns: Tensor of shape (batch,) with log p(x).
+
+Required input shape
+--------------------
+Canonical shape: (B, T, D)
+    B = batch size (independent sequences)
+    T = sequence length (ordered time windows / frames)
+    D = flattened feature dimension = Channels * Per‑channel spectral features (C×F).
+
+Pragmatic compatibility helpers (auto‑reshape):
+    * (T, D) -> unsqueezed to (1, T, D)
+    * (B, D, T) -> transposed to (B, T, D) if D==obs_dim and T != obs_dim
+    * (C, T) with C==obs_dim -> treated as (1, T, C) after transpose
+Any other unexpected rank raises ValueError. This keeps core logic minimal while
+allowing simple dataset loaders that output channel-first sequences.
 
 Example
 -------
@@ -26,6 +40,10 @@ Future extensions (not implemented to keep it simple):
     * Variable length handling via mask (log-sum ignoring padded steps).
     * Batched Baum-Welch (EM) style updates or posterior decoding.
     * Different emission families (categorical, mixture, etc.).
+
+
+    Input: N_samples x Number of frequency bins
+
 """
 from __future__ import annotations
 
@@ -38,7 +56,17 @@ from .base_model import BaseModel
 
 
 class HMM(BaseModel):
-    """Discrete-time HMM with diagonal Gaussian emissions.
+    """Discrete‑time Hidden Markov Model with Gaussian emissions.
+
+    Supports three emission covariance parameterisations:
+    - ``diag`` (default): state‑specific diagonal covariance (original behaviour)
+    - ``full``: state‑specific full covariance via unconstrained Cholesky factors
+    - ``meanonly``: fixed identity covariance (learn only means) – useful as a
+      baseline to test whether covariance structure matters.
+
+    Forward returns per‑sequence log p(x) (optionally normalised by time if
+    ``normalize_time=True``). Training can therefore proceed by maximising this
+    marginal log‑likelihood directly with any gradient optimiser (no EM needed).
 
     Parameters
     ----------
@@ -46,15 +74,24 @@ class HMM(BaseModel):
         Number of latent states (S).
     obs_dim : int
         Observation dimensionality (D).
+    covariance_type : {'diag','full','meanonly'}
+        Emission covariance parameterisation.
     device : str | torch.device | None
-        Device to place parameters. Auto-selects CUDA if available.
+        Device to place parameters. Auto‑selects CUDA if available.
+    jitter : float
+        Small positive value added to covariance diagonals for numerical
+        stability (ignored for meanonly which uses Identity).
+    normalize_time : bool
+        If True, divide log p(x) by sequence length T (average per time step).
     """
 
     def __init__(
         self,
         num_states: int,
         obs_dim: int,
+        covariance_type: str = "diag",
         device: str | torch.device | None = None,
+        jitter: float = 1e-5,
         normalize_time: bool = False,
     ) -> None:
         super().__init__()
@@ -64,13 +101,25 @@ class HMM(BaseModel):
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.device = torch.device(device)
         self.normalize_time = normalize_time  # if True, forward returns average log-prob per time step
+        self.covariance_type = covariance_type.lower()
+        if self.covariance_type not in {"diag", "full", "meanonly"}:
+            raise ValueError("covariance_type must be one of {'diag','full','meanonly'}")
+        self.jitter = float(jitter)
 
         # Parameterization (logits for simplex params; mean/logvar for Gaussians)
         self.initial_logits = nn.Parameter(torch.zeros(self.num_states))                 # (S,)
         self.transition_logits = nn.Parameter(torch.zeros(self.num_states, self.num_states))  # (S,S)
         self.emission_mean = nn.Parameter(torch.zeros(self.num_states, self.obs_dim))    # (S,D)
-        self.emission_logvar = nn.Parameter(torch.zeros(self.num_states, self.obs_dim))  # (S,D)
-
+        if self.covariance_type == "diag":
+            self.emission_logvar = nn.Parameter(torch.zeros(self.num_states, self.obs_dim))  # (S,D)
+        elif self.covariance_type == "full":
+            # Unconstrained lower‑triangular raw parameters for Cholesky factors L (S,D,D)
+            # We store a full matrix then mask to lower tri; diagonals passed through softplus.
+            self.emission_cholesky_raw = nn.Parameter(torch.zeros(self.num_states, self.obs_dim, self.obs_dim))
+        else:  # meanonly -> no covariance parameters (implicit Identity)
+            self.register_buffer("_identity_cov", torch.eye(self.obs_dim))
+        # Constant buffer for numerical expressions (avoids repeated Python math calls)
+        self.register_buffer("_log_2pi", torch.tensor(math.log(2 * math.pi), dtype=torch.get_default_dtype()))
         self.to(self.device)
 
     # ------------------------- Helper accessors -------------------------
@@ -79,6 +128,19 @@ class HMM(BaseModel):
 
     def log_transition(self) -> Tensor:
         return torch.log_softmax(self.transition_logits, dim=-1)  # (S,S)
+
+    def _full_cov_cholesky(self) -> Tensor:
+        """Return lower‑triangular Cholesky factors L (S,D,D) with positive diag."""
+        raw = self.emission_cholesky_raw
+        # Mask upper triangle
+        tril_mask = torch.tril(torch.ones_like(raw)).bool()
+        L = torch.zeros_like(raw)
+        L[tril_mask] = raw[tril_mask]
+        # Stabilise diagonals: softplus + jitter
+        diag_idx = torch.arange(self.obs_dim, device=L.device)
+        diag = L[:, diag_idx, diag_idx]
+        L[:, diag_idx, diag_idx] = torch.nn.functional.softplus(diag) + self.jitter
+        return L
 
     def emission_log_prob(self, x: Tensor) -> Tensor:
         """Return log p(x_t | z_t) for all states.
@@ -92,17 +154,40 @@ class HMM(BaseModel):
         Tensor, shape (B,T,S)
         """
         if x.dim() != 3:
-            raise ValueError(f"Expected input of shape (B,T,D); got {tuple(x.shape)}")
+            raise ValueError(f"emission_log_prob expects (B,T,D) after any flattening; got {tuple(x.shape)}")
         if x.shape[2] != self.obs_dim:
-            raise ValueError("Input obs_dim mismatch.")
+            raise ValueError(f"Input feature dimension {x.shape[2]} != model obs_dim {self.obs_dim}. If you passed (B,T,C,F) ensure obs_dim=C*F when constructing the model.")
+        B, T, D = x.shape
+        S = self.num_states
         # Broadcast diff: (B,T,1,D) - (S,D) -> (B,T,S,D)
         diff = x.unsqueeze(2) - self.emission_mean  # (B,T,S,D)
-        logvar = self.emission_logvar  # (S,D)
-        # (S,D) -> (1,1,S,D) for broadcast in next ops
-        inv_var = torch.exp(-logvar)  # positive
-        # Gaussian log-density per feature then sum over D
-        log_prob = -0.5 * (diff.pow(2) * inv_var + logvar + math.log(2 * math.pi))
-        return log_prob.sum(-1)  # (B,T,S)
+
+        if self.covariance_type == "diag":
+            logvar = self.emission_logvar  # (S,D)
+            inv_var = torch.exp(-logvar)  # positive
+            log_prob = -0.5 * (diff.pow(2) * inv_var + logvar + self._log_2pi)
+            return log_prob.sum(-1)  # (B,T,S)
+        elif self.covariance_type == "meanonly":
+            # Identity covariance -> log N(x | mu, I)
+            quad = diff.pow(2).sum(-1)  # (B,T,S)
+            const = D * self._log_2pi
+            return -0.5 * (quad + const)
+        else:  # full
+            L = self._full_cov_cholesky()  # (S,D,D)
+            # Precompute log det Σ_s = 2 * sum(log(diag(L_s)))
+            log_det = 2 * torch.log(torch.diagonal(L, dim1=1, dim2=2)).sum(-1)  # (S,)
+            # We'll loop over states (S typically small) for clarity
+            log_probs = []
+            for s in range(S):
+                Ls = L[s]  # (D,D)
+                # Flatten (B*T,D) for solve
+                d_flat = diff[:, :, s, :].reshape(B * T, D).T  # (D, B*T)
+                # Solve L y = diff^T -> y
+                y = torch.linalg.solve_triangular(Ls, d_flat, upper=False)  # (D, B*T)
+                m_dist2 = (y.pow(2).sum(0)).reshape(B, T)  # (B,T)
+                lp = -0.5 * (m_dist2 + log_det[s] + D * self._log_2pi)  # (B,T)
+                log_probs.append(lp.unsqueeze(-1))  # (B,T,1)
+            return torch.cat(log_probs, dim=-1)  # (B,T,S)
 
     # ----------------------- Core algorithms ------------------------
     def _forward_algorithm(self, log_emiss: Tensor, log_pi: Tensor, log_A: Tensor) -> Tensor:
@@ -127,13 +212,39 @@ class HMM(BaseModel):
         return torch.logsumexp(alpha, dim=1)  # (B,)
 
     # ---------------------------- API --------------------------------
+    def _standardize_input(self, x: Tensor) -> Tensor:
+        """Convert allowed shapes to (B,T,D).
+
+        Allowed:
+            (B,T,D) -> unchanged
+            (T,D)   -> (1,T,D)
+            (D,T)   -> (1,T,D) if D==obs_dim
+            (B,D,T) -> (B,T,D) if D==obs_dim
+        """
+        if x.dim() == 3:
+            B, A, B_or_D = x.shape
+            # Case already (B,T,D)
+            if x.shape[2] == self.obs_dim:
+                return x
+            # Case (B,D,T)
+            if x.shape[1] == self.obs_dim:
+                return x.transpose(1, 2)
+            raise ValueError(f"3D input must have one dimension equal to obs_dim={self.obs_dim}; got {tuple(x.shape)}")
+        if x.dim() == 2:
+            if x.shape[1] == self.obs_dim:  # (T,D)
+                return x.unsqueeze(0)
+            if x.shape[0] == self.obs_dim:  # (D,T)
+                return x.transpose(0,1).unsqueeze(0)
+            raise ValueError(f"2D input ambiguous shape {tuple(x.shape)} (obs_dim={self.obs_dim})")
+        raise ValueError(f"Unsupported input rank {x.dim()} (expected 2 or 3)")
+
     def forward(self, x: Tensor) -> Tensor:  # type: ignore[override]
         """Per-sequence log-likelihood.
 
-        x : (B,T,D)
-        Returns: (B,) log p(x)
+        Returns (B,) log p(x). Accepts canonical (B,T,D) and a few convenience
+        variants documented in `_standardize_input`.
         """
-        x = x.to(self.device)
+        x = self._standardize_input(x.to(self.device))
         log_pi = self.log_initial()
         log_A = self.log_transition()
         log_emiss = self.emission_log_prob(x)
@@ -142,21 +253,36 @@ class HMM(BaseModel):
             logp = logp / x.shape[1]
         return logp
 
+    # ---------------- Convenience API aliases ----------------
+    @torch.no_grad()
+    def log_prob(self, x: Tensor) -> Tensor:
+        """Alias for forward (evaluates log p(x))."""
+        return self.forward(x)
+
+    @torch.no_grad()
+    def predict(self, x: Tensor) -> Tensor:
+        """Alias returning Viterbi path for compatibility with sklearn-like API."""
+        return self.decode_viterbi(x)
+
+    def extra_repr(self) -> str:  # type: ignore[override]
+        return (
+            f"states={self.num_states}, obs_dim={self.obs_dim}, cov='{self.covariance_type}', "
+            f"normalize_time={self.normalize_time}"
+        )
+
     @torch.no_grad()
     def decode_viterbi(self, x: Tensor) -> Tensor:
-        """Most likely state sequence (Viterbi).
+        """Most likely state sequence (Viterbi path).
 
-        x : (B,T,D)
-        Returns: (B,T) int64 state indices
+        Accepts same flexible shapes as forward; returns (B,T) int64.
         """
-        x = x.to(self.device)
+        x = self._standardize_input(x.to(self.device))
         B, T, D = x.shape
         if D != self.obs_dim:
-            raise ValueError("Input obs_dim mismatch.")
+            raise ValueError(f"Input feature dimension {D} != model obs_dim {self.obs_dim}.")
         log_pi = self.log_initial()
         log_A = self.log_transition()
         log_emiss = self.emission_log_prob(x)  # (B,T,S)
-
         backptr = x.new_zeros((B, T, self.num_states), dtype=torch.long)
         delta = log_pi.unsqueeze(0) + log_emiss[:, 0, :]  # (B,S)
         for t in range(1, T):
@@ -170,6 +296,23 @@ class HMM(BaseModel):
         for t in range(T - 2, -1, -1):
             path[:, t] = backptr[torch.arange(B), t + 1, path[:, t + 1]]
         return path
+        # log_pi = self.log_initial()
+        # log_A = self.log_transition()
+        # log_emiss = self.emission_log_prob(x)  # (B,T,S)
+
+        # backptr = x.new_zeros((B, T, self.num_states), dtype=torch.long)
+        # delta = log_pi.unsqueeze(0) + log_emiss[:, 0, :]  # (B,S)
+        # for t in range(1, T):
+        #     scores = delta.unsqueeze(2) + log_A.unsqueeze(0)  # (B,S,S)
+        #     delta, idx = torch.max(scores, dim=1)            # (B,S)
+        #     delta = delta + log_emiss[:, t, :]
+        #     backptr[:, t, :] = idx
+        # last = torch.argmax(delta, dim=1)  # (B,)
+        # path = x.new_zeros((B, T), dtype=torch.long)
+        # path[:, -1] = last
+        # for t in range(T - 2, -1, -1):
+        #     path[:, t] = backptr[torch.arange(B), t + 1, path[:, t + 1]]
+        # return path
 
     # ----------------------- Initialization helpers -----------------------
     @torch.no_grad()
@@ -216,7 +359,19 @@ class HMM(BaseModel):
         resid = flat - means[assign]
         var = resid.pow(2).mean(0).clamp_min(1e-6)  # (D,)
         self.emission_mean.copy_(means)
-        self.emission_logvar.copy_(var.log().expand(S, D))
+        if self.covariance_type == "diag":
+            self.emission_logvar.copy_(var.log().expand(S, D))
+        elif self.covariance_type == "full":
+            # Initialise to diagonal with var -> set raw so that softplus(raw)=sqrt(var)
+            target_std = var.sqrt().clamp_min(1e-6)
+            with torch.no_grad():
+                raw = torch.zeros_like(self.emission_cholesky_raw)
+                diag_inv_softplus = torch.log(torch.exp(target_std - self.jitter) - 1.0)
+                for s in range(S):
+                    raw[s].fill_(0.)
+                    raw[s].diagonal().copy_(diag_inv_softplus)
+                self.emission_cholesky_raw.copy_(raw)
+        # meanonly: nothing
 
         # -------- Transitions / initial --------
         if estimate_transitions:

@@ -1,0 +1,67 @@
+## Realistic synthetic sleep config derived from real data exploration (excluding Artifact stage)
+## Source stats (approx):
+##   Stage proportions (mean): Awake ~45%, NREM ~49%, REM ~6%
+##   Transition high self-persistence (>99.99% per 30s epoch) so we reduce slightly for variability.
+##   Non-self transitions (normalized) suggest: Awake->NREM dominant, NREM->Awake dominant,
+##     REM often goes to Awake, smaller fractions to NREM.
+##
+## Generator stages order: 0=Awake, 1=NREM, 2=REM
+name: test2
+sampling_rate_hz: 128          # Close to dataset median (assumed 128 Hz)
+epoch_length_s: 4              # Standard PSG scoring epoch length
+n_epochs: 1000                   # ~3h20m of data (400*30s)
+n_stages: 3
+
+# Transition matrix (row i -> next state j). Rows sum to 1.
+# Derived by taking self-transition ~0.995 (less extreme than observed to allow variability)
+# and distributing remaining probability according to change-only probabilities (excluding Artifact) re-normalized.
+# change-only approximate ratios (from data, excluding Artifact column):
+#   Awake: to NREM ~0.9439, REM ~0.00207 -> renorm -> NREM 0.998, REM 0.002
+#   NREM: to Awake ~0.7798, REM ~0.2122 -> renorm -> Awake 0.786, REM 0.214
+#   REM: to Awake ~0.9356, NREM ~0.0569 -> renorm -> Awake 0.9427, NREM 0.0573
+# Remaining (1 - self) = 0.005 distributed by those ratios.
+transition_matrix:
+  # - [0.972, 0.028, 0.000]      # Awake row
+  # - [0.021, 0.969, 0.010]      # NREM row
+  # - [0.066, 0.004, 0.930]      # REM row
+  - [0.8, 0.1, 0.1]      # Awake row
+  - [0.1, 0.8, 0.1]      # NREM row
+  - [0.1, 0.1, 0.8]      # REM row
+
+# Frequency bins (Hz) focusing on sleep-relevant bands up to 35 Hz
+frequency_bins:
+  - [0.5, 4.0]    # Delta
+  - [4.0, 8.0]    # Theta
+  - [8.0, 12.0]   # Alpha
+  - [12.0, 30.0]  # Beta
+  - [30.0, 100.0]  # Gamma
+
+# stage_band_powers: relative amplitude prototypes per stage per bin
+# Awake: higher alpha, some theta/beta. NREM: strong delta + sigma (spindles). REM: theta + some alpha, reduced delta.
+stage_band_powers:
+  - [0.0, 0.2, 1.0, 0.5, 0.0]    # Awake: strong alpha, some theta/beta
+  - [1.5, 0.2, 0.0, 0.0, 0.0]    # NREM: very strong delta
+  - [0.0, 1.0, 0.2, 0.0, 1.0]    # REM: strong theta/gamma
+
+# stage_bin_selection_probability: sampling probability for each frequency bin per stage (rows sum to 1)
+# Bias selection toward dominant bands per stage consistent with band powers.
+stage_bin_selection_probability:
+  # uniform distribution below
+  - [0.2, 0.2, 0.2, 0.2, 0.2]  # Awake
+  - [0.2, 0.2, 0.2, 0.2, 0.2]  # NREM
+  - [0.2, 0.2, 0.2, 0.2, 0.2]  # REM
+
+components_per_epoch: 1000        # Slightly richer spectral composition
+amplitude_jitter_range: [0.8, 1.2]   # Default jitter; adjust to widen or narrow variability
+stage_mean_amplitudes: [0.0, 0.0, 0.0]
+
+# Linear boundary smoothing between epochs (seconds). Set 0 to disable.
+overlap_s: 0.25
+stage_rms_scales: [1.0, 1.0, 1.0]
+
+# Normalize each epoch to unit std before applying stage_rms_scales
+normalize_epoch: False
+seed: 123                      # Reproducibility
+
+# Optional stage names mapping for downstream visualization
+stage_names: [Awake, NREM, REM]

@@ -70,7 +70,11 @@ class BaseTrainer:
 		if loss_fn is None:
 			# Assume model(x) returns per-sample log-likelihood -> maximize => minimize -mean
 			def _default_loss(out: torch.Tensor, _: list[torch.Tensor] | None) -> torch.Tensor:
-				return -out.mean()
+				loss = -out.mean()
+				reg_fn = getattr(self.model, "regularization_loss", None)
+				if callable(reg_fn):
+					loss = loss + reg_fn()
+				return loss
 			loss_fn = _default_loss
 		self.loss_fn = loss_fn
 
