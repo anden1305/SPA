@@ -398,4 +398,92 @@ class HMM(BaseModel):
             if p.grad is not None:
                 p.grad.zero_()
 
+    @torch.no_grad()
+    def reset_parameters_random(
+        self,
+        data: Tensor | None = None,
+        kmeans_iters: int = 15,
+        estimate_transitions: bool = True,
+        mean_std: float = 1e-2,
+        cov_noise_std: float = 1e-3,
+        init_logits_std: float = 0.0,
+        self_transition_bias: float = 0.0,
+    ) -> None:
+        """K-means init followed by small random noise (symmetry breaking).
+
+        If ``data`` is provided, run ``reset_parameters(data, ...)`` to get a
+        sensible K-means initialisation for emissions (and optionally pi/A),
+        then add small random noise to parameters to avoid degenerate plateaus.
+        If ``data`` is None, fall back to a pure random jitter initialisation
+        close to Identity covariance.
+
+        Parameters
+        ----------
+        data : Tensor | None
+            Training batch or dataset slice shaped (T,D) or (B,T,D) used for K-means.
+        kmeans_iters : int
+            Number of K-means refinement iterations.
+        estimate_transitions : bool
+            Whether to estimate initial and transition probabilities from K-means labels.
+        mean_std : float
+            Std-dev of additive noise for emission means after initialisation.
+        cov_noise_std : float
+            Additive noise magnitude for covariance parameters (logvar or cholesky raw).
+        init_logits_std : float
+            Std-dev of additive noise for initial/transition logits after initialisation.
+        self_transition_bias : float
+            Optional extra bias added to transition logits diagonal after init (default 0.0).
+        """
+        # 1) Base initialisation
+        if data is not None:
+            # Use existing K-means initialiser
+            self.reset_parameters(data, kmeans_iters=kmeans_iters, estimate_transitions=estimate_transitions)
+        else:
+            # Fallback: initialise near Identity with small random differences
+            self.emission_mean.normal_(mean=0.0, std=mean_std)
+            if self.covariance_type == "diag":
+                self.emission_logvar.zero_()
+                if cov_noise_std > 0:
+                    self.emission_logvar.add_(cov_noise_std * torch.randn_like(self.emission_logvar))
+            elif self.covariance_type == "full":
+                raw = torch.zeros_like(self.emission_cholesky_raw)
+                if cov_noise_std > 0:
+                    tril_mask = torch.tril(torch.ones_like(raw)).bool()
+                    noise = cov_noise_std * torch.randn_like(raw)
+                    raw[tril_mask] = noise[tril_mask]
+                self.emission_cholesky_raw.copy_(raw)
+            # logits near 0
+            if init_logits_std > 0:
+                self.initial_logits.normal_(mean=0.0, std=init_logits_std)
+                self.transition_logits.normal_(mean=0.0, std=init_logits_std)
+            if self_transition_bias != 0.0:
+                self.transition_logits.diagonal().add_(float(self_transition_bias))
+
+        # 2) Add small random noise to break symmetry (applies to both branches)
+        # Emission means
+        if mean_std > 0:
+            self.emission_mean.add_(mean_std * torch.randn_like(self.emission_mean))
+
+        # Covariance params
+        if cov_noise_std > 0:
+            if self.covariance_type == "diag":
+                self.emission_logvar.add_(cov_noise_std * torch.randn_like(self.emission_logvar))
+            elif self.covariance_type == "full":
+                noise = cov_noise_std * torch.randn_like(self.emission_cholesky_raw)
+                tril_mask = torch.tril(torch.ones_like(self.emission_cholesky_raw)).bool()
+                self.emission_cholesky_raw[tril_mask] = self.emission_cholesky_raw[tril_mask] + noise[tril_mask]
+            # meanonly: nothing
+
+        # Logits (small unbiased jitter, optionally with diagonal bias)
+        if init_logits_std > 0:
+            self.initial_logits.add_(init_logits_std * torch.randn_like(self.initial_logits))
+            self.transition_logits.add_(init_logits_std * torch.randn_like(self.transition_logits))
+        if self_transition_bias != 0.0:
+            self.transition_logits.diagonal().add_(float(self_transition_bias))
+
+        # Clear any stale grads
+        for p in self.parameters():
+            if p.grad is not None:
+                p.grad.zero_()
+
 __all__ = ["HMM"]
