@@ -52,6 +52,7 @@ import torch
 from torch import Tensor
 import torch.nn as nn
 from typing import Optional, Sequence
+import itertools
 
 from .base_model import BaseModel
 
@@ -486,6 +487,120 @@ class HMM(BaseModel):
         for p in self.parameters():
             if p.grad is not None:
                 p.grad.zero_()
+
+    # ----------------------- Forward-Backward (Posterior) -----------------------
+    ## OPTIONAL - for testing math
+    @torch.no_grad()
+    def forward_backward(self, x: Tensor) -> tuple[Tensor, Tensor]:
+        """Compute posterior state probabilities (gamma) and log-likelihood.
+
+        Returns
+        -------
+        gamma : (T,S) posterior p(z_t | x)
+        logp  : scalar log p(x)
+        """
+        x_std = self._standardize_input(x.to(self.device))  # (B,T,D) or (1,T,D)
+        if x_std.shape[0] != 1:
+            raise ValueError("forward_backward expects a single sequence (T,D) or (1,T,D)")
+        _, T, _ = x_std.shape
+        log_pi = self.log_initial()               # (S,)
+        log_A = self.log_transition()             # (S,S)
+        log_emiss = self.emission_log_prob(x_std) # (1,T,S)
+        log_emiss = log_emiss.squeeze(0)          # (T,S)
+        S = self.num_states
+        # Forward
+        alpha = torch.empty((T, S), device=self.device)
+        alpha[0] = log_pi + log_emiss[0]
+        for t in range(1, T):
+            # shape (S,S): prev_alpha_j + log_A_{j->i}
+            scores = alpha[t-1].unsqueeze(1) + log_A  # (S,S)
+            alpha[t] = log_emiss[t] + torch.logsumexp(scores, dim=0)
+        logp = torch.logsumexp(alpha[-1], dim=0)
+        # Backward
+        beta = torch.empty((T, S), device=self.device)
+        beta[-1].zero_()
+        for t in range(T-2, -1, -1):
+            # (S,S): log_A_{i->j} + log_emiss_{t+1,j} + beta_{t+1,j}
+            scores = log_A + (log_emiss[t+1] + beta[t+1]).unsqueeze(0)
+            beta[t] = torch.logsumexp(scores, dim=1)
+        # Posterior
+        gamma = alpha + beta - logp  # log gamma
+        gamma = torch.softmax(gamma, dim=-1)  # numerically stable normalization
+        return gamma, logp
+
+    # ----------------------- Brute Force Likelihood (Tiny) -----------------------
+    ## OPTIONAL - for testing math
+    @torch.no_grad()
+    def brute_force_log_prob(self, x: Tensor, max_T: int = 8) -> Tensor:
+        """Exact log p(x) by enumerating all state sequences (for tiny T).
+
+        Useful for correctness verification. Only feasible for very small T.
+        """
+        x_std = self._standardize_input(x.to(self.device))  # (1,T,D) or (B,T,D)
+        if x_std.shape[0] != 1:
+            raise ValueError("brute_force_log_prob expects a single sequence")
+        _, T, _ = x_std.shape
+        if T > max_T:
+            raise ValueError(f"Sequence length T={T} too large for brute force (max_T={max_T})")
+        log_pi = self.log_initial()             # (S,)
+        log_A = self.log_transition()           # (S,S)
+        log_emiss = self.emission_log_prob(x_std).squeeze(0)  # (T,S)
+        S = self.num_states
+        paths = []
+        for states in itertools.product(range(S), repeat=T):
+            lp = log_pi[states[0]] + log_emiss[0, states[0]]
+            for t in range(1, T):
+                lp = lp + log_A[states[t-1], states[t]] + log_emiss[t, states[t]]
+            paths.append(lp)
+        return torch.logsumexp(torch.stack(paths), dim=0)
+
+    # ----------------------- Tiny Verification Bundle -----------------------
+    ## OPTIONAL - for testing math
+    @torch.no_grad()
+    def verify_tiny(self, x: Tensor, atol: float = 1e-5, verbose: bool = True) -> dict:
+        """Run a set of internal consistency checks on a tiny sequence.
+
+        Checks:
+            - forward vs brute-force likelihood
+            - forward vs forward_backward log-likelihood
+            - Viterbi path joint prob <= log-likelihood
+            - gamma rows sum to 1
+        Returns dictionary of metrics / differences.
+        """
+        bf = self.brute_force_log_prob(x)
+        fw = self.forward(x).squeeze(0)
+        gamma, fb = self.forward_backward(x)
+        # Viterbi path joint prob
+        path = self.decode_viterbi(x).squeeze(0)
+        x_std = self._standardize_input(x.to(self.device))
+        log_pi = self.log_initial()
+        log_A = self.log_transition()
+        log_emiss = self.emission_log_prob(x_std).squeeze(0)  # (T,S)
+        joint = log_pi[path[0]] + log_emiss[0, path[0]]
+        for t in range(1, path.numel()):
+            joint = joint + log_A[path[t-1], path[t]] + log_emiss[t, path[t]]
+        max_diff = (fw - joint).item()
+        gamma_row_sums = gamma.sum(-1)
+        metrics = {
+            "logp_forward": fw.item(),
+            "logp_bruteforce": bf.item(),
+            "abs_diff_forward_bruteforce": abs(fw.item() - bf.item()),
+            "logp_forward_backward": fb.item(),
+            "abs_diff_forward_fb": abs(fw.item() - fb.item()),
+            "viterbi_joint": joint.item(),
+            "forward_minus_viterbi_joint": max_diff,
+            "gamma_row_sums_min": gamma_row_sums.min().item(),
+            "gamma_row_sums_max": gamma_row_sums.max().item(),
+        }
+        if verbose:
+            print("[HMM verify_tiny]")
+            for k, v in metrics.items():
+                print(f"  {k}: {v}")
+            if metrics["abs_diff_forward_bruteforce"] > atol:
+                print(f"  WARNING: forward vs brute-force diff {metrics['abs_diff_forward_bruteforce']:.3e} > atol={atol}")
+            if metrics["abs_diff_forward_fb"] > atol:
+                print(f"  WARNING: forward vs forward_backward diff {metrics['abs_diff_forward_fb']:.3e} > atol={atol}")
+        return metrics
 
     # ----------------------- Lightweight Plot Helper -----------------------
     def plot_pca_scatter(
