@@ -3,6 +3,8 @@ from scr.data.base_dataset import BaseDataset
 import yaml
 import numpy as np
 
+from scr.preprocessing.normalize import Normalize
+
 class SyntheticDataset(BaseDataset):
     """Documentation
     
@@ -11,6 +13,7 @@ class SyntheticDataset(BaseDataset):
     
     def __init__(self, path: str):
         self.path = path
+        self.normalize = Normalize()
         self.__initialize()
     
     def __initialize(self):
@@ -18,6 +21,7 @@ class SyntheticDataset(BaseDataset):
         self.data: np.ndarray = np.load(self.path + "/eeg.npy")
         if self.data.ndim == 1:
             self.data = self.data[np.newaxis, :]
+        self.data = self.normalize(self.data)
         self.n_features = self.data.shape[0]
         self.n_timesteps = self.data.shape[1]
         self.raw_labels: np.ndarray = np.load(self.path + "/labels.npy")
