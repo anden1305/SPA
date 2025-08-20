@@ -16,11 +16,11 @@ from __future__ import annotations
 import sys, pathlib, argparse, random
 import numpy as np
 import torch
-# use the data loader
-# Ensure project root (parent of scripts/) is on sys.path for `import scr`.
+
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
 	sys.path.insert(0, str(PROJECT_ROOT))
+
 from scr.data.synthetic_loader import SyntheticLoader
 from scr.data.synthetic_dataset import SyntheticDataset
 from scr.preprocessing.collapse_dimensions import CollapseDimensions
@@ -31,6 +31,22 @@ import matplotlib.pyplot as plt
 
 from scr.data.synthetic_dataset import SyntheticDataset
 from scr.models.hmm import HMM
+
+def parse_args():
+	P = argparse.ArgumentParser(description="Train HMM on synthetic EEG")
+	P.add_argument("--data-path", type=pathlib.Path, required=True, default="data\\synthetic_data\\test", help="Synthetic dataset directory (contains eeg.npy, labels.npy, config_copy.yml)")
+	P.add_argument("--epochs", type=int, default=15000)
+	P.add_argument("--num-states", type=int, default=4)
+	P.add_argument("--lr", type=float, default=1e-2)
+	P.add_argument("--seed", type=int, default=0)
+	P.add_argument("--save", type=pathlib.Path, default=None, help="Output file (.pt)")
+	P.add_argument("--normalize", action="store_true", help="Per-feature z-score over time")
+	P.add_argument("--grad-clip", type=float, default=None, help="Gradient norm clip (optional)")
+	P.add_argument("--save-pred", type=pathlib.Path, default=None, help="Optional .npy path to save decoded Viterbi state sequence")
+	P.add_argument("--init", choices=["default","kmeans"], default="kmeans", help="Parameter init: default uniform/zeros or kmeans data-driven")
+	P.add_argument("--kmeans-iters", type=int, default=15, help="K-means refinement iterations when --init kmeans")
+	P.add_argument("--no-estimate-transitions", action="store_true", help="When using kmeans init, do not estimate pi/transition from clusters")
+	return P.parse_args()
 
 
 def _normalized_mutual_info(preds: np.ndarray, labels: np.ndarray, eps: float = 1e-12) -> float:
@@ -72,23 +88,6 @@ def _normalized_mutual_info(preds: np.ndarray, labels: np.ndarray, eps: float = 
 	return float(2 * I / den)
 
 
-def parse_args():
-	P = argparse.ArgumentParser(description="Train HMM on synthetic EEG")
-	P.add_argument("--data-path", type=pathlib.Path, required=True, default="data\\synthetic_data\\test", help="Synthetic dataset directory (contains eeg.npy, labels.npy, config_copy.yml)")
-	P.add_argument("--epochs", type=int, default=15000)
-	P.add_argument("--num-states", type=int, default=4)
-	P.add_argument("--lr", type=float, default=1e-2)
-	P.add_argument("--seed", type=int, default=0)
-	P.add_argument("--save", type=pathlib.Path, default=None, help="Output file (.pt)")
-	P.add_argument("--normalize", action="store_true", help="Per-feature z-score over time")
-	P.add_argument("--grad-clip", type=float, default=None, help="Gradient norm clip (optional)")
-	P.add_argument("--save-pred", type=pathlib.Path, default=None, help="Optional .npy path to save decoded Viterbi state sequence")
-	P.add_argument("--init", choices=["default","kmeans"], default="kmeans", help="Parameter init: default uniform/zeros or kmeans data-driven")
-	P.add_argument("--kmeans-iters", type=int, default=15, help="K-means refinement iterations when --init kmeans")
-	P.add_argument("--no-estimate-transitions", action="store_true", help="When using kmeans init, do not estimate pi/transition from clusters")
-	return P.parse_args()
-
-
 def seed_all(seed: int):
 	random.seed(seed)
 	np.random.seed(seed)
@@ -100,27 +99,30 @@ def seed_all(seed: int):
 def main():
 	args = parse_args()
 	seed_all(args.seed)
-	
+
 	dataset = SyntheticDataset('data/synthetic_data/test')  # TODO: consider using args.data_path
 	# Keep a handle to the transform to access window_size for plotting
 	fft_transform = FFT({'window_size': 512})
 	dimension_transform = CollapseDimensions({})
-	
+
 	dataloader = SyntheticLoader(
-        dataset=dataset,
-        batch_size=5120,
-        shuffle=False,
-        transforms=[
-            fft_transform,
-            dimension_transform
-        ]
-    )
-	
+		dataset=dataset,
+		batch_size=5120,
+		shuffle=False,
+		transforms=[
+			fft_transform,
+			dimension_transform
+		]
+	)
+
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 	# Grab (and cache) the single (full) batch produced by the synthetic loader + transforms
 	# Loader yields a single tuple (X, Y) where X shape (T, D) after FFT+collapse.
-	batch_x_np, batch_y_np = next(iter(dataloader))  # (T,D), (T,) (labels unused for unsupervised)
-	
+	# batch_x_np, batch_y_np = next(iter(dataloader))  # (T,D), (T,) (labels unused for unsupervised)
+	data = [(x,y) for x,y in dataloader]
+	batch_x_np = np.concatenate([xx for xx, _ in data])
+	batch_y_np = np.concatenate([yy for _, yy in data])
+
 	# Determine final feature dimension after transforms (not the raw channel count)
 	obs_dim = batch_x_np.shape[1] if batch_x_np.ndim == 2 else batch_x_np.shape[-1]
 	model = HMM(num_states=dataset.n_stages, obs_dim=obs_dim, normalize_time=True, device=device)
