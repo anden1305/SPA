@@ -35,7 +35,7 @@ from scr.models.hmm import HMM
 def parse_args():
 	P = argparse.ArgumentParser(description="Train HMM on synthetic EEG")
 	P.add_argument("--data-path", type=pathlib.Path, required=True, default="data\\synthetic_data\\test", help="Synthetic dataset directory (contains eeg.npy, labels.npy, config_copy.yml)")
-	P.add_argument("--epochs", type=int, default=15000)
+	P.add_argument("--epochs", type=int, default=150)
 	P.add_argument("--num-states", type=int, default=4)
 	P.add_argument("--lr", type=float, default=1e-2)
 	P.add_argument("--seed", type=int, default=0)
@@ -43,8 +43,8 @@ def parse_args():
 	P.add_argument("--normalize", action="store_true", help="Per-feature z-score over time")
 	P.add_argument("--grad-clip", type=float, default=None, help="Gradient norm clip (optional)")
 	P.add_argument("--save-pred", type=pathlib.Path, default=None, help="Optional .npy path to save decoded Viterbi state sequence")
-	P.add_argument("--init", choices=["default","kmeans"], default="kmeans", help="Parameter init: default uniform/zeros or kmeans data-driven")
-	P.add_argument("--kmeans-iters", type=int, default=15, help="K-means refinement iterations when --init kmeans")
+	P.add_argument("--init", choices=["default","kmeans"], default="kmeans", help="Parameter init: default random or kmeans data-driven")
+	P.add_argument("--kmeans-iters", type=int, default=1, help="K-means refinement iterations when --init kmeans")
 	P.add_argument("--no-estimate-transitions", action="store_true", help="When using kmeans init, do not estimate pi/transition from clusters")
 	P.add_argument("--scatter2d", action="store_true", default=True, help="Generate 2D PCA scatter (true vs predicted)")
 	P.add_argument("--scatter-subsample", type=int, default=10000, help="Max number of time points to plot (uniform subsample)")
@@ -103,7 +103,7 @@ def main():
 	args = parse_args()
 	seed_all(args.seed)
 
-	dataset = SyntheticDataset('data/synthetic_data/test')  # TODO: consider using args.data_path
+	dataset = SyntheticDataset(str(args.data_path))  # Load synthetic dataset from specified path (pass as str to avoid Path + str issues)
 	# Keep a handle to the transform to access window_size for plotting
 	fft_transform = FFT({'window_size': 512})
 	dimension_transform = CollapseDimensions({})
