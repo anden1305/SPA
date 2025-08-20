@@ -51,6 +51,7 @@ import math
 import torch
 from torch import Tensor
 import torch.nn as nn
+from typing import Optional, Sequence
 
 from .base_model import BaseModel
 
@@ -485,5 +486,99 @@ class HMM(BaseModel):
         for p in self.parameters():
             if p.grad is not None:
                 p.grad.zero_()
+
+    # ----------------------- Lightweight Plot Helper -----------------------
+    def plot_pca_scatter(
+        self,
+        x: Tensor,
+        true_labels: Optional[Sequence[int]] = None,
+        pred_labels: Optional[Sequence[int]] = None,
+        subsample: int = 5000,
+        out_path: Optional[str] = None,
+    ) -> Optional[str]:
+        """Generate a simple 2D PCA scatter of the (T,D) sequence.
+
+        Parameters
+        ----------
+        x : Tensor | (T,D) or (B,T,D)
+            Input sequence(s); if batched, will be flattened across batch.
+        true_labels : optional sequence length T
+        pred_labels : optional sequence length T
+        subsample : int
+            Uniformly subsample at most this many time points (0 => no limit).
+        out_path : str | None
+            If provided, saves figure to this path (parent dirs must exist).
+
+        Returns
+        -------
+        out_path if saved, else None.
+        """
+        try:
+            import numpy as _np
+            import matplotlib.pyplot as _plt
+        except Exception:
+            raise RuntimeError("matplotlib and numpy required for plot_pca_scatter")
+
+        x_std = self._standardize_input(x.to(self.device))  # (B,T,D)
+        B, T, D = x_std.shape
+        X = x_std.reshape(B * T, D).detach().cpu().numpy()  # (N,D)
+
+        if true_labels is not None:
+            true_arr = _np.asarray(true_labels).ravel()
+        else:
+            true_arr = None
+        if pred_labels is not None:
+            pred_arr = _np.asarray(pred_labels).ravel()
+        else:
+            pred_arr = None
+
+        N = X.shape[0]
+        if subsample and subsample > 0 and N > subsample:
+            idx = _np.linspace(0, N - 1, subsample).astype(int)
+            Xs = X[idx]
+            if true_arr is not None and true_arr.shape[0] == N:
+                true_arr = true_arr[idx]
+            if pred_arr is not None and pred_arr.shape[0] == N:
+                pred_arr = pred_arr[idx]
+        else:
+            Xs = X
+
+        # PCA via SVD
+        Xc = Xs - Xs.mean(0, keepdims=True)
+        U, Svals, _ = _np.linalg.svd(Xc, full_matrices=False)
+        proj = (U[:, :2] * Svals[:2]) if Svals.size >= 2 else _np.pad(U[:, :1] * Svals[:1], ((0,0),(0,1)))
+
+        def _color_map(labels):
+            if labels is None:
+                return None
+            palette = _np.array(["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"])
+            uniq = _np.unique(labels)
+            lut = {u: palette[i % len(palette)] for i, u in enumerate(sorted(uniq))}
+            return _np.array([lut[v] for v in labels])
+
+        colors_true = _color_map(true_arr)
+        colors_pred = _color_map(pred_arr)
+
+        ncols = 1 + int(pred_arr is not None and true_arr is not None)
+        fig, axes = _plt.subplots(1, ncols, figsize=(5 * ncols, 4), sharex=True, sharey=True)
+        if ncols == 1:
+            axes = [axes]
+        if true_arr is not None and pred_arr is not None:
+            axes[0].scatter(proj[:, 0], proj[:, 1], c=colors_true, s=6, alpha=0.8, edgecolors='none')
+            axes[0].set_title('True Labels (PCA)')
+            axes[1].scatter(proj[:, 0], proj[:, 1], c=colors_pred, s=6, alpha=0.8, edgecolors='none')
+            axes[1].set_title('Predicted Labels (PCA)')
+        else:
+            axes[0].scatter(proj[:, 0], proj[:, 1], c=colors_pred or colors_true or '#1f77b4', s=6, alpha=0.8, edgecolors='none')
+            axes[0].set_title('PCA Scatter')
+        for ax in axes:
+            ax.set_xlabel('PC1')
+        axes[0].set_ylabel('PC2')
+        _plt.tight_layout()
+        if out_path is not None:
+            _plt.savefig(out_path, dpi=150)
+            _plt.close(fig)
+            return out_path
+        return None
 
 __all__ = ["HMM"]

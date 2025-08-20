@@ -46,6 +46,9 @@ def parse_args():
 	P.add_argument("--init", choices=["default","kmeans"], default="kmeans", help="Parameter init: default uniform/zeros or kmeans data-driven")
 	P.add_argument("--kmeans-iters", type=int, default=15, help="K-means refinement iterations when --init kmeans")
 	P.add_argument("--no-estimate-transitions", action="store_true", help="When using kmeans init, do not estimate pi/transition from clusters")
+	P.add_argument("--scatter2d", action="store_true", default=True, help="Generate 2D PCA scatter (true vs predicted)")
+	P.add_argument("--scatter-subsample", type=int, default=10000, help="Max number of time points to plot (uniform subsample)")
+	P.add_argument("--plot-dir", type=pathlib.Path, default=pathlib.Path("results/training"), help="Directory to save plots")
 	return P.parse_args()
 
 
@@ -171,6 +174,21 @@ def main():
 	# NMI
 	nmi = _normalized_mutual_info(preds_tensor.numpy(), batch_y_np)
 	print(f"NMI: {nmi:.6f}")
+
+	# ---------------- Simple 2D scatter (true vs predicted) ----------------
+	if args.scatter2d:
+		args.plot_dir.mkdir(parents=True, exist_ok=True)
+		print("[Scatter2D] Building PCA projection and plotting true vs predicted labels...")
+		from pathlib import Path as _P
+		out_path = args.plot_dir / f"hmm_{args.data_path.name}_scatter2d.png"
+		_ = model.plot_pca_scatter(
+			batch_x,
+			true_labels=batch_y_np,
+			pred_labels=preds_tensor.numpy(),
+			subsample=args.scatter_subsample,
+			out_path=str(out_path),
+		)
+		print(f"[Scatter2D] Saved {out_path}")
 
 	# Optional silent saves
 	if args.save_pred:
