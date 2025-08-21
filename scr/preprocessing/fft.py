@@ -47,8 +47,7 @@ class FFT(BaseTransform):
             return np.log(power + self.eps).astype(np.float32)
         raise ValueError(f"Unknown feature '{self.feature}'. Use 'magnitude', 'power', or 'log_power'.")
     
-    def __reshape_input(self, samples: tuple[np.ndarray, np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
-        x, y = samples  # x: (C, T)
+    def __reshape_input(self, x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         C, T = x.shape
         n = T // self.window_size
         T_trunc = n * self.window_size
@@ -67,14 +66,13 @@ class FFT(BaseTransform):
             return vals[counts.argmax()]
 
         return np.apply_along_axis(vote, 1, Y)
-    
-    def __call__(self, samples: tuple[np.ndarray, np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
+
+    def __call__(self, x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Documentation
         Processes the data. Input is of shape (C, T) and output is real-valued of shape (T, C, F),
         where F is features per channel, T is timestamps and C is channels.
         """
-        x, y = samples
-        x, y = self.__reshape_input(samples=samples)
+        x, y = self.__reshape_input(x,y)
         Xc = self.__perform_fft(x=x)
         X = self.__complex_to_real_features(Xc)
         Y = self.__downsample_by_majority_voting(y=y)

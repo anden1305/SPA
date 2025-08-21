@@ -19,3 +19,7 @@ class BaseModel(nn.Module, ABC):
     @abstractmethod
     def forward(self, x: Tensor) -> Tensor:  # pragma: no cover - interface
         raise NotImplementedError('This method has to be implemented.')
+    
+    @abstractmethod
+    def __str__(self) -> str:
+        raise NotImplementedError('This method has to be implemented.')

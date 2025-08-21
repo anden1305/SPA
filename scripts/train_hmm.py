@@ -137,7 +137,7 @@ def main():
 		print(f"[Init] K-means (iters={args.kmeans_iters}, estimate_transitions={not args.no_estimate_transitions})")
 		model.reset_parameters(batch_x, kmeans_iters=args.kmeans_iters, estimate_transitions=not args.no_estimate_transitions)
 	else:
-		model.reset_parameters_random(batch_x, mean_std=1.6, cov_noise_std=1.6, init_logits_std=1.6)
+		model.reset_parameters_random(batch_x, mean_std=2, cov_noise_std=2, init_logits_std=2)
 
 	optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
