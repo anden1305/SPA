@@ -1,0 +1,68 @@
+
+
+from scr.config.config import GlobalConfig
+from scr.data.base_dataset import BaseDataset
+from scr.data.data_loader import DataLoader
+from scr.data.mssv_dataset import MSSVDataset
+from scr.data.synthetic_dataset import SyntheticDataset
+from scr.models.base_model import MLModel
+from scr.models.hmm import HMM
+from scr.models.new_hmm import NewHMM
+from scr.training.trainer import Trainer
+
+
+class Orchestrator:
+    
+    def __init__(self, config_path: str):
+        self.config_path = config_path
+        self.__set_config()
+        self.__prepare()
+
+    def __set_config(self):
+        self.global_config = GlobalConfig.from_yaml(self.config_path)
+
+    def __prepare(self):
+        self.dataset = self.__get_dataset()
+        self.data_loader = self.__get_dataloader(self.dataset)
+        self.model = self.__get_model()
+        self.trainer = self.__get_trainer(self.data_loader, self.model)
+    
+    def run(self):
+        self.trainer.train()
+
+    def __get_trainer(self, 
+                      data_loader: DataLoader,
+                      model: MLModel):
+        return Trainer(
+            data_loader=data_loader,
+            model=model,
+            config=self.global_config
+        )
+    
+    def __get_dataloader(self, dataset: BaseDataset):
+        return DataLoader(dataset=dataset, config=self.global_config)
+
+    def __get_dataset(self):
+        match self.global_config.dataset.type:
+            case "synthetic":
+                return SyntheticDataset(config=self.global_config)
+            case "mssv":
+                return MSSVDataset(config=self.global_config)
+            case _:
+                raise ValueError(f"Unknown dataset type: {self.global_config.dataset.type}")
+
+    def __get_model(self):
+        match self.global_config.model.type:
+            case "hmm":
+                return HMM(data_loader=self.data_loader, config=self.global_config)
+            case "new_hmm":
+                return NewHMM(data_loader=self.data_loader, config=self.global_config)
+            case _:
+                raise ValueError(f"Unknown model type: {self.global_config.model.type}")
+    
+    def __str__(self):
+        return (f"Orchestrator(config_path={self.config_path}, "
+                f"dataset={self.dataset}, "
+                f"data_loader={self.data_loader}, "
+                f"model={self.model}, "
+                f"trainer={self.trainer})")

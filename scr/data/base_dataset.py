@@ -3,6 +3,8 @@ from abc import ABC, abstractmethod
 import numpy as np
 import yaml
 
+from scr.config.config import GlobalConfig
+
 class BaseDataset(ABC):
     """Documentation
     
@@ -10,10 +12,11 @@ class BaseDataset(ABC):
     """
     
     def __init__(self,
-                 id: str,
-                 normalize: bool = True):
-        self.id = id
-        self.normalize = normalize
+                 config: GlobalConfig):
+        self.global_config = config
+        self.config = self.global_config.dataset
+        self.id = self.config.id
+        self.normalize = self.config.normalize
         self.config = self.load_config()
         self.data = self.load_data()
         self.labels = self.load_labels()
@@ -69,6 +72,9 @@ class BaseDataset(ABC):
 
     def __getitem__(self, idx):
         return self.data[:, idx], self.labels[idx]
+    
+    def get_num_states(self):
+        return self.config['n_stages']
 
     ###### ABSTRACT METHODS ######
 

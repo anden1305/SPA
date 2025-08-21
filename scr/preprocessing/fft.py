@@ -1,6 +1,7 @@
 
 import numpy as np
 
+from scr.config.config import TransformsConfig
 from scr.data.base_dataset import BaseDataset
 from scr.preprocessing.base_transform import BaseTransform
 
@@ -11,15 +12,16 @@ class FFT(BaseTransform):
     Abstract class for all preprocessing methods that is needed for this codebase.
     """
     
-    def __init__(self, params: dict):
-        self.params = params
-        assert 'window_size' in self.params, "Window size must be specified in params."
-        self.window_size: int = self.params['window_size']
-        # How to convert complex FFT to real features: 'magnitude' | 'power' | 'log_power'
-        self.feature: str = self.params.get('feature', 'log_power')
-        # Numerical stability for log power
-        self.eps: float = float(self.params.get('eps', 1e-12))
-    
+    def __init__(self, config: TransformsConfig):
+        super().__init__(config)
+        self.window_size: int = self.config.params['window_size']
+        self.feature: str = self.config.params.get('feature', 'log_power')
+        self.eps: float = float(self.config.params.get('eps', 1e-12))
+
+    def validate_config(self, config: TransformsConfig):
+        assert 'window_size' in config.params, "Window size must be specified in params."
+        assert isinstance(config.params['window_size'], int) and config.params['window_size'] > 0
+        
     def __perform_fft(self, x: np.ndarray) -> np.ndarray:
         return np.fft.rfft(x, axis=-1)
     
@@ -77,3 +79,6 @@ class FFT(BaseTransform):
         X = self.__complex_to_real_features(Xc)
         Y = self.__downsample_by_majority_voting(y=y)
         return X, Y
+    
+    def __str__(self) -> str:
+        return f"FFT(window_size={self.window_size}, feature={self.feature})"

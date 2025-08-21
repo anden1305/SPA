@@ -1,4 +1,5 @@
 
+from scr.config.config import GlobalConfig
 from scr.data.base_dataset import BaseDataset
 import yaml
 import numpy as np
@@ -11,10 +12,10 @@ class SyntheticDataset(BaseDataset):
     
     BASE_PATH = 'data/synthetic_data'
     
-    def __init__(self, id: str, normalize: bool = True):
-        self.data_path = f'{self.BASE_PATH}/{id}'
-        super().__init__(id=id, normalize=normalize)
-    
+    def __init__(self, config: GlobalConfig):
+        self.data_path = f'{self.BASE_PATH}/{config.dataset.id}'
+        super().__init__(config=config)
+
     def load_data(self):
         data = np.load(f'{self.data_path}/eeg.npy')
         data = data[np.newaxis, :]

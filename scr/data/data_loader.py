@@ -3,7 +3,7 @@ from typing import Iterator
 
 import numpy as np
 from scr.data.base_dataset import BaseDataset
-from scr.data.data_loader_config import DataLoaderConfig
+from scr.config.config import DataLoaderConfig, GlobalConfig, TransformsConfig
 from scr.preprocessing.base_transform import BaseTransform
 import torch
 from scr.preprocessing.collapse_dimensions import CollapseDimensions
@@ -17,24 +17,26 @@ class DataLoader(Iterator):
     
     def __init__(self, 
                  dataset: BaseDataset, 
-                 config: DataLoaderConfig,
+                 config: GlobalConfig,
                  device: torch.device = torch.device("cpu")):
+        self.global_config = config
+        self.config = self.global_config.dataloader
         self.dataset = dataset
-        self.batch_size = config.batch_size
-        self.__init_transforms(transforms_str=config.transforms)
+        self.batch_size = self.config.batch_size
+        self.__init_transforms(transform_configs=self.config.transforms)
         self.device = device
-        self.verbose = config.verbose
+        self.verbose = self.global_config.verbose
     
-    def __init_transforms(self, transforms_str: list[str]):
-        self.transforms = []
-        for transform in transforms_str:
-            match transform.lower():
+    def __init_transforms(self, transform_configs: list[TransformsConfig]):
+        self.transforms: list[BaseTransform] = []
+        for config in transform_configs:
+            match config.type.lower():
                 case "fft":
-                    self.transforms.append(FFT())
+                    self.transforms.append(FFT(config=config))
                 case "collapse_dimensions":
-                    self.transforms.append(CollapseDimensions())
+                    self.transforms.append(CollapseDimensions(config=config))
                 case _:
-                    raise ValueError(f"Unknown transform: {transform}")
+                    raise ValueError(f"Unknown transform: {config.type}.")
     
     def __len__(self) -> int:
         """Number of batches per epoch."""
@@ -66,6 +68,12 @@ class DataLoader(Iterator):
             x, y = self.__apply_transforms(x, y)
         self._cursor = end
         return torch.from_numpy(x).to(self.device), torch.from_numpy(y).to(self.device)
-    
+
+    def get_feature_dim(self) -> int:
+        x, y = self.dataset[:self.batch_size]
+        if self.transforms:
+            x, y = self.__apply_transforms(x, y)
+        return x.shape[-1]
+
     def __str__(self) -> str:
-        return f"DataLoader(dataset={self.dataset})"
+        return f"DataLoader(transform={self.transforms})"

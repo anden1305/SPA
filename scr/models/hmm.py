@@ -54,10 +54,13 @@ import torch.nn as nn
 from typing import Optional, Sequence
 import itertools
 
-from .base_model import BaseModel
+from scr.config.config import GlobalConfig
+from scr.data.data_loader import DataLoader
+
+from .base_model import MLModel
 
 
-class HMM(BaseModel):
+class HMM(MLModel):
     """Discrete‑time Hidden Markov Model with Gaussian emissions.
 
     Supports three emission covariance parameterisations:
@@ -87,39 +90,27 @@ class HMM(BaseModel):
         If True, divide log p(x) by sequence length T (average per time step).
     """
 
-    def __init__(
-        self,
-        num_states: int,
-        obs_dim: int,
-        covariance_type: str = "diag",
-        device: str | torch.device | None = None,
-        jitter: float = 1e-5,
-        normalize_time: bool = False,
-    ) -> None:
-        super().__init__()
-        self.num_states = int(num_states)
-        self.obs_dim = int(obs_dim)
-        if device is None:
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    def __init__(self,
+                 data_loader: DataLoader,
+                 config: GlobalConfig) -> None:
+        super().__init__(data_loader, config)
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.device = torch.device(device)
-        self.normalize_time = normalize_time  # if True, forward returns average log-prob per time step
-        self.covariance_type = covariance_type.lower()
-        if self.covariance_type not in {"diag", "full", "meanonly"}:
-            raise ValueError("covariance_type must be one of {'diag','full','meanonly'}")
-        self.jitter = float(jitter)
+        self.covariance_type = "diag"
+        self.jitter = float(1e-5)
 
         # Parameterization (logits for simplex params; mean/logvar for Gaussians)
         self.initial_logits = nn.Parameter(torch.zeros(self.num_states))                 # (S,)
         self.transition_logits = nn.Parameter(torch.zeros(self.num_states, self.num_states))  # (S,S)
-        self.emission_mean = nn.Parameter(torch.zeros(self.num_states, self.obs_dim))    # (S,D)
+        self.emission_mean = nn.Parameter(torch.zeros(self.num_states, self.num_features))    # (S,D)
         if self.covariance_type == "diag":
-            self.emission_logvar = nn.Parameter(torch.zeros(self.num_states, self.obs_dim))  # (S,D)
+            self.emission_logvar = nn.Parameter(torch.zeros(self.num_states, self.num_features))  # (S,D)
         elif self.covariance_type == "full":
             # Unconstrained lower‑triangular raw parameters for Cholesky factors L (S,D,D)
             # We store a full matrix then mask to lower tri; diagonals passed through softplus.
-            self.emission_cholesky_raw = nn.Parameter(torch.zeros(self.num_states, self.obs_dim, self.obs_dim))
+            self.emission_cholesky_raw = nn.Parameter(torch.zeros(self.num_states, self.num_features, self.num_features))
         else:  # meanonly -> no covariance parameters (implicit Identity)
-            self.register_buffer("_identity_cov", torch.eye(self.obs_dim))
+            self.register_buffer("_identity_cov", torch.eye(self.num_features))
         # Constant buffer for numerical expressions (avoids repeated Python math calls)
         self.register_buffer("_log_2pi", torch.tensor(math.log(2 * math.pi), dtype=torch.get_default_dtype()))
         self.to(self.device)
@@ -139,7 +130,7 @@ class HMM(BaseModel):
         L = torch.zeros_like(raw)
         L[tril_mask] = raw[tril_mask]
         # Stabilise diagonals: softplus + jitter
-        diag_idx = torch.arange(self.obs_dim, device=L.device)
+        diag_idx = torch.arange(self.num_features, device=L.device)
         diag = L[:, diag_idx, diag_idx]
         L[:, diag_idx, diag_idx] = torch.nn.functional.softplus(diag) + self.jitter
         return L
@@ -157,8 +148,8 @@ class HMM(BaseModel):
         """
         if x.dim() != 3:
             raise ValueError(f"emission_log_prob expects (B,T,D) after any flattening; got {tuple(x.shape)}")
-        if x.shape[2] != self.obs_dim:
-            raise ValueError(f"Input feature dimension {x.shape[2]} != model obs_dim {self.obs_dim}. If you passed (B,T,C,F) ensure obs_dim=C*F when constructing the model.")
+        if x.shape[2] != self.num_features:
+            raise ValueError(f"Input feature dimension {x.shape[2]} != model obs_dim {self.num_features}. If you passed (B,T,C,F) ensure obs_dim=C*F when constructing the model.")
         B, T, D = x.shape
         S = self.num_states
         # Broadcast diff: (B,T,1,D) - (S,D) -> (B,T,S,D)
@@ -226,18 +217,18 @@ class HMM(BaseModel):
         if x.dim() == 3:
             B, A, B_or_D = x.shape
             # Case already (B,T,D)
-            if x.shape[2] == self.obs_dim:
+            if x.shape[2] == self.num_features:
                 return x
             # Case (B,D,T)
-            if x.shape[1] == self.obs_dim:
+            if x.shape[1] == self.num_features:
                 return x.transpose(1, 2)
-            raise ValueError(f"3D input must have one dimension equal to obs_dim={self.obs_dim}; got {tuple(x.shape)}")
+            raise ValueError(f"3D input must have one dimension equal to obs_dim={self.num_features}; got {tuple(x.shape)}")
         if x.dim() == 2:
-            if x.shape[1] == self.obs_dim:  # (T,D)
+            if x.shape[1] == self.num_features:  # (T,D)
                 return x.unsqueeze(0)
-            if x.shape[0] == self.obs_dim:  # (D,T)
+            if x.shape[0] == self.num_features:  # (D,T)
                 return x.transpose(0,1).unsqueeze(0)
-            raise ValueError(f"2D input ambiguous shape {tuple(x.shape)} (obs_dim={self.obs_dim})")
+            raise ValueError(f"2D input ambiguous shape {tuple(x.shape)} (obs_dim={self.num_features})")
         raise ValueError(f"Unsupported input rank {x.dim()} (expected 2 or 3)")
 
     def forward(self, x: Tensor) -> Tensor:  # type: ignore[override]
@@ -251,8 +242,6 @@ class HMM(BaseModel):
         log_A = self.log_transition()
         log_emiss = self.emission_log_prob(x)
         logp = self._forward_algorithm(log_emiss, log_pi, log_A)
-        if self.normalize_time:
-            logp = logp / x.shape[1]
         return logp
 
     # ---------------- Convenience API aliases ----------------
@@ -268,7 +257,7 @@ class HMM(BaseModel):
 
     def extra_repr(self) -> str:  # type: ignore[override]
         return (
-            f"states={self.num_states}, obs_dim={self.obs_dim}, cov='{self.covariance_type}', "
+            f"states={self.num_states}, obs_dim={self.num_features}, cov='{self.covariance_type}', "
             f"normalize_time={self.normalize_time}"
         )
 
@@ -280,8 +269,8 @@ class HMM(BaseModel):
         """
         x = self._standardize_input(x.to(self.device))
         B, T, D = x.shape
-        if D != self.obs_dim:
-            raise ValueError(f"Input feature dimension {D} != model obs_dim {self.obs_dim}.")
+        if D != self.num_features:
+            raise ValueError(f"Input feature dimension {D} != model obs_dim {self.num_features}.")
         log_pi = self.log_initial()
         log_A = self.log_transition()
         log_emiss = self.emission_log_prob(x)  # (B,T,S)
@@ -298,23 +287,6 @@ class HMM(BaseModel):
         for t in range(T - 2, -1, -1):
             path[:, t] = backptr[torch.arange(B), t + 1, path[:, t + 1]]
         return path
-        # log_pi = self.log_initial()
-        # log_A = self.log_transition()
-        # log_emiss = self.emission_log_prob(x)  # (B,T,S)
-
-        # backptr = x.new_zeros((B, T, self.num_states), dtype=torch.long)
-        # delta = log_pi.unsqueeze(0) + log_emiss[:, 0, :]  # (B,S)
-        # for t in range(1, T):
-        #     scores = delta.unsqueeze(2) + log_A.unsqueeze(0)  # (B,S,S)
-        #     delta, idx = torch.max(scores, dim=1)            # (B,S)
-        #     delta = delta + log_emiss[:, t, :]
-        #     backptr[:, t, :] = idx
-        # last = torch.argmax(delta, dim=1)  # (B,)
-        # path = x.new_zeros((B, T), dtype=torch.long)
-        # path[:, -1] = last
-        # for t in range(T - 2, -1, -1):
-        #     path[:, t] = backptr[torch.arange(B), t + 1, path[:, t + 1]]
-        # return path
 
     # ----------------------- Initialization helpers -----------------------
     @torch.no_grad()
@@ -336,7 +308,7 @@ class HMM(BaseModel):
             raise ValueError("data must have shape (T,D) or (B,T,D)")
         B, T, D = data.shape
         S = self.num_states
-        if D != self.obs_dim:
+        if D != self.num_features:
             raise ValueError("obs_dim mismatch")
         device = self.device
         flat = data.reshape(-1, D).to(device)
@@ -695,5 +667,12 @@ class HMM(BaseModel):
             _plt.close(fig)
             return out_path
         return None
+    
+    def prepare_for_training(self, data: Tensor):
+        self.train()
+        self.reset_parameters_random()
+
+    def __str__(self):
+        return f"HMM(num_states={self.num_states}, num_features={self.num_features})"
 
 __all__ = ["HMM"]

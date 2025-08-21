@@ -3,9 +3,9 @@ import torch
 from torch import Tensor
 import torch.nn as nn
 from typing import Optional
-from .base_model import BaseModel
+from .base_model import MLModel
 
-class HMM(BaseModel):
+class HMM(MLModel):
     
     def __init__(
         self,

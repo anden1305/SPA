@@ -1,13 +1,17 @@
 import numpy as np
 
+from scr.config.config import TransformsConfig
 from scr.data.base_dataset import BaseDataset
 from scr.preprocessing.base_transform import BaseTransform
 
 
 class CollapseDimensions(BaseTransform):
 
-    def __init__(self, params: dict):
-        self.params = params
+    def __init__(self, config: TransformsConfig):
+        super().__init__(config)
+
+    def validate_config(self, _: TransformsConfig):
+        pass
 
     def __collapse_dimensions(self, x: np.ndarray, y: np.ndarray):
         X = x.reshape(x.shape[0], -1)  # Collapse dimensions to (T, F*C)
@@ -19,4 +23,6 @@ class CollapseDimensions(BaseTransform):
         where F is features per channel, T is timestamps and C is channels.
         """
         return self.__collapse_dimensions(x, y)
-        
+    
+    def __str__(self) -> str:
+        return f"CollapseDimensions()"

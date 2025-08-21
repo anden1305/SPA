@@ -1,0 +1,18 @@
+trainer:
+  epochs: 200
+  learning_rate: 0.001
+dataloader:
+  batch_size: 5120
+  transforms:
+    - type: fft
+      params: {
+        "window_size": 512,
+      }
+    - type: collapse_dimensions
+      params: {}
+dataset:
+  type: synthetic
+  id: test
+model:
+  type: hmm
+verbose: true

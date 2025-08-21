@@ -125,7 +125,7 @@ def main():
 	data = [(x,y) for x,y in dataloader]
 	batch_x_np = np.concatenate([xx for xx, _ in data])
 	batch_y_np = np.concatenate([yy for _, yy in data])
-
+	
 	# Determine final feature dimension after transforms (not the raw channel count)
 	obs_dim = batch_x_np.shape[1] if batch_x_np.ndim == 2 else batch_x_np.shape[-1]
 	model = HMM(num_states=dataset.n_stages, obs_dim=obs_dim, normalize_time=True, device=device)

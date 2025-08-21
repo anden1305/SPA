@@ -1,4 +1,5 @@
 
+from scr.config.config import GlobalConfig
 from scr.data.base_dataset import BaseDataset
 import yaml
 import numpy as np
@@ -12,11 +13,12 @@ class MSSVDataset(BaseDataset):
     
     BASE_PATH = 'data/ds006366_processed'
 
-    def __init__(self, id: str, run: int = 1, normalize: bool = True):
-        self.run = run
-        self.data_path = f'{self.BASE_PATH}/{id}/{run}'
-        super().__init__(id=id, normalize=normalize)
-    
+    def __init__(self, 
+                 config: GlobalConfig):
+        self.run = config.dataset.run
+        self.data_path = f'{self.BASE_PATH}/{config.dataset.id}/{config.dataset.run}'
+        super().__init__(config=config)
+
     def load_data(self):
         data = None
         for signal in self.config['signals']:
