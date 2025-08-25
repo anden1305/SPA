@@ -23,7 +23,7 @@ class Validator:
     def validate(self, epoch: int):
         self.validations[epoch] = {}
         self.model.prepare_for_inference()
-        x, y = self.data_loader.get_all_data()
+        x, y = self.data_loader.get_all_data(shuffle=False)
         with torch.no_grad():
             preds = self.model.predict(x)
             if self.config.nmi:

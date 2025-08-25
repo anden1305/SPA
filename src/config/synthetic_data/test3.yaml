@@ -1,0 +1,46 @@
+
+name: test3
+sampling_rate_hz: 128
+epoch_length_s: 4
+n_epochs: 5000
+n_stages: 5
+
+transition_matrix:
+  - [0.8, 0.05, 0.05, 0.05, 0.05]
+  - [0.05, 0.8, 0.05, 0.05, 0.05]
+  - [0.05, 0.05, 0.8, 0.05, 0.05]
+  - [0.05, 0.05, 0.05, 0.8, 0.05]
+  - [0.05, 0.05, 0.05, 0.05, 0.8]
+
+frequency_bins:
+  - [0.5, 4.0]    # Delta
+  - [4.0, 8.0]    # Theta
+  - [8.0, 12.0]   # Alpha
+  - [12.0, 30.0]  # Beta
+  - [30.0, 100.0]  # Gamma
+
+stage_band_powers:
+  - [0.10, 0.25, 0.10, 0.25, 0.30]
+  - [0.60, 0.10, 0.15, 0.10, 0.05]
+  - [0.10, 0.60, 0.10, 0.10, 0.10]
+  - [0.10, 0.10, 0.10, 0.60, 0.10]
+  - [0.10, 0.10, 0.10, 0.10, 0.60]
+
+stage_bin_selection_probability:
+  - [0.2, 0.2, 0.2, 0.2, 0.2]
+  - [0.2, 0.2, 0.2, 0.2, 0.2]
+  - [0.2, 0.2, 0.2, 0.2, 0.2]
+  - [0.2, 0.2, 0.2, 0.2, 0.2]
+  - [0.2, 0.2, 0.2, 0.2, 0.2]
+
+components_per_epoch: 1000
+amplitude_jitter_range: [0.8, 1.2]
+stage_mean_amplitudes: [0.0, 0.0, 0.0, 0.0, 0.0]
+
+overlap_s: 0.25
+stage_rms_scales: [1.0, 1.0, 1.0, 1.0, 1.0]
+
+normalize_epoch: False
+seed: 1234
+
+stage_names: [Stage1, Stage2, Stage3, Stage4, Stage5]

@@ -22,7 +22,21 @@ class Orchestrator:
         self.config_path = config_path
         self.__set_config()
         self.__prepare()
-
+        
+    ### public methods ###
+    
+    def run(self):
+        if self.global_config.validator.prior_validation:
+            self.validator.validate(epoch=0)
+        self.trainer.train()
+        self.trainer.save_info()
+        self.validator.validate(epoch=self.global_config.trainer.epochs)
+        self.validator.save_info()
+        self.visualizer.visualize()
+        self.model.save_info()
+    
+    ### private methods ###
+    
     def __set_config(self):
         self.global_config = GlobalConfig.from_yaml(self.config_path)
     
@@ -44,16 +58,6 @@ class Orchestrator:
     def __save_config(self):
         with open(Path(self.global_config.results_dir) / self.global_config.run_name / "config.json", "w") as f:
             json.dump(self.global_config.model_dump(), f)
-    
-    def run(self):
-        if self.global_config.validator.prior_validation:
-            self.validator.validate(epoch=0)
-        self.trainer.train()
-        self.trainer.save_info()
-        self.validator.validate(epoch=self.global_config.trainer.epochs)
-        self.validator.save_info()
-        self.visualizer.visualize()
-        self.model.save_info()
 
     def __get_trainer(self, 
                       data_loader: DataLoader,
