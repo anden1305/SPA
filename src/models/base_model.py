@@ -49,6 +49,11 @@ class MLModel(nn.Module, ABC):
     @abstractmethod
     def predict(self, x: Tensor) -> Tensor:
         raise NotImplementedError('This method has to be implemented.')
+    
+    ### SAVE MODEL ###
+    def save(self):
+        """Save model parameters to a file."""
+        torch.save(self.state_dict(), f"{self.global_config.results_dir}/{self.global_config.run_name}/model.pth")
 
     ### STRING REPRESENTATION ###
     @abstractmethod
