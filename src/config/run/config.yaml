@@ -1,5 +1,5 @@
 trainer:
-  epochs: 100
+  epochs: 30
   learning_rate: 0.001
 validator:
   nmi: True
@@ -17,11 +17,11 @@ dataloader:
       }
 dataset:
   type: synthetic
-  id: test
+  id: test3
 model:
   type: hmm
   init_strategy: kmeans_noisy
 verbose: true
 seed: 123
 results_dir: results/training
-run_name: test
+run_name: test3

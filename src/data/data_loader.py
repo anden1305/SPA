@@ -83,14 +83,17 @@ class DataLoader(Iterator):
         if self.transforms:
             x, y = self.__apply_transforms(x, y)
         return x.shape[-1]
-    
-    def get_all_data(self) -> tuple[torch.Tensor, torch.Tensor]:
+
+    def get_all_data(self, shuffle: bool = False) -> tuple[torch.Tensor, torch.Tensor]:
+        __shuffle = self.shuffle
+        self.shuffle = shuffle
         xs, ys = [], []
         for xb, yb in self:
             xs.append(xb)
             ys.append(yb)
         x = torch.concat(xs, dim=0)
         y = torch.concat(ys, dim=0)
+        self.shuffle = __shuffle
         return x,y
 
     def __str__(self) -> str:

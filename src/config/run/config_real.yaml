@@ -1,6 +1,6 @@
 trainer:
-  epochs: 10
-  learning_rate: 0.001
+  epochs: 1
+  learning_rate: 0.05
 validator:
   nmi: True
 visualizer:
@@ -20,6 +20,7 @@ dataset:
   id: sub-001
 model:
   type: hmm
+  init_strategy: kmeans
 verbose: true
 seed: 123
 results_dir: results/training
