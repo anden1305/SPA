@@ -51,7 +51,7 @@ class MLModel(nn.Module, ABC):
         raise NotImplementedError('This method has to be implemented.')
     
     ### SAVE MODEL ###
-    def save(self):
+    def save_info(self):
         """Save model parameters to a file."""
         torch.save(self.state_dict(), f"{self.global_config.results_dir}/{self.global_config.run_name}/model.pth")
 

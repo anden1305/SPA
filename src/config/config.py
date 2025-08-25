@@ -16,6 +16,8 @@ class ValidatorConfig(BaseModel):
 
 class VisualizerConfig(BaseModel):
     losses: bool = Field(default=True)
+    pca_tripanel: bool = Field(default=False)
+    pca_top_k: int = Field(default=4, ge=2)
 
 class TransformsConfig(BaseModel):
     type: str = Field(default="default_transform")
