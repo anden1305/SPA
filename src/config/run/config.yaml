@@ -1,10 +1,12 @@
 trainer:
-  epochs: 30
+  epochs: 50
   learning_rate: 0.001
 validator:
   nmi: True
 visualizer:
   losses: True
+  pca_tripanel: True
+  pca_top_k: 4
 dataloader:
   batch_size: 5120
   shuffle: True

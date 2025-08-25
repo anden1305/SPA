@@ -33,6 +33,7 @@ class Orchestrator:
         self.validator.validate(epoch=self.global_config.trainer.epochs)
         self.validator.save_info()
         self.visualizer.visualize()
+        self.model.save_info()
     
     ### private methods ###
     
@@ -46,7 +47,7 @@ class Orchestrator:
         self.model = self.__get_model(self.device)
         self.trainer = self.__get_trainer(self.data_loader, self.model)
         self.validator = Validator(data_loader=self.data_loader, model=self.model, config=self.global_config)
-        self.visualizer = Visualizer(data_loader=self.data_loader, model=self.model, trainer=self.trainer, config=self.global_config)
+        self.visualizer = Visualizer(data_loader=self.data_loader, model=self.model, trainer=self.trainer, config=self.global_config, validator=self.validator)
         self.__make_output_dir()
         self.__save_config()
 
