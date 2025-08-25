@@ -1,12 +1,12 @@
 trainer:
-  epochs: 10
+  epochs: 20
   learning_rate: 0.001
 validator:
   nmi: True
 visualizer:
   losses: True
 dataloader:
-  batch_size: 5120
+  batch_size: 1024
   transforms:
     - type: add_feature_dim
       params: {}
