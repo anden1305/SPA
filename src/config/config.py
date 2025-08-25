@@ -24,6 +24,7 @@ class TransformsConfig(BaseModel):
 class DataLoaderConfig(BaseModel):
     batch_size: int = Field(default=32, ge=1)
     transforms: list[TransformsConfig] = Field(default_factory=list)
+    shuffle: bool = Field(default=True)
 
 class DatasetConfig(BaseModel):
     type: str = Field(default="synthetic", pattern="^(synthetic|mssv)$")
@@ -42,6 +43,7 @@ class GlobalConfig(BaseModel):
     dataset: DatasetConfig = Field(default_factory=DatasetConfig)
     model: ModelConfig = Field(default_factory=ModelConfig)
     verbose: bool = Field(default=False)
+    seed: int = Field(default=42, ge=0)
     results_dir: str = Field(default="results/training")
     run_name: str = Field(default="default_run")
 

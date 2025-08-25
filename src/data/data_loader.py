@@ -24,9 +24,12 @@ class DataLoader(Iterator):
         self.config = self.global_config.dataloader
         self.dataset = dataset
         self.batch_size = self.config.batch_size
+        self.seed = self.global_config.seed
+        self.shuffle = self.config.shuffle
         self.__init_transforms(transform_configs=self.config.transforms)
         self.device = device
         self.verbose = self.global_config.verbose
+        self._epoch = 0
     
     def __init_transforms(self, transform_configs: list[TransformsConfig]):
         self.transforms: list[BaseTransform] = []
@@ -54,22 +57,27 @@ class DataLoader(Iterator):
     def __iter__(self) -> "DataLoader":
         """Handles every start of new epoch logic (shuffle etc.)."""
         self._size = len(self.dataset)
-        self._indices = list(range(self._size))
-        self._cursor = 0
+        self._num_batches = self._size // self.batch_size
+        batch_starts = [i * self.batch_size for i in range(self._num_batches)]
+        if self.shuffle:
+            rs = np.random.RandomState(self.seed + self._epoch)
+            batch_starts = rs.permutation(batch_starts).tolist()
+        self._batch_starts = batch_starts
+        self._batch_cursor = 0
+        self._epoch += 1
         return self
     
     def __next__(self) -> tuple[torch.Tensor, torch.Tensor]:
         """Loads, transforms and returns the next batch of data."""
-        remaining = self._size - self._cursor
-        if remaining < self.batch_size:
+        if self._batch_cursor >= getattr(self, "_num_batches", 0):
             raise StopIteration
-        start = self._cursor
+        start = self._batch_starts[self._batch_cursor]
         end = start + self.batch_size
-        batch_idx = self._indices[start:end]
+        batch_idx = list(range(start, end))
         x, y = self.dataset[batch_idx]
         if self.transforms:
             x, y = self.__apply_transforms(x, y)
-        self._cursor = end
+        self._batch_cursor += 1
         return torch.from_numpy(x).to(self.device), torch.from_numpy(y).to(self.device)
 
     def get_feature_dim(self) -> int:
