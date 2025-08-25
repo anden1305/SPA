@@ -20,6 +20,7 @@ dataset:
   id: test
 model:
   type: hmm
+  init_strategy: kmeans_noisy
 verbose: true
 seed: 123
 results_dir: results/training

@@ -75,6 +75,7 @@ class DataLoader(Iterator):
         if self.transforms:
             x, y = self.__apply_transforms(x, y)
         self._batch_cursor += 1
+        x = x[np.newaxis, :]
         return torch.from_numpy(x).to(self.device), torch.from_numpy(y).to(self.device)
 
     def get_feature_dim(self) -> int:
@@ -88,8 +89,8 @@ class DataLoader(Iterator):
         for xb, yb in self:
             xs.append(xb)
             ys.append(yb)
-        x = torch.stack(xs, dim=0)
-        y = torch.stack(ys, dim=0)
+        x = torch.concat(xs, dim=0)
+        y = torch.concat(ys, dim=0)
         return x,y
 
     def __str__(self) -> str:

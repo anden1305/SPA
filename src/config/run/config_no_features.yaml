@@ -16,6 +16,7 @@ dataset:
   id: test
 model:
   type: hmm
+  init_strategy: kmeans
 verbose: true
 seed: 123
 results_dir: results/training

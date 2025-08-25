@@ -30,8 +30,6 @@ class Orchestrator:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.dataset = self.__get_dataset()
         self.data_loader = self.__get_dataloader(self.dataset, self.device)
-        x, y = next(iter(self.data_loader))
-        print('x shape', x.shape)
         self.model = self.__get_model(self.device)
         self.trainer = self.__get_trainer(self.data_loader, self.model)
         self.validator = Validator(data_loader=self.data_loader, model=self.model, config=self.global_config)
