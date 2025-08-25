@@ -1,0 +1,20 @@
+trainer:
+  epochs: 20
+  learning_rate: 0.001
+validator:
+  nmi: True
+visualizer:
+  losses: True
+dataloader:
+  batch_size: 1024
+  transforms:
+    - type: add_feature_dim
+      params: {}
+dataset:
+  type: synthetic
+  id: test
+model:
+  type: hmm
+verbose: true
+results_dir: results/training
+run_name: no_features

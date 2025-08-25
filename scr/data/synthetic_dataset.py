@@ -1,57 +1,43 @@
 
+from scr.config.config import GlobalConfig
 from scr.data.base_dataset import BaseDataset
 import yaml
 import numpy as np
 
-from scr.preprocessing.normalize import Normalize
-
 class SyntheticDataset(BaseDataset):
     """Documentation
     
-    Abstract class for all datasets that are needed for this codebase.
+    Dataset class for the synthetic EEG sleep data.
     """
     
-    def __init__(self, path: str):
-        self.path = path
-        self.normalize = Normalize()
-        self.__initialize()
+    BASE_PATH = 'data/synthetic_data'
     
-    def __initialize(self):
-        self.__load_config()
-        self.data: np.ndarray = np.load(self.path + "/eeg.npy")
-        if self.data.ndim == 1:
-            self.data = self.data[np.newaxis, :]
-        self.data = self.normalize(self.data)
-        self.n_features = self.data.shape[0]
-        self.n_timesteps = self.data.shape[1]
-        self.raw_labels: np.ndarray = np.load(self.path + "/labels.npy")
-        self.labels: np.ndarray = np.repeat(self.raw_labels, self.sampling_rate * self.epoch_length, axis=0)
+    def __init__(self, config: GlobalConfig):
+        self.data_path = f'{self.BASE_PATH}/{config.dataset.id}'
+        super().__init__(config=config)
 
-    def __load_config(self):
-        with open(self.path + "/config_copy.yml", 'r') as file:
-            self.config = yaml.safe_load(file)
-        assert self.config is not None, "Config file is empty or not found."
-        assert 'name' in self.config, "Dataset name not found in config."
-        assert 'sampling_rate_hz' in self.config, "Sampling rate not found in config."
-        assert 'epoch_length_s' in self.config, "Epoch length not found in config."
-        assert 'n_stages' in self.config, "Number of stages not found in config."
-        assert 'stage_names' in self.config, "Stage names not found in config."
-        self.name = self.config['name']
-        self.sampling_rate = self.config['sampling_rate_hz']
-        self.epoch_length = self.config['epoch_length_s']
-        self.n_stages = self.config['n_stages']
-        self.stage_names = self.config['stage_names']
+    def load_data(self):
+        data = np.load(f'{self.data_path}/eeg.npy')
+        data = data[np.newaxis, :]
+        return data
 
-    def __len__(self):
-        """Number of samples in dataset (T)."""
-        return len(self.data[-1])
+    def load_labels(self):
+        epoch_labels = np.load(f'{self.data_path}/labels.npy')
+        labels: np.ndarray = np.repeat(epoch_labels, self.config['sampling_rate'] * self.config['epoch_length'], axis=0)
+        return labels
+
+    def load_config(self):
+        config = {}
+        with open(f'{self.data_path}/config_copy.yml', 'r') as file:
+            synthetic_config = yaml.safe_load(file)
+        config['name'] = synthetic_config['name']
+        config['n_channels'] = 1
+        config['n_timesteps'] = synthetic_config['sampling_rate_hz'] * synthetic_config['epoch_length_s'] * synthetic_config['n_epochs']
+        config['sampling_rate'] = synthetic_config['sampling_rate_hz']
+        config['epoch_length'] = synthetic_config['epoch_length_s']
+        config['n_stages'] = synthetic_config['n_stages']
+        config['stage_names'] = synthetic_config['stage_names']
+        return config
     
-    def __getitem__(self, idx):
-        """Loads and returns the next samples in the dataset."""
-        """Returns data as (x, y), where x is of shape (C, T) and y is of shape (T)"""
-        if isinstance(idx, (int, np.integer)):
-            if idx < 0 or idx >= len(self):
-                raise IndexError("index out of range")
-        x = self.data[:, idx]
-        y = self.labels[idx] if self.labels is not None else None
-        return (x, y)
+    def __str__(self):
+        return f"SyntheticDataset(id={self.config['name']})"
