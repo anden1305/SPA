@@ -34,6 +34,7 @@ class DatasetConfig(BaseModel):
 
 class ModelConfig(BaseModel):
     type: str = Field(default="new_hmm", pattern="^(hmm|new_hmm)$")
+    init_strategy: str = Field(default="random", pattern="^(random|kmeans|kmeans_noisy)$")
 
 class GlobalConfig(BaseModel):
     trainer: TrainerConfig = Field(default_factory=TrainerConfig)

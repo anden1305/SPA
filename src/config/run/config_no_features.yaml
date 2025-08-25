@@ -9,13 +9,14 @@ dataloader:
   batch_size: 1024
   shuffle: True
   transforms:
-    - type: add_feature_dim
+    - type: reshape
       params: {}
 dataset:
   type: synthetic
   id: test
 model:
   type: hmm
+  init_strategy: kmeans
 verbose: true
 seed: 123
 results_dir: results/training

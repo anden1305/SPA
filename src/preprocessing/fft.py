@@ -50,12 +50,21 @@ class FFT(BaseTransform):
         raise ValueError(f"Unknown feature '{self.feature}'. Use 'magnitude', 'power', or 'log_power'.")
     
     def __reshape_input(self, x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        C, T = x.shape
+        """Reshape input assuming x has shape (T, C) and y has length T.
+
+        Produces windows along the time axis of length `window_size` and returns
+        an array shaped (n, C, window_size), where n = floor(T / window_size).
+        """
+        T, C = x.shape
         n = T // self.window_size
         T_trunc = n * self.window_size
-        x = x[:, :T_trunc].reshape(C, n, self.window_size).transpose(1, 0, 2)  # (T, C, window_size)
+        x = x[:T_trunc, :].reshape(n, self.window_size, C).transpose(0, 2, 1)
         y = y[:T_trunc]
         return x, y
+    
+    def __collapse_dimensions(self, x: np.ndarray):
+        X = x.reshape(x.shape[0], -1)  # Collapse dimensions to (T, F*C)
+        return X
     
     def __downsample_by_majority_voting(self, y: np.ndarray) -> np.ndarray:
         n = len(y) // self.window_size
@@ -71,12 +80,13 @@ class FFT(BaseTransform):
 
     def __call__(self, x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Documentation
-        Processes the data. Input is of shape (C, T) and output is real-valued of shape (T, C, F),
-        where F is features per channel, T is timestamps and C is channels.
+        Processes the data. Input is of shape (T, C) and output is real-valued of shape (T, C, F),
+        where F is features per channel, T is time windows (after chunking by window_size) and C is channels.
         """
         x, y = self.__reshape_input(x,y)
         Xc = self.__perform_fft(x=x)
         X = self.__complex_to_real_features(Xc)
+        X = self.__collapse_dimensions(X)
         Y = self.__downsample_by_majority_voting(y=y)
         return X, Y
     

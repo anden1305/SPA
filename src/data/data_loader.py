@@ -3,12 +3,11 @@ from typing import Iterator
 
 import numpy as np
 from src.data.base_dataset import BaseDataset
-from src.config.config import DataLoaderConfig, GlobalConfig, TransformsConfig
-from src.preprocessing.add_feature_dim import AddFeatureDim
+from src.config.config import GlobalConfig, TransformsConfig
 from src.preprocessing.base_transform import BaseTransform
 import torch
-from src.preprocessing.collapse_dimensions import CollapseDimensions
 from src.preprocessing.fft import FFT
+from src.preprocessing.reshape import Reshape
 
 class DataLoader(Iterator):
     """Documentation
@@ -37,10 +36,8 @@ class DataLoader(Iterator):
             match config.type.lower():
                 case "fft":
                     self.transforms.append(FFT(config=config))
-                case "collapse_dimensions":
-                    self.transforms.append(CollapseDimensions(config=config))
-                case "add_feature_dim":
-                    self.transforms.append(AddFeatureDim(config=config))
+                case "reshape":
+                    self.transforms.append(Reshape(config=config))
                 case _:
                     raise ValueError(f"Unknown transform: {config.type}.")
     
@@ -78,6 +75,7 @@ class DataLoader(Iterator):
         if self.transforms:
             x, y = self.__apply_transforms(x, y)
         self._batch_cursor += 1
+        x = x[np.newaxis, :]
         return torch.from_numpy(x).to(self.device), torch.from_numpy(y).to(self.device)
 
     def get_feature_dim(self) -> int:
@@ -91,8 +89,8 @@ class DataLoader(Iterator):
         for xb, yb in self:
             xs.append(xb)
             ys.append(yb)
-        x = torch.cat(xs, dim=0)
-        y = torch.cat(ys, dim=0)
+        x = torch.concat(xs, dim=0)
+        y = torch.concat(ys, dim=0)
         return x,y
 
     def __str__(self) -> str:

@@ -1,27 +1,22 @@
 trainer:
-  epochs: 100
+  epochs: 20
   learning_rate: 0.001
 validator:
   nmi: True
 visualizer:
   losses: True
 dataloader:
-  batch_size: 5120
+  batch_size: 1024
   shuffle: True
   transforms:
     - type: reshape
       params: {}
-    - type: fft
-      params: {
-        "window_size": 512,
-      }
 dataset:
-  type: synthetic
-  id: test
+  type: mssv
+  id: sub-001
 model:
   type: hmm
-  init_strategy: kmeans_noisy
 verbose: true
 seed: 123
 results_dir: results/training
-run_name: test
+run_name: no_features
