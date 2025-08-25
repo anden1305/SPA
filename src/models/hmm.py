@@ -12,7 +12,6 @@ import math
 import torch
 from torch import Tensor
 import torch.nn as nn
-from typing import Optional, Sequence
 from src.config.config import GlobalConfig
 from src.data.data_loader import DataLoader
 from .base_model import MLModel
@@ -28,6 +27,10 @@ class HMM(MLModel):
 
     def __initialize_parameters(self) -> None:
         self.seed = self.global_config.seed
+        torch.manual_seed(int(self.seed))
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(int(self.seed))
+            
         self.covariance_type = "diag"
         self.jitter = float(1e-5)
 
@@ -46,7 +49,7 @@ class HMM(MLModel):
         # Constant buffer for numerical expressions (avoids repeated Python math calls)
         self.register_buffer("_log_2pi", torch.tensor(math.log(2 * math.pi), dtype=torch.get_default_dtype()))
         self.to(self.device)
-    
+
     def forward(self, x: Tensor) -> Tensor:  # type: ignore[override]
         """Per-sequence log-likelihood.
 
@@ -239,7 +242,7 @@ class HMM(MLModel):
             R = torch.randn(S, D, device=device)
             dirs = R / R.norm(dim=1, keepdim=True).clamp_min(1e-8)
         means = spread * dirs
-        means = means + jitter_std * torch.randn_like(means)
+        means = means + jitter_std * torch.randn(means.shape, device=device)
         self.emission_mean.copy_(means)
         # 2. Covariance
         if self.covariance_type == "diag":
@@ -285,6 +288,7 @@ class HMM(MLModel):
         device = self.device
         flat = data.reshape(-1, D).to(device)
 
+        # Deterministic seeding for initial centers
         perm = torch.randperm(flat.size(0), device=device)
         means = flat[perm[:S]].clone()
         iters = max(0, int(kmeans_iters))
@@ -339,17 +343,19 @@ class HMM(MLModel):
     ) -> None:
         """Apply small Gaussian noise to emissions and logits, and add optional self-transition bias."""
         if mean_std > 0:
-            self.emission_mean.add_(mean_std * torch.randn_like(self.emission_mean))
+            noise = torch.randn(self.emission_mean.shape, device=self.emission_mean.device)
+            self.emission_mean.add_(mean_std * noise)
         if cov_noise_std > 0:
             if self.covariance_type == "diag":
-                self.emission_logvar.add_(cov_noise_std * torch.randn_like(self.emission_logvar))
+                noise = torch.randn(self.emission_logvar.shape, device=self.emission_logvar.device)
+                self.emission_logvar.add_(cov_noise_std * noise)
             elif self.covariance_type == "full":
-                noise = cov_noise_std * torch.randn_like(self.emission_cholesky_raw)
+                noise = cov_noise_std * torch.randn(self.emission_cholesky_raw.shape, device=self.emission_cholesky_raw.device)
                 tril_mask = torch.tril(torch.ones_like(self.emission_cholesky_raw)).bool()
                 self.emission_cholesky_raw[tril_mask] = self.emission_cholesky_raw[tril_mask] + noise[tril_mask]
         if init_logits_std > 0:
-            self.initial_logits.add_(init_logits_std * torch.randn_like(self.initial_logits))
-            self.transition_logits.add_(init_logits_std * torch.randn_like(self.transition_logits))
+            self.initial_logits.add_(init_logits_std * torch.randn(self.initial_logits.shape, device=self.initial_logits.device))
+            self.transition_logits.add_(init_logits_std * torch.randn(self.transition_logits.shape, device=self.transition_logits.device))
         if self_transition_bias != 0.0:
             self.transition_logits.diagonal().add_(float(self_transition_bias))
 
