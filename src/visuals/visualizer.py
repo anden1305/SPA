@@ -10,9 +10,11 @@ class Visualizer:
     
     def __init__(self,
                  data_loader: DataLoader,
+                 model: MLModel,
                  trainer: Trainer,
                  config: GlobalConfig):
         self.data_loader = data_loader
+        self.model = model
         self.trainer = trainer
         self.global_config = config
         self.config = self.global_config.visualizer

@@ -33,7 +33,7 @@ class Orchestrator:
         self.model = self.__get_model(self.device)
         self.trainer = self.__get_trainer(self.data_loader, self.model)
         self.validator = Validator(data_loader=self.data_loader, model=self.model, config=self.global_config)
-        self.visualizer = Visualizer(data_loader=self.data_loader, trainer=self.trainer, config=self.global_config)
+        self.visualizer = Visualizer(data_loader=self.data_loader, model=self.model, trainer=self.trainer, config=self.global_config)
         self.__make_output_dir()
         self.__save_config()
 

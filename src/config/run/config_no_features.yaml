@@ -7,6 +7,7 @@ visualizer:
   losses: True
 dataloader:
   batch_size: 1024
+  shuffle: True
   transforms:
     - type: add_feature_dim
       params: {}
@@ -16,5 +17,6 @@ dataset:
 model:
   type: hmm
 verbose: true
+seed: 123
 results_dir: results/training
 run_name: no_features

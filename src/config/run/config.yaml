@@ -7,6 +7,7 @@ visualizer:
   losses: True
 dataloader:
   batch_size: 5120
+  shuffle: True
   transforms:
     - type: fft
       params: {
@@ -20,5 +21,6 @@ dataset:
 model:
   type: hmm
 verbose: true
+seed: 123
 results_dir: results/training
 run_name: test
