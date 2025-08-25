@@ -15,10 +15,10 @@ class MSSVDataset(BaseDataset):
 
     def __init__(self, 
                  config: GlobalConfig):
-        self.run = config.dataset.run
-        self.data_path = f'{self.BASE_PATH}/{config.dataset.id}/{config.dataset.run}'
+        self.run = config.dataset.run if 'run' in config.dataset else 1
+        self.data_path = f'{self.BASE_PATH}/{config.dataset.id}/{self.run}'
         super().__init__(config=config)
-
+    
     def load_data(self):
         data = None
         for signal in self.config['signals']:
@@ -36,6 +36,7 @@ class MSSVDataset(BaseDataset):
     def load_config(self):
         config = {}
         metadata_all = pd.read_csv(f'{self.BASE_PATH}/metadata.csv')
+        assert not metadata_all[(metadata_all['participant_id'] == self.id) & (metadata_all['run'] == self.run)].empty, f"Metadata for participant {self.id} and run {self.run} not found"
         metadata = metadata_all[(metadata_all['participant_id'] == self.id) & (metadata_all['run'] == self.run)].iloc[0]
         config['name'] = metadata['participant_id']
         config['lab'] = metadata['lab']

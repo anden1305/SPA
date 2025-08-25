@@ -1,5 +1,5 @@
 trainer:
-  epochs: 100
+  epochs: 10
   learning_rate: 0.001
 validator:
   nmi: True
@@ -15,10 +15,10 @@ dataloader:
     - type: collapse_dimensions
       params: {}
 dataset:
-  type: synthetic
-  id: test
+  type: mssv
+  id: sub-001
 model:
   type: hmm
 verbose: true
 results_dir: results/training
-run_name: test
+run_name: real

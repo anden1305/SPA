@@ -1,5 +1,5 @@
 trainer:
-  epochs: 100
+  epochs: 10
   learning_rate: 0.001
 validator:
   nmi: True
@@ -8,11 +8,7 @@ visualizer:
 dataloader:
   batch_size: 5120
   transforms:
-    - type: fft
-      params: {
-        "window_size": 512,
-      }
-    - type: collapse_dimensions
+    - type: add_feature_dim
       params: {}
 dataset:
   type: synthetic
@@ -21,4 +17,4 @@ model:
   type: hmm
 verbose: true
 results_dir: results/training
-run_name: test
+run_name: no_features

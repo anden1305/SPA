@@ -29,6 +29,8 @@ class MLModel(nn.Module, ABC):
         self.num_states = self.dataset.get_num_states()
         self.num_features = self.data_loader.get_feature_dim()
 
+
+    ### TRAINING ###
     @abstractmethod
     def forward(self, x: Tensor) -> Tensor:  # pragma: no cover - interface
         raise NotImplementedError('This method has to be implemented.')
@@ -37,6 +39,16 @@ class MLModel(nn.Module, ABC):
     def prepare_for_training(self):
         raise NotImplementedError('This method has to be implemented.')
     
+    ### INFERENCE ###
+    @abstractmethod
+    def prepare_for_inference(self):
+        raise NotImplementedError('This method has to be implemented.')
+    
+    @abstractmethod
+    def predict(self, x: Tensor) -> Tensor:
+        raise NotImplementedError('This method has to be implemented.')
+
+    ### STRING REPRESENTATION ###
     @abstractmethod
     def __str__(self) -> str:
         raise NotImplementedError('This method has to be implemented.')

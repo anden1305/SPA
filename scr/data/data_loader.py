@@ -4,6 +4,7 @@ from typing import Iterator
 import numpy as np
 from scr.data.base_dataset import BaseDataset
 from scr.config.config import DataLoaderConfig, GlobalConfig, TransformsConfig
+from scr.preprocessing.add_feature_dim import AddFeatureDim
 from scr.preprocessing.base_transform import BaseTransform
 import torch
 from scr.preprocessing.collapse_dimensions import CollapseDimensions
@@ -35,6 +36,8 @@ class DataLoader(Iterator):
                     self.transforms.append(FFT(config=config))
                 case "collapse_dimensions":
                     self.transforms.append(CollapseDimensions(config=config))
+                case "add_feature_dim":
+                    self.transforms.append(AddFeatureDim(config=config))
                 case _:
                     raise ValueError(f"Unknown transform: {config.type}.")
     
@@ -74,6 +77,15 @@ class DataLoader(Iterator):
         if self.transforms:
             x, y = self.__apply_transforms(x, y)
         return x.shape[-1]
+    
+    def get_all_data(self) -> tuple[torch.Tensor, torch.Tensor]:
+        xs, ys = [], []
+        for xb, yb in self:
+            xs.append(xb)
+            ys.append(yb)
+        x = torch.cat(xs, dim=0)
+        y = torch.cat(ys, dim=0)
+        return x,y
 
     def __str__(self) -> str:
         return f"DataLoader(transform={self.transforms})"

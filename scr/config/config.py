@@ -10,6 +10,13 @@ class TrainerConfig(BaseModel):
     optimizer: str = Field(default="adam", pattern="^(adam|sgd|rmsprop)$")
     grad_clip: float | None = Field(default=None, ge=0, description="Gradient clipping value. If None, no clipping is applied.")
 
+class ValidatorConfig(BaseModel):
+    prior_validation: bool = Field(default=True)
+    nmi: bool = Field(default=True)
+
+class VisualizerConfig(BaseModel):
+    losses: bool = Field(default=True)
+
 class TransformsConfig(BaseModel):
     type: str = Field(default="default_transform")
     params: dict[str, Any] = Field(default_factory=dict)
@@ -29,11 +36,15 @@ class ModelConfig(BaseModel):
 
 class GlobalConfig(BaseModel):
     trainer: TrainerConfig = Field(default_factory=TrainerConfig)
+    validator: ValidatorConfig = Field(default_factory=ValidatorConfig)
+    visualizer: VisualizerConfig = Field(default_factory=VisualizerConfig)
     dataloader: DataLoaderConfig = Field(default_factory=DataLoaderConfig)
     dataset: DatasetConfig = Field(default_factory=DatasetConfig)
     model: ModelConfig = Field(default_factory=ModelConfig)
     verbose: bool = Field(default=False)
-    
+    results_dir: str = Field(default="results/training")
+    run_name: str = Field(default="default_run")
+
     @classmethod
     def from_yaml(cls, file_path: str) -> "GlobalConfig":
         path = Path(file_path)

@@ -1,4 +1,5 @@
 
+import json
 from scr.data.data_loader import DataLoader
 from scr.models.base_model import MLModel
 from scr.config.config import GlobalConfig, TrainerConfig
@@ -15,7 +16,8 @@ class Trainer:
         self.model = model
         self.global_config = config
         self.config = self.global_config.trainer
-        
+        self.losses = None
+
     def __init_optimizer(self):
         if self.config.optimizer == "adam":
             self.optimizer = Adam(self.model.parameters(), lr=self.config.learning_rate)
@@ -28,16 +30,11 @@ class Trainer:
         self.__init_optimizer()
         self.epoch_losses: list[float] = []
         self.losses: list[float] = []
-        x, _ = next(iter(self.data_loader))
-        self.model.prepare_for_training(data=x)
+        self.model.prepare_for_training()
     
     def train(self):
         self.__init_training()
-        if self.global_config.verbose:
-            print(f"Starting training for {self.model} with {self.config.epochs} epochs on {self.data_loader}...")
         for epoch in range(self.config.epochs):
-            if self.global_config.verbose:
-                print(f"Epoch {epoch + 1}/{self.config.epochs}")
             for x, _ in self.data_loader:
                 self.model.train()
                 self.optimizer.zero_grad()
@@ -49,9 +46,17 @@ class Trainer:
                 self.optimizer.step()
                 self.epoch_losses.append(loss.item())
             if self.global_config.verbose:
-                print(f"Epoch {epoch + 1} loss: {sum(self.epoch_losses) / len(self.epoch_losses):.4f}")
+                print(f"Epoch {epoch + 1} / {self.config.epochs} loss: {sum(self.epoch_losses) / len(self.epoch_losses):.4f}")
             self.losses.append(sum(self.epoch_losses) / len(self.epoch_losses))
             self.epoch_losses.clear()
+
+    def save_info(self):
+        with open(f"{self.global_config.results_dir}/{self.global_config.run_name}/losses.json", "w") as f:
+            json.dump(self.losses, f)
+
+    def get_losses(self) -> list[float]:
+        assert self.losses is not None, "Training has not been run yet."
+        return self.losses
 
     def __str__(self) -> str:
         return f"Trainer(config={self.config})"

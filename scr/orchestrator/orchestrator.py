@@ -1,5 +1,7 @@
 
 
+import json
+from pathlib import Path
 from scr.config.config import GlobalConfig
 from scr.data.base_dataset import BaseDataset
 from scr.data.data_loader import DataLoader
@@ -7,8 +9,9 @@ from scr.data.mssv_dataset import MSSVDataset
 from scr.data.synthetic_dataset import SyntheticDataset
 from scr.models.base_model import MLModel
 from scr.models.hmm import HMM
-from scr.models.new_hmm import NewHMM
 from scr.training.trainer import Trainer
+from scr.validation.validator import Validator
+from scr.visuals.visualizer import Visualizer
 
 
 class Orchestrator:
@@ -26,9 +29,27 @@ class Orchestrator:
         self.data_loader = self.__get_dataloader(self.dataset)
         self.model = self.__get_model()
         self.trainer = self.__get_trainer(self.data_loader, self.model)
+        self.validator = Validator(data_loader=self.data_loader, model=self.model, config=self.global_config)
+        self.visualizer = Visualizer(data_loader=self.data_loader, trainer=self.trainer, config=self.global_config)
+        self.__make_output_dir()
+        self.__save_config()
+
+    def __make_output_dir(self):
+        output_dir = Path(self.global_config.results_dir) / self.global_config.run_name
+        output_dir.mkdir(parents=True, exist_ok=True)
+    
+    def __save_config(self):
+        with open(Path(self.global_config.results_dir) / self.global_config.run_name / "config.json", "w") as f:
+            json.dump(self.global_config.model_dump(), f)
     
     def run(self):
+        if self.global_config.validator.prior_validation:
+            self.validator.validate(epoch=0)
         self.trainer.train()
+        self.trainer.save_info()
+        self.validator.validate(epoch=self.global_config.trainer.epochs)
+        self.validator.save_info()
+        self.visualizer.visualize()
 
     def __get_trainer(self, 
                       data_loader: DataLoader,
@@ -55,8 +76,6 @@ class Orchestrator:
         match self.global_config.model.type:
             case "hmm":
                 return HMM(data_loader=self.data_loader, config=self.global_config)
-            case "new_hmm":
-                return NewHMM(data_loader=self.data_loader, config=self.global_config)
             case _:
                 raise ValueError(f"Unknown model type: {self.global_config.model.type}")
     

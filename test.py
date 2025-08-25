@@ -3,6 +3,7 @@
 from scr.orchestrator.orchestrator import Orchestrator
 
 
-orchestrator = Orchestrator("scr/config/config.yaml")
+config_path = "scr/config/config_no_features.yaml"
 
+orchestrator = Orchestrator(config_path)
 orchestrator.run()

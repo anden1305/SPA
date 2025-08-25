@@ -114,6 +114,7 @@ class HMM(MLModel):
         # Constant buffer for numerical expressions (avoids repeated Python math calls)
         self.register_buffer("_log_2pi", torch.tensor(math.log(2 * math.pi), dtype=torch.get_default_dtype()))
         self.to(self.device)
+        self.reset_parameters_random()
 
     # ------------------------- Helper accessors -------------------------
     def log_initial(self) -> Tensor:
@@ -384,7 +385,7 @@ class HMM(MLModel):
         self_transition_bias: float = 0.0,
     ) -> None:
         """K-means init followed by small random noise (symmetry breaking).
-
+        
         If ``data`` is provided, run ``reset_parameters(data, ...)`` to get a
         sensible K-means initialisation for emissions (and optionally pi/A),
         then add small random noise to parameters to avoid degenerate plateaus.
@@ -409,29 +410,31 @@ class HMM(MLModel):
             Optional extra bias added to transition logits diagonal after init (default 0.0).
         """
         # 1) Base initialisation
-        if data is not None:
-            # Use existing K-means initialiser
-            self.reset_parameters(data, kmeans_iters=kmeans_iters, estimate_transitions=estimate_transitions)
-        else:
-            # Fallback: initialise near Identity with small random differences
-            self.emission_mean.normal_(mean=0.0, std=mean_std)
-            if self.covariance_type == "diag":
-                self.emission_logvar.zero_()
-                if cov_noise_std > 0:
-                    self.emission_logvar.add_(cov_noise_std * torch.randn_like(self.emission_logvar))
-            elif self.covariance_type == "full":
-                raw = torch.zeros_like(self.emission_cholesky_raw)
-                if cov_noise_std > 0:
-                    tril_mask = torch.tril(torch.ones_like(raw)).bool()
-                    noise = cov_noise_std * torch.randn_like(raw)
-                    raw[tril_mask] = noise[tril_mask]
-                self.emission_cholesky_raw.copy_(raw)
-            # logits near 0
-            if init_logits_std > 0:
-                self.initial_logits.normal_(mean=0.0, std=init_logits_std)
-                self.transition_logits.normal_(mean=0.0, std=init_logits_std)
-            if self_transition_bias != 0.0:
-                self.transition_logits.diagonal().add_(float(self_transition_bias))
+        # if data is not None:
+        
+        data, _ = next(iter(self.data_loader))
+        # Use existing K-means initialiser
+        self.reset_parameters(data, kmeans_iters=kmeans_iters, estimate_transitions=estimate_transitions)
+        # else:
+        #     # Fallback: initialise near Identity with small random differences
+        #     self.emission_mean.normal_(mean=0.0, std=mean_std)
+        #     if self.covariance_type == "diag":
+        #         self.emission_logvar.zero_()
+        #         if cov_noise_std > 0:
+        #             self.emission_logvar.add_(cov_noise_std * torch.randn_like(self.emission_logvar))
+        #     elif self.covariance_type == "full":
+        #         raw = torch.zeros_like(self.emission_cholesky_raw)
+        #         if cov_noise_std > 0:
+        #             tril_mask = torch.tril(torch.ones_like(raw)).bool()
+        #             noise = cov_noise_std * torch.randn_like(raw)
+        #             raw[tril_mask] = noise[tril_mask]
+        #         self.emission_cholesky_raw.copy_(raw)
+        #     # logits near 0
+        #     if init_logits_std > 0:
+        #         self.initial_logits.normal_(mean=0.0, std=init_logits_std)
+        #         self.transition_logits.normal_(mean=0.0, std=init_logits_std)
+        #     if self_transition_bias != 0.0:
+        #         self.transition_logits.diagonal().add_(float(self_transition_bias))
 
         # 2) Add small random noise to break symmetry (applies to both branches)
         # Emission means
@@ -668,9 +671,15 @@ class HMM(MLModel):
             return out_path
         return None
     
-    def prepare_for_training(self, data: Tensor):
+    def prepare_for_training(self):
         self.train()
-        self.reset_parameters_random()
+
+    def prepare_for_inference(self):
+        self.eval()
+    
+    def predict(self, x: Tensor) -> Tensor:
+        return self.decode_viterbi(x)
+        
 
     def __str__(self):
         return f"HMM(num_states={self.num_states}, num_features={self.num_features})"
