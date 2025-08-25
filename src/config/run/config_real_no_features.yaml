@@ -12,8 +12,8 @@ dataloader:
     - type: reshape
       params: {}
 dataset:
-  type: synthetic
-  id: test
+  type: mssv
+  id: sub-001
 model:
   type: hmm
 verbose: true

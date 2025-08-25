@@ -9,12 +9,12 @@ dataloader:
   batch_size: 5120
   shuffle: True
   transforms:
+    - type: reshape
+      params: {}
     - type: fft
       params: {
         "window_size": 512,
       }
-    - type: collapse_dimensions
-      params: {}
 dataset:
   type: synthetic
   id: test
