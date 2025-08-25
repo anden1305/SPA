@@ -2,6 +2,7 @@
 from abc import ABC, abstractmethod
 
 import numpy as np
+import torch
 import torch.nn as nn
 from torch import Tensor
 
@@ -17,11 +18,12 @@ class MLModel(nn.Module, ABC):
     A concrete `__init__` is provided so calling `super().__init__()` is safe.
     """
 
-    def __init__(self, data_loader: DataLoader, config: GlobalConfig):
+    def __init__(self, data_loader: DataLoader, config: GlobalConfig, device: torch.device):
         self.global_config = config
         self.config = self.global_config.model
         self.dataset = data_loader.dataset
         self.data_loader = data_loader
+        self.device = device
         self.__extract_model_parameters()
         super().__init__()
     

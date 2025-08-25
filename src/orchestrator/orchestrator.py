@@ -2,6 +2,8 @@
 
 import json
 from pathlib import Path
+
+import torch
 from src.config.config import GlobalConfig
 from src.data.base_dataset import BaseDataset
 from src.data.data_loader import DataLoader
@@ -23,11 +25,12 @@ class Orchestrator:
 
     def __set_config(self):
         self.global_config = GlobalConfig.from_yaml(self.config_path)
-
+    
     def __prepare(self):
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.dataset = self.__get_dataset()
-        self.data_loader = self.__get_dataloader(self.dataset)
-        self.model = self.__get_model()
+        self.data_loader = self.__get_dataloader(self.dataset, self.device)
+        self.model = self.__get_model(self.device)
         self.trainer = self.__get_trainer(self.data_loader, self.model)
         self.validator = Validator(data_loader=self.data_loader, model=self.model, config=self.global_config)
         self.visualizer = Visualizer(data_loader=self.data_loader, trainer=self.trainer, config=self.global_config)
@@ -59,9 +62,9 @@ class Orchestrator:
             model=model,
             config=self.global_config
         )
-    
-    def __get_dataloader(self, dataset: BaseDataset):
-        return DataLoader(dataset=dataset, config=self.global_config)
+
+    def __get_dataloader(self, dataset: BaseDataset, device: torch.device):
+        return DataLoader(dataset=dataset, config=self.global_config, device=device)
 
     def __get_dataset(self):
         match self.global_config.dataset.type:
@@ -72,10 +75,10 @@ class Orchestrator:
             case _:
                 raise ValueError(f"Unknown dataset type: {self.global_config.dataset.type}")
 
-    def __get_model(self):
+    def __get_model(self, device: torch.device):
         match self.global_config.model.type:
             case "hmm":
-                return HMM(data_loader=self.data_loader, config=self.global_config)
+                return HMM(data_loader=self.data_loader, config=self.global_config, device=device)
             case _:
                 raise ValueError(f"Unknown model type: {self.global_config.model.type}")
     

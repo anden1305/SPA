@@ -92,10 +92,9 @@ class HMM(MLModel):
 
     def __init__(self,
                  data_loader: DataLoader,
-                 config: GlobalConfig) -> None:
-        super().__init__(data_loader, config)
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.device = torch.device(device)
+                 config: GlobalConfig,
+                 device: torch.device) -> None:
+        super().__init__(data_loader, config, device)
         self.covariance_type = "diag"
         self.jitter = float(1e-5)
 
