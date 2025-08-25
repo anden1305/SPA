@@ -1,10 +1,10 @@
 
 import json
 import torch
-from scr.config.config import GlobalConfig
-from scr.data.data_loader import DataLoader
-from scr.helpers.nmi import calculate_nmi
-from scr.models.base_model import MLModel
+from src.config.config import GlobalConfig
+from src.data.data_loader import DataLoader
+from src.helpers.nmi import calculate_nmi
+from src.models.base_model import MLModel
 
 class Validator:
     

@@ -54,8 +54,8 @@ import torch.nn as nn
 from typing import Optional, Sequence
 import itertools
 
-from scr.config.config import GlobalConfig
-from scr.data.data_loader import DataLoader
+from src.config.config import GlobalConfig
+from src.data.data_loader import DataLoader
 
 from .base_model import MLModel
 

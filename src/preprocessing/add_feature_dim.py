@@ -1,8 +1,8 @@
 import numpy as np
 
-from scr.config.config import TransformsConfig
-from scr.data.base_dataset import BaseDataset
-from scr.preprocessing.base_transform import BaseTransform
+from src.config.config import TransformsConfig
+from src.data.base_dataset import BaseDataset
+from src.preprocessing.base_transform import BaseTransform
 
 
 class AddFeatureDim(BaseTransform):

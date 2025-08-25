@@ -5,9 +5,9 @@ import numpy as np
 import torch.nn as nn
 from torch import Tensor
 
-from scr.config.config import GlobalConfig
-from scr.data.base_dataset import BaseDataset
-from scr.data.data_loader import DataLoader
+from src.config.config import GlobalConfig
+from src.data.base_dataset import BaseDataset
+from src.data.data_loader import DataLoader
 
 
 class MLModel(nn.Module, ABC):

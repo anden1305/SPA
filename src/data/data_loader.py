@@ -2,13 +2,13 @@
 from typing import Iterator
 
 import numpy as np
-from scr.data.base_dataset import BaseDataset
-from scr.config.config import DataLoaderConfig, GlobalConfig, TransformsConfig
-from scr.preprocessing.add_feature_dim import AddFeatureDim
-from scr.preprocessing.base_transform import BaseTransform
+from src.data.base_dataset import BaseDataset
+from src.config.config import DataLoaderConfig, GlobalConfig, TransformsConfig
+from src.preprocessing.add_feature_dim import AddFeatureDim
+from src.preprocessing.base_transform import BaseTransform
 import torch
-from scr.preprocessing.collapse_dimensions import CollapseDimensions
-from scr.preprocessing.fft import FFT
+from src.preprocessing.collapse_dimensions import CollapseDimensions
+from src.preprocessing.fft import FFT
 
 class DataLoader(Iterator):
     """Documentation

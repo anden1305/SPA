@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 import yaml
 
-from scr.config.config import GlobalConfig
+from src.config.config import GlobalConfig
 
 class BaseDataset(ABC):
     """Documentation

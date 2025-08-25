@@ -2,7 +2,7 @@
 from abc import ABC, abstractmethod
 import numpy as np
 
-from scr.config.config import TransformsConfig
+from src.config.config import TransformsConfig
 
 
 class BaseTransform(ABC):

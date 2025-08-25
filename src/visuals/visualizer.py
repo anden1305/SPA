@@ -1,8 +1,8 @@
 
-from scr.config.config import GlobalConfig
-from scr.data.data_loader import DataLoader
-from scr.models.base_model import MLModel
-from scr.training.trainer import Trainer
+from src.config.config import GlobalConfig
+from src.data.data_loader import DataLoader
+from src.models.base_model import MLModel
+from src.training.trainer import Trainer
 import matplotlib.pyplot as plt
 
 class Visualizer:

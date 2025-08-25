@@ -2,16 +2,16 @@
 
 import json
 from pathlib import Path
-from scr.config.config import GlobalConfig
-from scr.data.base_dataset import BaseDataset
-from scr.data.data_loader import DataLoader
-from scr.data.mssv_dataset import MSSVDataset
-from scr.data.synthetic_dataset import SyntheticDataset
-from scr.models.base_model import MLModel
-from scr.models.hmm import HMM
-from scr.training.trainer import Trainer
-from scr.validation.validator import Validator
-from scr.visuals.visualizer import Visualizer
+from src.config.config import GlobalConfig
+from src.data.base_dataset import BaseDataset
+from src.data.data_loader import DataLoader
+from src.data.mssv_dataset import MSSVDataset
+from src.data.synthetic_dataset import SyntheticDataset
+from src.models.base_model import MLModel
+from src.models.hmm import HMM
+from src.training.trainer import Trainer
+from src.validation.validator import Validator
+from src.visuals.visualizer import Visualizer
 
 
 class Orchestrator:

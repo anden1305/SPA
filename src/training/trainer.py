@@ -1,8 +1,8 @@
 
 import json
-from scr.data.data_loader import DataLoader
-from scr.models.base_model import MLModel
-from scr.config.config import GlobalConfig, TrainerConfig
+from src.data.data_loader import DataLoader
+from src.models.base_model import MLModel
+from src.config.config import GlobalConfig, TrainerConfig
 from torch.optim import Adam, SGD, RMSprop
 import torch
 

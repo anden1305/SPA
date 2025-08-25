@@ -1,6 +1,6 @@
 
-from scr.config.config import GlobalConfig
-from scr.data.base_dataset import BaseDataset
+from src.config.config import GlobalConfig
+from src.data.base_dataset import BaseDataset
 import yaml
 import numpy as np
 import pandas as pd
