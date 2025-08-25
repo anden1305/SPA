@@ -36,7 +36,6 @@ class Trainer:
         self.__init_training()
         for epoch in range(self.config.epochs):
             for x, _ in self.data_loader:
-                self.model.train()
                 self.optimizer.zero_grad()
                 logp = self.model.forward(x)
                 loss = -logp.mean()
