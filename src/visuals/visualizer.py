@@ -42,7 +42,7 @@ class Visualizer:
         final_losses = list(validations.get("loss", {}).values())
         nmis = list(validations.get("nmi", {}).values())
         cross_nmis = list(validations.get("cross_nmi", {}).values())
-        
+
         self.plot_run_losses(losses, path=path)
 
         # Visualize validations
@@ -134,6 +134,9 @@ class Visualizer:
         # Flatten labels to (N,)
         to_np = lambda a: (a.detach().cpu().numpy() if hasattr(a, "detach") else np.asarray(a)).reshape(-1)
         true_arr = to_np(y_true)
+        
+        init_arr, _, _ = self.remap_predictions_to_labels(true_arr, init_arr)
+        trained_arr, _, _ = self.remap_predictions_to_labels(true_arr, trained_arr)
 
         if not (len(true_arr) == len(init_arr) == len(trained_arr) == X.shape[0]):
             raise ValueError("Label lengths must match number of rows in x after flattening")
