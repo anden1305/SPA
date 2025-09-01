@@ -3,9 +3,26 @@
 
 from torch import Tensor
 import torch
+import numpy as np
+from typing import Any
 
 
-def calculate_nmi(pred: Tensor, target: Tensor) -> float:
+def _to_tensor(x: Any) -> Tensor:
+    """Convert numpy arrays, lists/tuples, or torch tensors to a torch.Tensor.
+
+    Returns a CPU tensor for non-torch inputs.
+    """
+    if isinstance(x, torch.Tensor):
+        return x
+    if isinstance(x, np.ndarray):
+        return torch.from_numpy(x)
+    if isinstance(x, (list, tuple)):
+        return torch.as_tensor(x)
+    # Fallback: try to construct a tensor (may raise)
+    return torch.as_tensor(x)
+
+
+def calculate_nmi(pred: Any, target: Any) -> float:
     """Compute Normalized Mutual Information (NMI) between integer label tensors.
 
     Args:
@@ -15,6 +32,10 @@ def calculate_nmi(pred: Tensor, target: Tensor) -> float:
     Returns:
         float: NMI in [0, 1], using the arithmetic normalization 2*I(X;Y)/(H(X)+H(Y)).
     """
+    # Accept numpy arrays, python lists/tuples or torch tensors
+    pred = _to_tensor(pred)
+    target = _to_tensor(target)
+
     if pred.numel() == 0:
         return 0.0
 

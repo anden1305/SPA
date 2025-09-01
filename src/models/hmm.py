@@ -179,7 +179,7 @@ class HMM(MLModel):
     @torch.no_grad()
     def __initialise_weights(
         self,
-        kmeans_iters: int = 15,
+        kmeans_iters: int = 50,
         estimate_transitions: bool = True,
         mean_std: float = 1.5,
         cov_noise_std: float = 1.5,

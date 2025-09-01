@@ -9,6 +9,7 @@ from torch import Tensor
 from src.config.config import GlobalConfig
 from src.data.base_dataset import BaseDataset
 from src.data.data_loader import DataLoader
+from src.orchestrator.train_details import TrainDetails
 
 
 class MLModel(nn.Module, ABC):
@@ -51,9 +52,9 @@ class MLModel(nn.Module, ABC):
         raise NotImplementedError('This method has to be implemented.')
     
     ### SAVE MODEL ###
-    def save_info(self):
+    def save_info(self, train_details: TrainDetails):
         """Save model parameters to a file."""
-        torch.save(self.state_dict(), f"{self.global_config.results_dir}/{self.global_config.run_name}/model.pth")
+        torch.save(self.state_dict(), train_details.get_path() / "model.pth")
 
     ### STRING REPRESENTATION ###
     @abstractmethod

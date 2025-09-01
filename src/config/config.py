@@ -13,10 +13,12 @@ class TrainerConfig(BaseModel):
 class ValidatorConfig(BaseModel):
     prior_validation: bool = Field(default=True)
     nmi: bool = Field(default=True)
+    cross_nmi: bool = Field(default=True)
 
 class VisualizerConfig(BaseModel):
     losses: bool = Field(default=True)
     pca_tripanel: bool = Field(default=False)
+    confusion_matrix: bool = Field(default=False)
     pca_top_k: int = Field(default=4, ge=2)
 
 class TransformsConfig(BaseModel):
@@ -35,7 +37,7 @@ class DatasetConfig(BaseModel):
     run: int | None = Field(default=None, ge=1)
 
 class ModelConfig(BaseModel):
-    type: str = Field(default="new_hmm", pattern="^(hmm|new_hmm)$")
+    type: str = Field(default="hmm", pattern="^(hmm|new_hmm)$")
     init_strategy: str = Field(default="random", pattern="^(random|kmeans|kmeans_noisy)$")
 
 class GlobalConfig(BaseModel):
@@ -49,6 +51,7 @@ class GlobalConfig(BaseModel):
     seed: int = Field(default=42, ge=0)
     results_dir: str = Field(default="results/training")
     run_name: str = Field(default="default_run")
+    runs: int = Field(default=1, ge=1)
 
     @classmethod
     def from_yaml(cls, file_path: str) -> "GlobalConfig":
