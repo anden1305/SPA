@@ -32,7 +32,6 @@ class MLModel(nn.Module, ABC):
         self.num_states = self.dataset.get_num_states()
         self.num_features = self.data_loader.get_feature_dim()
 
-
     ### TRAINING ###
     @abstractmethod
     def forward(self, x: Tensor) -> Tensor:  # pragma: no cover - interface

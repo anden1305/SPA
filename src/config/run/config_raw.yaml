@@ -1,5 +1,5 @@
 trainer:
-  epochs: 50
+  epochs: 100
   learning_rate: 0.001
 validator:
   nmi: True
@@ -10,15 +10,11 @@ visualizer:
   confusion_matrix: True
   pca_top_k: 4
 dataloader:
-  batch_size: 16384
+  batch_size: 5120
   shuffle: True
   transforms:
     - type: reshape
       params: {}
-    - type: fft
-      params: {
-        "window_size": 512,
-      }
 dataset:
   type: synthetic
   id: test3
@@ -29,4 +25,4 @@ verbose: true
 seed: 123
 results_dir: results/training
 run_name: test
-runs: 10
+runs: 1

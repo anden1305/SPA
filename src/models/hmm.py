@@ -179,7 +179,7 @@ class HMM(MLModel):
     @torch.no_grad()
     def __initialise_weights(
         self,
-        kmeans_iters: int = 50,
+        kmeans_iters: int = 150,
         estimate_transitions: bool = True,
         mean_std: float = 1.5,
         cov_noise_std: float = 1.5,
@@ -300,7 +300,7 @@ class HMM(MLModel):
             means = new_means / counts.unsqueeze(1)
         if iters == 0:
             assign = torch.cdist(flat, means).argmin(-1)
-
+        
         resid = flat - means[assign]
         var = resid.pow(2).mean(0).clamp_min(1e-6)  # (D,)
         self.emission_mean.copy_(means)
