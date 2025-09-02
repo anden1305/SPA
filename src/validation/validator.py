@@ -1,4 +1,3 @@
-
 import json
 import torch
 from src.config.config import GlobalConfig
@@ -7,10 +6,9 @@ from src.helpers.nmi import calculate_nmi
 from src.models.base_model import MLModel
 from src.orchestrator.train_details import TrainDetails
 from src.training.trainer import Trainer
+from src.helpers.state_distinctness import compute_state_distinctness
 
 class Validator:
-    
-    
     def __init__(self,
                  data_loader: DataLoader,
                  model: MLModel,
@@ -23,6 +21,7 @@ class Validator:
         self.config = self.global_config.validator
         self.validations: dict[int, dict] = {}
         self.predictions: dict[int, list] = {}
+        self.data_validations: dict[int, dict] = {}
 
     def validate(self):
         epoch = self.trainer.current_epoch
@@ -51,6 +50,16 @@ class Validator:
         with open(f"{self.global_config.results_dir}/{self.global_config.run_name}/validations.json", "w") as f:
             json.dump(validations, f)
         return validations
+
+    def validate_data(self):
+        x, y = self.data_loader.get_all_data(shuffle=False)
+        if self.config.state_distinctness:
+            distinctness = compute_state_distinctness(x, y, compute_fisher=True)
+            print(distinctness)
+            self.data_validations = distinctness
+            out_path = f"{self.global_config.results_dir}/{self.global_config.run_name}/data_validations.json"
+            with open(out_path, "w") as f:
+                json.dump(self.data_validations, f, indent=2)
 
     def __calculate_cross_nmi(self, train_details: list[TrainDetails]):
         cross_nmis: dict[int, float] = {}

@@ -30,6 +30,8 @@ class Orchestrator:
         for i in range(self.global_config.runs):
             self.run_number = i + 1
             self.__prepare_run()
+            if self.run_number == 1: #TODO refactor this line
+                self.validator.validate_data()
             if self.global_config.validator.prior_validation:
                 self.validator.validate()
             self.trainer.train()

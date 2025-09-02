@@ -1,8 +1,10 @@
-
+import json
 from typing import Any, Optional, Sequence
 from pathlib import Path
-import numpy as np
 from torch import Tensor
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
 from src.config.config import GlobalConfig
 from src.data.data_loader import DataLoader
 from src.models.base_model import MLModel
@@ -10,11 +12,13 @@ from src.orchestrator import train_details
 from src.orchestrator.train_details import TrainDetails
 from src.training.trainer import Trainer
 from src.validation.validator import Validator
+from sklearn.metrics import confusion_matrix
+from scipy.optimize import linear_sum_assignment
+import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.metrics import confusion_matrix
-import numpy as np
-from scipy.optimize import linear_sum_assignment
+from itertools import combinations
+
 
 class Visualizer:
     def __init__(self,
@@ -33,7 +37,55 @@ class Visualizer:
             self.plot_pca_tripanel(train_details)
         if self.config.confusion_matrix:
             self.plot_confusion_matrix(train_details=train_details)
-    
+    # State distinctness, Fisher, and pairwise ED are plotted only in the across-runs folder using validate_data() outputs
+
+    def plot_state_distinctness(self, obj: Any, path: Optional[Path] = None):
+        """
+        Plot state distinctness using outputs from Validator.validate_data().
+        We ignore per-run differences (synthetic data is fixed) and always
+        read results/<run_name>/data_validations.json, saving plots into
+        results/<run_name>/plots.
+        """
+        # Always read state distinctness from data_validations.json
+        # Determine output dir (across-runs plots folder)
+        if path is None:
+            path = Path(self.global_config.results_dir) / self.global_config.run_name / "plots"
+        path.mkdir(parents=True, exist_ok=True)
+
+        data_path = Path(self.global_config.results_dir) / self.global_config.run_name / "data_validations.json"
+        if not data_path.exists():
+            return
+
+        with open(data_path, "r") as f:
+            sd = json.load(f)
+
+        # sd is expected to be a dict with keys produced by compute_state_distinctness
+        ed_mat = np.asarray(sd.get("pairwise_energy", []), dtype=float)
+        if ed_mat.size == 0:
+            return
+        states = list(sd.get("states", range(ed_mat.shape[0])))
+        counts = sd.get("counts", {})
+        mean_ed = float(sd.get("mean_pairwise_energy", np.nan))
+        wmean_ed = float(sd.get("weighted_mean_pairwise_energy", np.nan))
+        fisher = sd.get("fisher_trace", None)
+
+        tick_labels = [f"{s} (n={counts.get(int(s), 0)})" for s in states]
+
+        # Per-state bar chart
+        if ed_mat.shape[0] >= 2:
+            mask = ~np.eye(ed_mat.shape[0], dtype=bool)
+            per_state_mean = (ed_mat * mask).sum(axis=1) / mask.sum(axis=1)
+            fig, ax = plt.subplots(figsize=(7.0, 3.8))
+            sns.barplot(x=[str(s) for s in states], y=per_state_mean, color="#1f77b4", ax=ax)
+            ax.set_ylabel("Mean energy distance to other states")
+            ax.set_xlabel("State")
+            ax.set_title("Per-state separation (higher is better)")
+            for i, v in enumerate(per_state_mean):
+                ax.text(i, v, f"{v:.2f}", ha="center", va="bottom", fontsize=9)
+            plt.tight_layout()
+            plt.savefig(path / "state_distinctness_per_state.png", dpi=160)
+            plt.close(fig)
+
     def visualize_runs(self, train_details: list[TrainDetails], validations: dict[str, Any]):
         path = Path(self.global_config.results_dir) / self.global_config.run_name / "plots"
         path.mkdir(parents=True, exist_ok=True)
@@ -45,9 +97,12 @@ class Visualizer:
 
         self.plot_run_losses(losses, path=path)
 
-        # Visualize validations
         if validations.get("nmi"):
             self.plot_reliability(nmis, cross_nmis, final_losses, path=path)
+        
+        # Across-runs plots (data-level)
+        self.plot_state_distinctness(train_details, path=path)
+        self.plot_pairwise_energy_distance(train_details, path=path)
 
     def remap_predictions_to_labels(self, y_true, y_pred):
         
@@ -115,10 +170,7 @@ class Visualizer:
         plt.close()
 
     def plot_pca_tripanel(self, train_details: TrainDetails):
-        """Save tri-panel PCA plots comparing HMM-init, HMM-trained, and True labels.
-
-        x may be (T,D) or (B,T,D). Labels must match flattened time length.
-        """
+        """Save tri-panel PCA plots comparing HMM-init, HMM-trained, and True labels."""
         # Get data and predictions
         x, y_true = self.data_loader.get_all_data()
         
@@ -152,17 +204,28 @@ class Visualizer:
             u = np.unique(a)
             lut = {v: palette[i % len(palette)] for i, v in enumerate(u)}
             return np.array([lut[v] for v in a])
+        
         cols = [colors(init_arr), colors(trained_arr), colors(true_arr)]
         titles = ["HMM init", "HMM trained", "True"]
+        arrays = [init_arr, trained_arr, true_arr]
 
         saved: list[str] = []
-        from itertools import combinations
         for a, b in combinations(range(proj.shape[1]), 2):
-            fig, axes = plt.subplots(1, 3, figsize=(11.4, 3.2), sharex=True, sharey=True)
-            for ax, c, t in zip(axes, cols, titles):
-                ax.scatter(proj[:, a], proj[:, b], c=c, s=6, alpha=0.85, edgecolors="none")
+            fig, axes = plt.subplots(1, 3, figsize=(15, 4), sharex=True, sharey=True)
+            for ax, arr, c, t in zip(axes, arrays, cols, titles):
+                # Create scatter plot
+                scatter = ax.scatter(proj[:, a], proj[:, b], c=c, s=6, alpha=0.85, edgecolors="none")
                 ax.set_title(f"{t} (PC{a+1} vs PC{b+1})")
                 ax.set_xlabel(f"PC{a+1}")
+                
+                # Add legend with state/class numbers
+                unique_labels = np.unique(arr)
+                legend_elements = [plt.Line2D([0], [0], marker='o', color='w', 
+                                  markerfacecolor=palette[i % len(palette)], 
+                                  label=f'State {label}', markersize=8) 
+                                  for i, label in enumerate(unique_labels)]
+                ax.legend(handles=legend_elements, loc='best', title='States')
+                
             axes[0].set_ylabel(f"PC{b+1}")
             fig.tight_layout()
             out_path = train_details.get_path() / "plots" / f"hmm_tripanel_pc{a+1}_pc{b+1}.png"
@@ -210,3 +273,93 @@ class Visualizer:
         plt.tight_layout()
         plt.savefig(path / "reliability_plot.png")
         plt.close()
+
+    def plot_pairwise_energy_distance(self, train_details: list[TrainDetails], path: Path):
+        """Create a circular network visualization for pairwise Energy Distance between states.
+        Annotates each state node with its mean pairwise ED to other states and displays Fisher trace.
+        """
+        # Read ED matrix from data_validations.json (produced by validate_data)
+        data_path = Path(self.global_config.results_dir) / self.global_config.run_name / "data_validations.json"
+        if not data_path.exists():
+            return
+        with open(data_path, "r") as f:
+            sd = json.load(f)
+        if not sd or "pairwise_energy" not in sd:
+            return
+
+        ed_mat = np.asarray(sd.get("pairwise_energy", []), dtype=float)
+        if ed_mat.size == 0:
+            return
+        states = list(sd.get("states", range(ed_mat.shape[0])))
+        counts = sd.get("counts", {})
+        # Per-state mean pairwise ED (exclude diagonal)
+        n_states = len(states)
+        if n_states < 2:
+            return
+        mask = ~np.eye(n_states, dtype=bool)
+        per_state_mean = (ed_mat * mask).sum(axis=1) / mask.sum(axis=1)
+        # Fisher trace, if available
+        fisher_val = sd.get("fisher_trace", None)
+        # Network in circular layout
+        if n_states >= 3:  # Only create this plot if we have at least 3 states
+            fig, ax = plt.subplots(figsize=(10, 9))
+            
+            # Create circular layout coordinates
+            theta = np.linspace(0, 2*np.pi, n_states, endpoint=False)
+            x = np.cos(theta)
+            y = np.sin(theta)
+            
+            # Draw state nodes with mean ED annotation
+            for i, state in enumerate(states):
+                circle = plt.Circle((x[i], y[i]), 0.1, fill=True, 
+                                   color=plt.cm.tab10(i % 10), 
+                                   alpha=0.8)
+                ax.add_artist(circle)
+                ax.text(x[i]*1.15, y[i]*1.15, f"State {state}\nmean ED={per_state_mean[i]:.2f}", 
+                      ha='center', va='center', fontsize=11, fontweight='bold')
+            
+            # Draw lines between states, colored by ED
+            norm = plt.Normalize(vmin=np.min(ed_mat[~np.eye(n_states, dtype=bool)]), 
+                               vmax=np.max(ed_mat[~np.eye(n_states, dtype=bool)]))
+            
+            for i in range(n_states):
+                for j in range(i+1, n_states):
+                    # Calculate midpoint with slight curve for visibility
+                    mid_x = (x[i] + x[j])/2 * 0.8  # Pull toward center
+                    mid_y = (y[i] + y[j])/2 * 0.8
+                    
+                    # Get points for curved line
+                    t = np.linspace(0, 1, 50)
+                    curve_x = (1-t)**2 * x[i] + 2*(1-t)*t * mid_x + t**2 * x[j]
+                    curve_y = (1-t)**2 * y[i] + 2*(1-t)*t * mid_y + t**2 * y[j]
+                    
+                    # Draw the curve with color based on ED
+                    line = ax.plot(curve_x, curve_y, '-', linewidth=2.5, 
+                                 color=plt.cm.plasma(norm(ed_mat[i, j])),
+                                 alpha=0.75)[0]
+                    
+                    # Add ED value text
+                    text_x = mid_x * 1.2
+                    text_y = mid_y * 1.2
+                    ax.text(text_x, text_y, f"{ed_mat[i, j]:.2f}", 
+                          ha='center', va='center', fontsize=9,
+                          bbox=dict(facecolor='white', alpha=0.7, boxstyle='round,pad=0.2'))
+            
+            ax.set_xlim(-1.3, 1.3)
+            ax.set_ylim(-1.3, 1.3)
+            ax.set_aspect('equal')
+            ax.axis('off')
+            
+            # Add colorbar
+            sm = plt.cm.ScalarMappable(cmap=plt.cm.plasma, norm=norm)
+            sm.set_array([])
+            cbar = plt.colorbar(sm, ax=ax, shrink=0.75)
+            cbar.set_label("Energy Distance (higher = better separation)")
+            
+            title = "Pairwise Energy Distance Network\n(Line color intensity shows separation strength)"
+            if fisher_val is not None:
+                title += f"\nFisher trace: {float(fisher_val):.3f}"
+            plt.title(title)
+            plt.tight_layout()
+            plt.savefig(path / "pairwise_ed_network.png", dpi=200)
+            plt.close(fig)
