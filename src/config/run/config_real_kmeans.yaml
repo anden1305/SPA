@@ -1,6 +1,6 @@
 trainer:
-  epochs: 10
-  learning_rate: 0.01
+  epochs: 50
+  learning_rate: 0.001
   optimizer: adam
 validator:
   nmi: True
@@ -11,24 +11,25 @@ visualizer:
   confusion_matrix: True
   pca_top_k: 4
 dataloader:
-  batch_size: 4096
+  batch_size: 16384
   shuffle: True
   normalize: True
   transforms:
     - type: reshape
       params: {}
-    - type: batch_raw
+    - type: fft
       params: {
-        "window_size": 512
+        "window_size": 512,
+        "feature": "band_power",
       }
 dataset:
-  type: synthetic
-  id: test3
+  type: mssv
+  id: sub-050
 model:
   type: hmm
-  init_strategy: random
+  init_strategy: kmeans
 verbose: true
 seed: 123
 results_dir: results/training
-run_name: raw_synthetic
+run_name: feature_mssv_kmeans
 runs: 1

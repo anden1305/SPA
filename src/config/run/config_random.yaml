@@ -1,6 +1,7 @@
 trainer:
-  epochs: 50
+  epochs: 100
   learning_rate: 0.001
+  optimizer: adam
 validator:
   nmi: True
   cross_nmi: True
@@ -12,21 +13,23 @@ visualizer:
 dataloader:
   batch_size: 16384
   shuffle: True
+  normalize: True
   transforms:
     - type: reshape
       params: {}
     - type: fft
       params: {
         "window_size": 512,
+        "feature": "power",
       }
 dataset:
   type: synthetic
   id: test3
 model:
   type: hmm
-  init_strategy: kmeans
+  init_strategy: random
 verbose: true
 seed: 123
 results_dir: results/training
-run_name: test
-runs: 10
+run_name: feature_synthetic
+runs: 5

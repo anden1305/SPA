@@ -23,14 +23,8 @@ class BaseDataset(ABC):
         self.validate_config()
         self.validate_data()
         self.validate_labels()
-        self.data = self.normalize_data(self.data)
     
     ###### BASE METHODS ######
-
-    def normalize_data(self, data: np.ndarray) -> np.ndarray:
-        if self.normalize:
-            return (data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-8)
-        return data
     
     def validate_config(self):
         if not isinstance(self.config, dict):

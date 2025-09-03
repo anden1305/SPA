@@ -199,6 +199,7 @@ class HMM(MLModel):
         s = self.global_config.model.init_strategy.lower()
         if s == "random":
             self.__init_random(spread=spread, jitter_std=jitter_std)
+            self.__clear_param_grads()
         elif s == "kmeans":
             self.__init_kmeans(kmeans_iters=kmeans_iters, estimate_transitions=estimate_transitions)
             self.__clear_param_grads()
@@ -274,8 +275,6 @@ class HMM(MLModel):
             trans_row = torch.softmax(self.transition_logits, dim=-1)[0]
             print(f"[HMM random init] pairwise_dist min/mean/max = {min_dist:.3f}/{mean_dist:.3f}/{max_dist:.3f}; avg_feature_std={avg_feat_std:.3f}")
             print(f"[HMM random init] first transition row (uniform expected): {trans_row.cpu().numpy()}")
-
-        self.__clear_param_grads()
         
     @torch.no_grad()
     def __init_kmeans(self, kmeans_iters: int, estimate_transitions: bool) -> None:
