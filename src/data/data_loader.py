@@ -6,7 +6,11 @@ from src.data.base_dataset import BaseDataset
 from src.config.config import GlobalConfig, TransformsConfig
 from src.preprocessing.base_transform import BaseTransform
 import torch
+from src.preprocessing.batch_raw import BatchRaw
 from src.preprocessing.fft import FFT
+from src.preprocessing.high_pass_filter import HighPassFilter
+from src.preprocessing.normalize import Normalize
+from src.preprocessing.percentile_clipping import PercentileClipping
 from src.preprocessing.reshape import Reshape
 
 class DataLoader(Iterator):
@@ -25,10 +29,13 @@ class DataLoader(Iterator):
         self.batch_size = self.config.batch_size
         self.seed = self.global_config.seed
         self.shuffle = self.config.shuffle
+        self.normalize = self.config.normalize
         self.__init_transforms(transform_configs=self.config.transforms)
         self.device = device
         self.verbose = self.global_config.verbose
         self._epoch = 0
+        if self.normalize:
+            self.statistics = self.__get_data_statistics()
     
     def __init_transforms(self, transform_configs: list[TransformsConfig]):
         self.transforms: list[BaseTransform] = []
@@ -38,9 +45,24 @@ class DataLoader(Iterator):
                     self.transforms.append(FFT(config=config))
                 case "reshape":
                     self.transforms.append(Reshape(config=config))
+                case "percentile_clipping":
+                    self.transforms.append(PercentileClipping(config=config))
+                case "high_pass_filter":
+                    self.transforms.append(HighPassFilter(config=config))
+                case "batch_raw":
+                    self.transforms.append(BatchRaw(config=config))
                 case _:
                     raise ValueError(f"Unknown transform: {config.type}.")
     
+    def __get_data_statistics(self):
+        self.normalize = False
+        x, _ = self.get_all_data(shuffle=False)
+        self.normalize = True
+        return {
+            "mean": x.mean(dim=(0,1)).numpy(),
+            "std": x.std(dim=(0,1)).numpy(),
+        }
+
     def __len__(self) -> int:
         """Number of batches per epoch."""
         return len(self.dataset) // self.batch_size
@@ -75,15 +97,16 @@ class DataLoader(Iterator):
         if self.transforms:
             x, y = self.__apply_transforms(x, y)
         self._batch_cursor += 1
-        x = x[np.newaxis, :]
+        if self.normalize:
+            x = (x - self.statistics["mean"]) / self.statistics["std"]
         return torch.from_numpy(x).to(self.device), torch.from_numpy(y).to(self.device)
-
+    
     def get_feature_dim(self) -> int:
         x, y = self.dataset[:self.batch_size]
         if self.transforms:
             x, y = self.__apply_transforms(x, y)
         return x.shape[-1]
-
+    
     def get_all_data(self, shuffle: bool = False) -> tuple[torch.Tensor, torch.Tensor]:
         __shuffle = self.shuffle
         self.shuffle = shuffle

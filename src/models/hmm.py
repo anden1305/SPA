@@ -179,7 +179,7 @@ class HMM(MLModel):
     @torch.no_grad()
     def __initialise_weights(
         self,
-        kmeans_iters: int = 50,
+        kmeans_iters: int = 150,
         estimate_transitions: bool = True,
         mean_std: float = 1.5,
         cov_noise_std: float = 1.5,
@@ -199,6 +199,7 @@ class HMM(MLModel):
         s = self.global_config.model.init_strategy.lower()
         if s == "random":
             self.__init_random(spread=spread, jitter_std=jitter_std)
+            self.__clear_param_grads()
         elif s == "kmeans":
             self.__init_kmeans(kmeans_iters=kmeans_iters, estimate_transitions=estimate_transitions)
             self.__clear_param_grads()
@@ -274,8 +275,6 @@ class HMM(MLModel):
             trans_row = torch.softmax(self.transition_logits, dim=-1)[0]
             print(f"[HMM random init] pairwise_dist min/mean/max = {min_dist:.3f}/{mean_dist:.3f}/{max_dist:.3f}; avg_feature_std={avg_feat_std:.3f}")
             print(f"[HMM random init] first transition row (uniform expected): {trans_row.cpu().numpy()}")
-
-        self.__clear_param_grads()
         
     @torch.no_grad()
     def __init_kmeans(self, kmeans_iters: int, estimate_transitions: bool) -> None:
@@ -300,7 +299,7 @@ class HMM(MLModel):
             means = new_means / counts.unsqueeze(1)
         if iters == 0:
             assign = torch.cdist(flat, means).argmin(-1)
-
+        
         resid = flat - means[assign]
         var = resid.pow(2).mean(0).clamp_min(1e-6)  # (D,)
         self.emission_mean.copy_(means)

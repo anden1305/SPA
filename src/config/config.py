@@ -33,6 +33,7 @@ class DataLoaderConfig(BaseModel):
     batch_size: int = Field(default=32, ge=1)
     transforms: list[TransformsConfig] = Field(default_factory=list)
     shuffle: bool = Field(default=True)
+    normalize: bool = Field(default=True)
 
 class DatasetConfig(BaseModel):
     type: str = Field(default="synthetic", pattern="^(synthetic|mssv)$")

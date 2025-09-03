@@ -13,8 +13,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     method = args.method
     config_path = args.config_path
-    
-    if method not in ["train", "generate"]:
+
+    if method not in ["train", "generate", "explore_synthetic"]:
         raise ValueError(f"Unknown method: {method}")
     
     if method == "train":
@@ -23,3 +23,6 @@ if __name__ == "__main__":
     elif method == "generate":
         data_orchestrator = SyntheticDataOrchestrator(config_path)
         data_orchestrator.generate_data()
+    elif method == "explore_synthetic":
+        data_orchestrator = SyntheticDataOrchestrator(config_path)
+        data_orchestrator.explore_synthetic()

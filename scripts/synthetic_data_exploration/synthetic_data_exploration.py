@@ -81,14 +81,14 @@ def load_folder(folder: Path):
 
 # ---------------------- Label Summary ----------------------
 
-def summarize_labels(labels: np.ndarray, meta: dict):
+def summarize_labels(labels: np.ndarray, meta: dict, results: Path):
     stages = meta.get("stages", [])
     unique, counts = np.unique(labels, return_counts=True)
     mapping = {u: stages[u] if u < len(stages) else str(u) for u in unique}
     summary_lines = [
         f"{u} ({mapping[u]}): {c} ({c/len(labels):.2%})" for u, c in zip(unique, counts)
     ]
-    (RESULTS / "label_summary.txt").write_text("\n".join(summary_lines))
+    (results / "label_summary.txt").write_text("\n".join(summary_lines))
     # Plot
     plt.figure(figsize=(5,3))
     import pandas as pd
@@ -97,7 +97,7 @@ def summarize_labels(labels: np.ndarray, meta: dict):
     plt.title("Stage counts")
     plt.ylabel("Epochs")
     plt.tight_layout()
-    plt.savefig(RESULTS / "stage_counts.png", dpi=150)
+    plt.savefig(results / "stage_counts.png", dpi=150)
     plt.close()
     # Transition matrix if stage names length known
     n_stages = len(stages) if stages else unique.max() + 1
@@ -112,12 +112,12 @@ def summarize_labels(labels: np.ndarray, meta: dict):
     sns.heatmap(tm_prob, annot=True, fmt=".2f", cmap="magma", xticklabels=tick_labels, yticklabels=tick_labels)
     plt.title("Transition matrix (P(next|current))")
     plt.tight_layout()
-    plt.savefig(RESULTS / "transition_matrix.png", dpi=150)
+    plt.savefig(results / "transition_matrix.png", dpi=150)
     plt.close()
 
 # ---------------------- Epoch Std Distribution ----------------------
 
-def epoch_std_distribution(eeg: np.ndarray):
+def epoch_std_distribution(eeg: np.ndarray, results: Path):
     stds = eeg.std(axis=1)
     unique_vals = np.unique(stds)
     plt.figure(figsize=(5,3))
@@ -136,13 +136,13 @@ def epoch_std_distribution(eeg: np.ndarray):
     plt.xlabel("Epoch std (a.u.)")
     plt.title("Epoch amplitude distribution")
     plt.tight_layout()
-    plt.savefig(RESULTS / "epoch_std_hist.png", dpi=150)
+    plt.savefig(results / "epoch_std_hist.png", dpi=150)
     plt.close()
-    np.savetxt(RESULTS / "epoch_std_summary.txt", [stds.mean(), np.median(stds), stds.min(), stds.max()], header="mean,median,min,max")
+    np.savetxt(results / "epoch_std_summary.txt", [stds.mean(), np.median(stds), stds.min(), stds.max()], header="mean,median,min,max")
 
 # ---------------------- Raw EEG Excerpt ----------------------
 
-def raw_eeg_excerpt(eeg: np.ndarray, labels: np.ndarray, meta: dict, seconds: int = 40, show_labels: bool = True):
+def raw_eeg_excerpt(eeg: np.ndarray, labels: np.ndarray, meta: dict, results: Path, seconds: int = 40, show_labels: bool = True):
     """Exact-style raw EEG excerpt (port of original plot_raw_eeg logic).
 
     Accepts either (epochs, samples) EEG or 1-D continuous. Determines epoch samples
@@ -214,7 +214,7 @@ def raw_eeg_excerpt(eeg: np.ndarray, labels: np.ndarray, meta: dict, seconds: in
     ax.set_xlim(0, actual_seconds)
     ax.grid(alpha=0.25, axis='y')
     fig.tight_layout()
-    fig.savefig(RESULTS / 'raw_eeg_excerpt.png', dpi=300)
+    fig.savefig(results / 'raw_eeg_excerpt.png', dpi=300)
     plt.close(fig)
 
 # ---------------------- PSD Helpers ----------------------
@@ -242,7 +242,7 @@ def _spectral_confidence(psds: Iterable[np.ndarray], alpha: float = 0.05) -> Tup
     return mean, np.clip(mean - half_width, a_min=0, a_max=None), mean + half_width
 
 
-def mean_power_spectrum(eeg: np.ndarray, labels: np.ndarray, meta: dict):
+def mean_power_spectrum(eeg: np.ndarray, labels: np.ndarray, meta: dict, results: Path):
     sr = meta.get("sampling_rate_hz", meta.get("config_used", {}).get("sampling_rate_hz", 1))
     stages = meta.get("stages", [])
     if eeg.ndim != 2:
@@ -327,7 +327,7 @@ def mean_power_spectrum(eeg: np.ndarray, labels: np.ndarray, meta: dict):
     ax.set_title('Normalized PSD 0.5-50 Hz (95% CI)', fontweight='bold')
     ax.grid(True, alpha=0.3)
     plt.tight_layout(rect=[0, 0, 1, 0.97])
-    out_path = RESULTS / 'detailed_mean_power_spectrum.png'
+    out_path = results / 'detailed_mean_power_spectrum.png'
     plt.savefig(out_path, dpi=200)
     plt.close(fig)
     print(f"Detailed PSD figure saved to {out_path}")

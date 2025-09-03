@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-
+import shutil
 import torch
 from src.config.config import GlobalConfig
 from src.data.base_dataset import BaseDataset
@@ -83,7 +83,10 @@ class Orchestrator:
         self.__save_config()
 
     def __make_output_dir(self):
-        output_dir = Path(self.global_config.results_dir) / self.global_config.run_name / str(self.run_number)
+        output_dir = Path(self.global_config.results_dir) / self.global_config.run_name
+        if output_dir.exists():
+            shutil.rmtree(output_dir)
+        output_dir = output_dir / str(self.run_number)
         output_dir.mkdir(parents=True, exist_ok=True)
     
     def __save_config(self):
