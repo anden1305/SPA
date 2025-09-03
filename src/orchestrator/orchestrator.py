@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-import shutil
+import uuid
 import torch
 from src.config.config import GlobalConfig
 from src.data.base_dataset import BaseDataset
@@ -77,18 +77,17 @@ class Orchestrator:
         self.visualizer = Visualizer(data_loader=self.data_loader, config=self.global_config, validator=self.validator)
 
     def __prepare(self):
+        uid = uuid.uuid1()
+        self.global_config.run_name = f"{self.global_config.run_name} [{uid}]"
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.train_details: list[TrainDetails] = []
         self.run_number: int = 1
         self.__make_output_dir()
         self.__save_config()
-        self.dataset = self.__get_dataset()
-        self.data_loader = DataLoader(dataset=self.dataset, config=self.global_config, device=self.device)
+        self.__prepare_run()
 
     def __make_output_dir(self):
         output_dir = Path(self.global_config.results_dir) / self.global_config.run_name
-        if output_dir.exists():
-            shutil.rmtree(output_dir)
         output_dir = output_dir / str(self.run_number)
         output_dir.mkdir(parents=True, exist_ok=True)
     

@@ -1,6 +1,6 @@
 trainer:
   epochs: 10
-  learning_rate: 0.01
+  learning_rate: 0.001
   optimizer: adam
 validator:
   nmi: True
@@ -17,6 +17,16 @@ dataloader:
   transforms:
     - type: reshape
       params: {}
+    - type: percentile_clipping
+      params: {
+        "percentile": 5
+      }
+    - type: high_pass_filter
+      params: {
+        "low_cutoff": 0.5,
+        "high_cutoff": 45,
+        "sampling_rate": 128
+      }
     - type: batch_raw
       params: {
         "window_size": 512
