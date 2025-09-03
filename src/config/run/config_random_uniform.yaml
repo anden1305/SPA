@@ -1,5 +1,5 @@
 trainer:
-  epochs: 700
+  epochs: 1200
   learning_rate: 0.0005
   optimizer: adam
 validator:
@@ -29,9 +29,9 @@ dataset:
   id: test3
 model:
   type: hmm
-  init_strategy: random_separated
+  init_strategy: random_uniform
 verbose: true
 seed: 123
 results_dir: results/training
-run_name: feature_synthetic_separated
-runs: 5
+run_name: feature_synthetic_uniform
+runs: 2

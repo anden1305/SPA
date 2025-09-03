@@ -24,12 +24,12 @@ class Orchestrator:
         self.__set_config()
         self.__prepare()
 
-        
     ### public methods ###
     
     def run(self):
         if self.global_config.validate_data:
             self.validator.validate_data()
+            data_validations = self.validator.get_data_validations()
         for i in range(self.global_config.runs):
             self.run_number = i + 1
             self.__prepare_run()
@@ -43,7 +43,7 @@ class Orchestrator:
             self.global_config.seed += 1
         if self.global_config.runs > 1:
             validations = self.validator.validate_runs(train_details=self.train_details)
-            self.visualizer.visualize_runs(train_details=self.train_details, validations=validations)
+            self.visualizer.visualize_runs(train_details=self.train_details, validations=validations, data_validations=data_validations)
     
     ### private methods ###
     

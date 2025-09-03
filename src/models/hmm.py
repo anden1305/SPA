@@ -190,56 +190,53 @@ class HMM(MLModel):
     ) -> None:
         """Short dispatcher for HMM weight initialization.
 
-        strategy in {random, kmeans, kmeans_noisy}.
-        - random: simple separated means with unit variance, uniform pi/A.
+        strategy in {random, random_separated, random_uniform, random_dirichlet, kmeans, kmeans_noisy}.
+        - random or random_separated: separated means (approx. orthogonal), unit covariance, uniform pi/A.
+        - random_uniform: fully random means, unit covariance, uniform pi/A.
+        - random_dirichlet: fully random means, unit covariance, Dirichlet-sampled pi/A.
         - kmeans: k-means for emissions (and optionally pi/A).
         - kmeans_noisy: run k-means, then add small random noise to avoid plateaus.
-        Data is optional (not needed for random).
+        Data is optional (not needed for random*).
         """
         s = self.global_config.model.init_strategy.lower()
-        if s == "random":
-            self.__init_random(spread=spread, jitter_std=jitter_std)
-            self.__clear_param_grads()
+        if s in ("random", "random_separated"):
+            self.__init_random_separated(spread=spread, jitter_std=jitter_std)
+        elif s == "random_uniform":
+            self.__init_random_uniform(mean_std=mean_std, jitter_std=jitter_std)
+        elif s == "random_dirichlet":
+            self.__init_random_dirichlet(mean_std=mean_std, alpha=1.0, self_transition_bias=self_transition_bias)
         elif s == "kmeans":
             self.__init_kmeans(kmeans_iters=kmeans_iters, estimate_transitions=estimate_transitions)
-            self.__clear_param_grads()
         elif s == "kmeans_noisy":
             self.__init_kmeans(kmeans_iters=kmeans_iters, estimate_transitions=estimate_transitions)
-            self.__apply_noise_and_bias(
-                mean_std=mean_std,
-                cov_noise_std=cov_noise_std,
-                init_logits_std=init_logits_std,
-                self_transition_bias=self_transition_bias,
-            )
-            self.__clear_param_grads()
+            self.__apply_noise_and_bias(mean_std=mean_std, cov_noise_std=cov_noise_std, init_logits_std=init_logits_std, self_transition_bias=self_transition_bias)
         else:
-            raise ValueError("strategy must be one of {'random','kmeans','kmeans_noisy'}")
+            raise ValueError("strategy must be one of {'random','random_separated','random_uniform','random_dirichlet','kmeans','kmeans_noisy'}")
+        self.__clear_param_grads()
 
-    def __init_random(
-        self,
-        spread: float = 2.0,
-        jitter_std: float = 0.05,
-    ) -> None:
-        """Very simple random init with clearly separated means.
+    def __init_random_separated(self, spread: float = 2.0, jitter_std: float = 0.05,) -> None:
+        """Structured random initialization that separates state means.
 
-        Strategy:
-        1. Place each state's mean along a different (cycled) feature dimension
-           at evenly spaced positions in [-spread, spread]. Add small Gaussian
-           jitter (jitter_std) to all dimensions to avoid exact symmetry.
-        2. Set diagonal variances to 1 (logvar=0) or full cov to identity.
-        3. Use uniform initial state and transition distributions (logits=0).
-        This yields distinguishable emissions without complex heuristics.
+          Compared to a fully random init (e.g., sampling means i.i.d. from N(0, I)),
+          this method intentionally spreads means across distinct directions to avoid
+          overlapping emissions and poor early training dynamics.
+
+          Steps:
+          1) Build S approximately orthogonal direction vectors in R^D and scale by
+              `spread`. Add small Gaussian jitter (jitter_std) in all dims to break
+              symmetry.
+          2) Set covariance to unit variance: diag logvars=0 or full-cov L with
+              softplus(diag) ~ 1 (+ self.jitter for stability).
+          3) Initialize initial/transition logits uniformly (zeros).
         """
         S, D = self.num_states, self.num_features
         device = self.emission_mean.device
         # Construct S distinct direction vectors in R^D
         if D >= S:
-            # Use QR for orthogonal directions (columns of Q)
             R = torch.randn(D, S, device=device)
             Q, _ = torch.linalg.qr(R, mode='reduced')  # (D,S)
             dirs = Q.T  # (S,D)
         else:
-            # More states than dimensions: sample and normalise
             R = torch.randn(S, D, device=device)
             dirs = R / R.norm(dim=1, keepdim=True).clamp_min(1e-8)
         means = spread * dirs
@@ -250,32 +247,82 @@ class HMM(MLModel):
             self.emission_logvar.zero_()
         elif self.covariance_type == "full":
             raw = torch.zeros_like(self.emission_cholesky_raw)
-            # diagonals: inverse softplus(1.0) ~ log(exp(1)-1)
-            diag_raw_val = math.log(math.e - 1.0)
-            for s in range(S):
-                raw[s].diagonal().fill_(diag_raw_val)
+            target = max(1.0 - float(self.jitter), 1e-6)
+            diag_raw_val = torch.log(torch.expm1(torch.tensor(target, device=device)))
+            idx = torch.arange(D, device=device)
+            raw[:, idx, idx] = diag_raw_val
             self.emission_cholesky_raw.copy_(raw)
-        # meanonly: implicit identity
-        # 3. Uniform pi/A -> logits already zero
+        # 3. Uniform pi/A
         self.initial_logits.zero_()
         self.transition_logits.zero_()
 
-        # Diagnostics: report separation to help debug single-state collapse
-        with torch.no_grad():
-            means = self.emission_mean
-            # Pairwise distances
-            pdist = torch.cdist(means, means, p=2)
-            # Ignore diagonal for stats
-            off_diag = pdist[~torch.eye(S, dtype=torch.bool, device=means.device)]
-            mean_dist = off_diag.mean().item() if off_diag.numel() else 0.0
-            min_dist = off_diag.min().item() if off_diag.numel() else 0.0
-            max_dist = off_diag.max().item() if off_diag.numel() else 0.0
-            feat_std = means.std(0)
-            avg_feat_std = feat_std.mean().item()
-            trans_row = torch.softmax(self.transition_logits, dim=-1)[0]
-            print(f"[HMM random init] pairwise_dist min/mean/max = {min_dist:.3f}/{mean_dist:.3f}/{max_dist:.3f}; avg_feature_std={avg_feat_std:.3f}")
-            print(f"[HMM random init] first transition row (uniform expected): {trans_row.cpu().numpy()}")
-        
+    def __init_random_uniform(self, mean_std: float = 1.0, jitter_std: float = 0.0) -> None:
+        """Fully random means, unit covariance, uniform π and A."""
+        S, D = self.num_states, self.num_features
+        device = self.emission_mean.device
+        # Means ~ N(0, mean_std^2 I)
+        means = mean_std * torch.randn(S, D, device=device)
+        if jitter_std > 0:
+            means = means + jitter_std * torch.randn_like(means)
+        self.emission_mean.copy_(means)
+        # Covariance ~ Identity
+        if self.covariance_type == "diag":
+            self.emission_logvar.zero_()
+        elif self.covariance_type == "full":
+            raw = torch.zeros_like(self.emission_cholesky_raw)
+            target = max(1.0 - float(self.jitter), 1e-6)
+            diag_raw_val = torch.log(torch.expm1(torch.tensor(target, device=device)))
+            idx = torch.arange(D, device=device)
+            raw[:, idx, idx] = diag_raw_val
+            self.emission_cholesky_raw.copy_(raw)
+        # Uniform π and A
+        self.initial_logits.zero_()
+        self.transition_logits.zero_()
+
+    def __init_random_dirichlet(
+        self,
+        mean_std: float = 1.0,
+        alpha: float = 1.0,
+        self_transition_bias: float = 0.0,
+    ) -> None:
+        """Fully random means, unit covariance, Dirichlet-sampled π and A."""
+        S, D = self.num_states, self.num_features
+        device = self.emission_mean.device
+        dtype = self.initial_logits.dtype
+
+        # Means ~ N(0, mean_std^2 I)
+        means = mean_std * torch.randn(S, D, device=device)
+        self.emission_mean.copy_(means)
+
+        # Covariance ~ Identity
+        if self.covariance_type == "diag":
+            self.emission_logvar.zero_()
+        elif self.covariance_type == "full":
+            raw = torch.zeros_like(self.emission_cholesky_raw)
+            target = max(1.0 - float(self.jitter), 1e-6)
+            diag_raw_val = torch.log(torch.expm1(torch.tensor(target, device=device)))
+            idx = torch.arange(D, device=device)
+            raw[:, idx, idx] = diag_raw_val
+            self.emission_cholesky_raw.copy_(raw)
+
+        # π ~ Dirichlet(α)
+        alpha_vec = torch.full((S,), float(alpha), device=device, dtype=dtype)
+        pi = torch.distributions.Dirichlet(alpha_vec).sample()
+        # A rows ~ Dirichlet(α)
+        A = torch.stack(
+            [torch.distributions.Dirichlet(alpha_vec).sample() for _ in range(S)],
+            dim=0
+        )
+
+        # Store as logits (training uses log_softmax later)
+        self.initial_logits.copy_(pi.clamp_min(1e-12).log())
+        self.transition_logits.copy_(A.clamp_min(1e-12).log())
+
+        # Optional self-transition bias in logits space
+        if self_transition_bias != 0.0:
+            self.transition_logits.diagonal().add_(float(self_transition_bias))
+
+
     @torch.no_grad()
     def __init_kmeans(self, kmeans_iters: int, estimate_transitions: bool) -> None:
         data, _ = self.data_loader.get_all_data()
@@ -379,4 +426,5 @@ class HMM(MLModel):
     def __str__(self):
         return f"HMM(num_states={self.num_states}, num_features={self.num_features})"
 
+   
 __all__ = ["HMM"]

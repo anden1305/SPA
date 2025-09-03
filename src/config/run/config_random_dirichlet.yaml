@@ -29,9 +29,9 @@ dataset:
   id: test3
 model:
   type: hmm
-  init_strategy: random_separated
+  init_strategy: random_dirichlet
 verbose: true
 seed: 123
 results_dir: results/training
-run_name: feature_synthetic_separated
+run_name: feature_synthetic_dirichlet
 runs: 5

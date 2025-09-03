@@ -40,7 +40,25 @@ class Visualizer:
         if self.config.confusion_matrix:
             self.plot_confusion_matrix(train_details=train_details)
 
-    def plot_state_distinctness(self):
+    def visualize_runs(self, train_details: list[TrainDetails], validations: dict[str, Any], data_validations: dict[str, Any] = None):
+        path = Path(self.global_config.results_dir) / self.global_config.run_name / "plots"
+        path.mkdir(parents=True, exist_ok=True)
+
+        losses = [list(detail.losses.values()) for detail in train_details]
+        final_losses = list(validations.get("loss", {}).values())
+        nmis = list(validations.get("nmi", {}).values())
+        cross_nmis = list(validations.get("cross_nmi", {}).values())
+
+        self.plot_run_losses(losses, path=path)
+
+        if validations.get("nmi"):
+            self.plot_reliability(nmis, cross_nmis, final_losses, path=path)
+        
+        # Across-runs plots (data-level)
+        if self.global_config.visualizer.state_distinctness and self.global_config.validator.state_distinctness:
+                self.plot_state_distinctness(data_validations)
+
+    def plot_state_distinctness(self, data_validations: dict[str, Any] = None):
         """Create a circular network visualization for pairwise Energy Distance between states.
         Annotates each state node with its mean pairwise ED to other states and displays Fisher trace.
         """
@@ -48,14 +66,11 @@ class Visualizer:
         path = Path(self.global_config.results_dir) / self.global_config.run_name / "plots"
         path.mkdir(parents=True, exist_ok=True)
 
-        # load from validator
-        sd = self.validator.get_data_validations()
-
-        ed_mat = np.asarray(sd.get("pairwise_energy", []), dtype=float)
+        ed_mat = np.asarray(data_validations.get("pairwise_energy", []), dtype=float)
         if ed_mat.size == 0:
             return
-        states = list(sd.get("states", range(ed_mat.shape[0])))
-        counts = sd.get("counts", {})
+        states = list(data_validations.get("states", range(ed_mat.shape[0])))
+        counts = data_validations.get("counts", {})
         # Per-state mean pairwise ED (exclude diagonal)
         n_states = len(states)
         if n_states < 2:
@@ -63,7 +78,7 @@ class Visualizer:
         mask = ~np.eye(n_states, dtype=bool)
         per_state_mean = (ed_mat * mask).sum(axis=1) / mask.sum(axis=1)
         # Fisher trace, if available
-        fisher_val = sd.get("fisher_trace", None)
+        fisher_val = data_validations.get("fisher_trace", None)
         # Network in circular layout
         if n_states >= 3:  # Only create this plot if we have at least 3 states
             fig, ax = plt.subplots(figsize=(10, 9))
@@ -127,25 +142,6 @@ class Visualizer:
             plt.tight_layout()
             plt.savefig(path / "pairwise_ed_network.png", dpi=200)
             plt.close(fig)
-
-
-    def visualize_runs(self, train_details: list[TrainDetails], validations: dict[str, Any]):
-        path = Path(self.global_config.results_dir) / self.global_config.run_name / "plots"
-        path.mkdir(parents=True, exist_ok=True)
-
-        losses = [list(detail.losses.values()) for detail in train_details]
-        final_losses = list(validations.get("loss", {}).values())
-        nmis = list(validations.get("nmi", {}).values())
-        cross_nmis = list(validations.get("cross_nmi", {}).values())
-
-        self.plot_run_losses(losses, path=path)
-
-        if validations.get("nmi"):
-            self.plot_reliability(nmis, cross_nmis, final_losses, path=path)
-        
-        # Across-runs plots (data-level)
-        if self.global_config.visualizer.state_distinctness and self.global_config.validator.state_distinctness:
-            self.plot_state_distinctness(train_details, path=path)
 
     def remap_predictions_to_labels(self, y_true, y_pred):
         
