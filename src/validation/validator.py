@@ -3,6 +3,8 @@ import torch
 from typing import Any
 from src.config.config import GlobalConfig
 from src.data.data_loader import DataLoader
+from src.helpers.accuracy import accuracy
+from src.helpers.align_labels import align_labels_hungarian
 from src.helpers.nmi import calculate_nmi
 from src.helpers.summary_statistics import compute_summary_statistics
 from src.models.base_model import MLModel
@@ -31,13 +33,20 @@ class Validator:
         epoch = self.trainer.current_epoch
         self.validations[epoch] = {}
         self.model.prepare_for_inference()
-        x, y = self.data_loader.get_all_data(shuffle=False)
+        xt, yt = self.data_loader.get_all_data(shuffle=False)
+        y = yt.detach().cpu().numpy().flatten()
         with torch.no_grad():
-            preds = self.model.predict(x)
+            predst = self.model.predict(xt)
+            preds = predst.detach().cpu().numpy().flatten()
             if self.config.nmi:
                 nmi = calculate_nmi(preds, y)
                 print(f"NMI: {nmi}")
                 self.validations[epoch]["nmi"] = nmi
+            if self.config.accuracy:
+                aligned_preds = align_labels_hungarian(y, preds)
+                acc = accuracy(aligned_preds, y)
+                print(f"Accuracy: {acc}")
+                self.validations[epoch]["accuracy"] = acc
             self.predictions[epoch] = preds.tolist()
     
     def validate_runs(self, train_details: list[TrainDetails]):
@@ -63,7 +72,7 @@ class Validator:
             distinctness = compute_state_distinctness(x, y)
             self.data_validations.update(distinctness)
         if self.config.summary_statistics:
-            self.data_validations.update(compute_summary_statistics(x, y))
+            self.data_validations.update(compute_summary_statistics(x, y, self.data_loader.dataset))
         with open(out_path, "w") as f:
             json.dump(self.data_validations, f, indent=2)
 
@@ -85,7 +94,11 @@ class Validator:
         return cross_nmis
     
     
-    ####### GETTER METHODS #######
+    ####### PUBLIC HELPER METHODS #######
+    
+    def reset(self):
+        self.validations = {}
+        self.predictions = {}
 
     def get_predictions(self) -> dict[int, list]:
         assert self.predictions, "Inference has not been run yet."

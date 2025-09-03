@@ -11,8 +11,8 @@ class TrainerConfig(BaseModel):
     grad_clip: float | None = Field(default=None, ge=0, description="Gradient clipping value. If None, no clipping is applied.")
 
 class ValidatorConfig(BaseModel):
-    prior_validation: bool = Field(default=True)
     nmi: bool = Field(default=True)
+    accuracy: bool = Field(default=True)
     cross_nmi: bool = Field(default=True)
     state_distinctness: bool = Field(default=True)
     summary_statistics: bool = Field(default=True)

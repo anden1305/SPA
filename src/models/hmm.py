@@ -23,7 +23,7 @@ class HMM(MLModel):
                  device: torch.device) -> None:
         super().__init__(data_loader, config, device)
         self.__initialize_parameters()
-        self.__initialise_weights()
+        self.__initialize_weights()
 
     def __initialize_parameters(self) -> None:
         self.seed = self.global_config.seed
@@ -168,7 +168,7 @@ class HMM(MLModel):
         for t in range(T - 2, -1, -1):
             path[:, t] = backptr[torch.arange(B), t + 1, path[:, t + 1]]
         return path
-
+    
     def prepare_for_training(self):
         self.train()
 
@@ -177,7 +177,7 @@ class HMM(MLModel):
 
     # ----------------------- Initialization helpers -----------------------
     @torch.no_grad()
-    def __initialise_weights(
+    def __initialize_weights(
         self,
         kmeans_iters: int = 150,
         estimate_transitions: bool = True,
@@ -259,22 +259,6 @@ class HMM(MLModel):
         # 3. Uniform pi/A -> logits already zero
         self.initial_logits.zero_()
         self.transition_logits.zero_()
-
-        # Diagnostics: report separation to help debug single-state collapse
-        with torch.no_grad():
-            means = self.emission_mean
-            # Pairwise distances
-            pdist = torch.cdist(means, means, p=2)
-            # Ignore diagonal for stats
-            off_diag = pdist[~torch.eye(S, dtype=torch.bool, device=means.device)]
-            mean_dist = off_diag.mean().item() if off_diag.numel() else 0.0
-            min_dist = off_diag.min().item() if off_diag.numel() else 0.0
-            max_dist = off_diag.max().item() if off_diag.numel() else 0.0
-            feat_std = means.std(0)
-            avg_feat_std = feat_std.mean().item()
-            trans_row = torch.softmax(self.transition_logits, dim=-1)[0]
-            print(f"[HMM random init] pairwise_dist min/mean/max = {min_dist:.3f}/{mean_dist:.3f}/{max_dist:.3f}; avg_feature_std={avg_feat_std:.3f}")
-            print(f"[HMM random init] first transition row (uniform expected): {trans_row.cpu().numpy()}")
         
     @torch.no_grad()
     def __init_kmeans(self, kmeans_iters: int, estimate_transitions: bool) -> None:
@@ -375,6 +359,9 @@ class HMM(MLModel):
                 f"Feature dimension mismatch: got D={x.shape[2]}, expected {self.num_features} (obs_dim)."
             )
         return x.to(self.device) 
+
+    def reset(self):
+        self.__initialize_weights()
 
     def __str__(self):
         return f"HMM(num_states={self.num_states}, num_features={self.num_features})"

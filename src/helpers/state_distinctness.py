@@ -128,9 +128,7 @@ def compute_state_distinctness(x: Any, y: Any) -> Dict[str, Any]:
     weighted_mean = (weighted_sum / total_weight) if total_weight > 0 else mean_pairwise
 
     fisher_val = _fisher_trace(X, Y)
-
-    print(f"State Distinctness - Mean Pairwise ED: {mean_pairwise}, \nWeighted Mean ED: {weighted_mean}, \nFisher Trace: {fisher_val}")
-    
+        
     return {
         "pairwise_energy": ed_mat,
         "mean_pairwise_energy": float(mean_pairwise),

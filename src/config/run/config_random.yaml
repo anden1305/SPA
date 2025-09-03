@@ -1,5 +1,5 @@
 trainer:
-  epochs: 100
+  epochs: 50
   learning_rate: 0.001
   optimizer: adam
 validator:
@@ -32,4 +32,4 @@ verbose: true
 seed: 123
 results_dir: results/training
 run_name: feature_synthetic
-runs: 5
+runs: 2

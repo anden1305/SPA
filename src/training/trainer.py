@@ -49,14 +49,15 @@ class Trainer:
                 self.epoch_losses.append(loss.item())
             if self.global_config.verbose:
                 print(f"Epoch {epoch + 1} / {self.config.epochs} loss: {sum(self.epoch_losses) / len(self.epoch_losses):.4f}")
-                print(f"Dimension of x: {x.shape}")
-                print(f"Dimension of y: {y.shape}")
             self.losses[epoch] = sum(self.epoch_losses) / len(self.epoch_losses)
             self.epoch_losses.clear()
     
     def get_losses(self) -> dict[int, float]:
         assert self.losses, "Training has not been run yet."
         return self.losses
+    
+    def reset(self):
+        self.current_epoch = 0
 
     def __str__(self) -> str:
         return f"Trainer(config={self.config})"

@@ -1,9 +1,9 @@
 
 from pyparsing import Any
 import torch
+from src.data.base_dataset import BaseDataset
 
-
-def compute_summary_statistics(x: torch.Tensor, y: torch.Tensor) -> dict[str, Any]:
+def compute_summary_statistics(x: torch.Tensor, y: torch.Tensor, dataset: BaseDataset) -> dict[str, Any]:
     
     # target statistics
     classes = [_y.item() for _y in y.unique()]
@@ -24,4 +24,5 @@ def compute_summary_statistics(x: torch.Tensor, y: torch.Tensor) -> dict[str, An
         "target_counts": class_counts,
         "target_means": x_means,
         "target_stds": x_stds,
+        "target_labels": dataset.get_state_names(),
     }

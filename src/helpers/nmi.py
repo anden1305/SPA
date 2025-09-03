@@ -79,6 +79,6 @@ def calculate_nmi(pred: Any, target: Any) -> float:
     # Degenerate case: both partitions have (near) zero entropy (single cluster)
     if Hx.item() < 1e-10 and Hy.item() < 1e-10:
         return 1.0
-
+    
     nmi = (2.0 * Ixy / denom).clamp(min=0.0, max=1.0)
     return round(float(nmi.item()), 4)

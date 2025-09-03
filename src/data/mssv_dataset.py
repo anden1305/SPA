@@ -31,6 +31,7 @@ class MSSVDataset(BaseDataset):
 
     def load_labels(self):
         labels = np.load(f'{self.data_path}/labels.npy')
+        labels = labels - min(labels)
         return labels
 
     def load_config(self):

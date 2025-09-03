@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+import datetime
 import uuid
 import torch
 from src.config.config import GlobalConfig
@@ -33,15 +34,16 @@ class Orchestrator:
             self.visualizer.visualize_data()
         for i in range(self.global_config.runs):
             self.run_number = i + 1
-            self.__prepare_run()
-            if self.global_config.validator.prior_validation:
-                self.validator.validate()
+            self.model.reset()
+            self.trainer.reset()
+            self.validator.validate()
             self.trainer.train()
             self.validator.validate()
             train_details = self.__collect_training_details()
             self.__save_info(train_details=train_details)
             self.visualizer.visualize(train_details=train_details)
             self.global_config.seed += 1
+            self.validator.reset()
         if self.global_config.runs > 1:
             validations = self.validator.validate_runs(train_details=self.train_details)
             self.visualizer.visualize_runs(train_details=self.train_details, validations=validations)
@@ -78,8 +80,8 @@ class Orchestrator:
         self.visualizer = Visualizer(data_loader=self.data_loader, config=self.global_config, validator=self.validator)
 
     def __prepare(self):
-        uid = uuid.uuid1()
-        self.global_config.run_name = f"{self.global_config.run_name} [{uid}]"
+        time_str = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        self.global_config.run_name = f"{self.global_config.run_name} [{time_str}]"
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.train_details: list[TrainDetails] = []
         self.run_number: int = 1
@@ -95,7 +97,7 @@ class Orchestrator:
     def __save_config(self):
         with open(Path(self.global_config.results_dir) / self.global_config.run_name / "config.json", "w") as f:
             json.dump(self.global_config.model_dump(), f)
-    
+
     def __get_dataset(self):
         match self.global_config.dataset.type:
             case "synthetic":
