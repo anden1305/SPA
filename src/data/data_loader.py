@@ -99,6 +99,7 @@ class DataLoader(Iterator):
         self._batch_cursor += 1
         if self.normalize:
             x = (x - self.statistics["mean"]) / self.statistics["std"]
+            
         return torch.from_numpy(x).to(self.device), torch.from_numpy(y).to(self.device)
     
     def get_feature_dim(self) -> int:

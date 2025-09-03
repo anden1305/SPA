@@ -23,13 +23,14 @@ class Orchestrator:
         self.config_path = config_path
         self.__set_config()
         self.__prepare()
-
+        
         
     ### public methods ###
     
     def run(self):
         if self.global_config.validate_data:
             self.validator.validate_data()
+            self.visualizer.visualize_data()
         for i in range(self.global_config.runs):
             self.run_number = i + 1
             self.__prepare_run()
@@ -94,7 +95,7 @@ class Orchestrator:
     def __save_config(self):
         with open(Path(self.global_config.results_dir) / self.global_config.run_name / "config.json", "w") as f:
             json.dump(self.global_config.model_dump(), f)
-
+    
     def __get_dataset(self):
         match self.global_config.dataset.type:
             case "synthetic":

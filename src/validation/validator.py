@@ -4,6 +4,7 @@ from typing import Any
 from src.config.config import GlobalConfig
 from src.data.data_loader import DataLoader
 from src.helpers.nmi import calculate_nmi
+from src.helpers.summary_statistics import compute_summary_statistics
 from src.models.base_model import MLModel
 from src.orchestrator.train_details import TrainDetails
 from src.training.trainer import Trainer
@@ -23,6 +24,8 @@ class Validator:
         self.validations: dict[int, dict] = {}
         self.predictions: dict[int, list] = {}
         self.data_validations: dict[int, dict] = {}
+
+    ####### GENERAL METHODS #######
 
     def validate(self):
         epoch = self.trainer.current_epoch
@@ -54,13 +57,20 @@ class Validator:
 
     def validate_data(self):
         x, y = self.data_loader.get_all_data(shuffle=False)
+        self.data_validations = {}
+        out_path = f"{self.global_config.results_dir}/{self.global_config.run_name}/data_validations.json"
         if self.config.state_distinctness:
-            distinctness = compute_state_distinctness(x, y, compute_fisher=True)
-            self.data_validations = distinctness
-            # TODO: Data validations like shape, basic statistics, etc
-            out_path = f"{self.global_config.results_dir}/{self.global_config.run_name}/data_validations.json"
-            with open(out_path, "w") as f:
-                json.dump(self.data_validations, f, indent=2)
+            distinctness = compute_state_distinctness(x, y)
+            self.data_validations.update(distinctness)
+        if self.config.summary_statistics:
+            self.data_validations.update(compute_summary_statistics(x, y))
+        with open(out_path, "w") as f:
+            json.dump(self.data_validations, f, indent=2)
+
+
+
+
+    ####### HELPER METHODS #######
 
     def __calculate_cross_nmi(self, train_details: list[TrainDetails]):
         cross_nmis: dict[int, float] = {}
@@ -73,6 +83,9 @@ class Validator:
                     nmis.append(nmi)
             cross_nmis[details.run_number] = sum(nmis) / len(nmis)
         return cross_nmis
+    
+    
+    ####### GETTER METHODS #######
 
     def get_predictions(self) -> dict[int, list]:
         assert self.predictions, "Inference has not been run yet."

@@ -93,14 +93,14 @@ def _fisher_trace(X: torch.Tensor, y: torch.Tensor, reg: float = 1e-4, max_dim: 
     except Exception:
         return None
 
-def compute_state_distinctness(x: Any, y: Any, compute_fisher: bool = True) -> Dict[str, Any]:
+def compute_state_distinctness(x: Any, y: Any) -> Dict[str, Any]:
     X = _to_2d_features(x)
     Y = _to_labels(y).to(device=X.device)
     X, Y = _align_samples_and_labels(X, Y)
 
     classes = torch.unique(Y)
     classes_sorted = [int(c.item()) for c in classes]
-
+    
     grouped: Dict[int, torch.Tensor] = {cid: X[Y == c] for cid, c in zip(classes_sorted, classes)}
     counts = {cid: int(grouped[cid].shape[0]) for cid in classes_sorted}
 
@@ -127,13 +127,11 @@ def compute_state_distinctness(x: Any, y: Any, compute_fisher: bool = True) -> D
     )
     weighted_mean = (weighted_sum / total_weight) if total_weight > 0 else mean_pairwise
 
-    fisher_val = _fisher_trace(X, Y) if compute_fisher else None
+    fisher_val = _fisher_trace(X, Y)
 
     print(f"State Distinctness - Mean Pairwise ED: {mean_pairwise}, \nWeighted Mean ED: {weighted_mean}, \nFisher Trace: {fisher_val}")
     
     return {
-        "states": classes_sorted,
-        "counts": counts,
         "pairwise_energy": ed_mat,
         "mean_pairwise_energy": float(mean_pairwise),
         "weighted_mean_pairwise_energy": float(weighted_mean),
