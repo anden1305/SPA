@@ -23,15 +23,16 @@ class Orchestrator:
         self.config_path = config_path
         self.__set_config()
         self.__prepare()
+
         
     ### public methods ###
     
     def run(self):
+        if self.global_config.validate_data:
+            self.validator.validate_data()
         for i in range(self.global_config.runs):
             self.run_number = i + 1
             self.__prepare_run()
-            if self.run_number == 1: #TODO refactor this line
-                self.validator.validate_data()
             if self.global_config.validator.prior_validation:
                 self.validator.validate()
             self.trainer.train()
@@ -73,14 +74,16 @@ class Orchestrator:
         self.model = self.__get_model(self.device)
         self.trainer = Trainer(data_loader=self.data_loader, model=self.model, config=self.global_config)
         self.validator = Validator(data_loader=self.data_loader, model=self.model, trainer=self.trainer, config=self.global_config)
-        self.visualizer = Visualizer(data_loader=self.data_loader, config=self.global_config)
-    
+        self.visualizer = Visualizer(data_loader=self.data_loader, config=self.global_config, validator=self.validator)
+
     def __prepare(self):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.train_details: list[TrainDetails] = []
         self.run_number: int = 1
         self.__make_output_dir()
         self.__save_config()
+        self.dataset = self.__get_dataset()
+        self.data_loader = DataLoader(dataset=self.dataset, config=self.global_config, device=self.device)
 
     def __make_output_dir(self):
         output_dir = Path(self.global_config.results_dir) / self.global_config.run_name

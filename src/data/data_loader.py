@@ -59,8 +59,8 @@ class DataLoader(Iterator):
         x, _ = self.get_all_data(shuffle=False)
         self.normalize = True
         return {
-            "mean": x.mean(dim=(0,1)).numpy(),
-            "std": x.std(dim=(0,1)).numpy(),
+            "mean": x.mean(dim=(0,1)).detach().cpu().numpy(),
+            "std": x.std(dim=(0,1)).detach().cpu().numpy(),
         }
 
     def __len__(self) -> int:

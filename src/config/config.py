@@ -14,7 +14,7 @@ class ValidatorConfig(BaseModel):
     prior_validation: bool = Field(default=True)
     nmi: bool = Field(default=True)
     cross_nmi: bool = Field(default=True)
-    state_distinctness: bool = Field(default=True)
+    state_distinctness: bool = Field(default=True) #TODO refactor
 
 class VisualizerConfig(BaseModel):
     losses: bool = Field(default=True)
@@ -22,8 +22,6 @@ class VisualizerConfig(BaseModel):
     confusion_matrix: bool = Field(default=False)
     pca_top_k: int = Field(default=4, ge=2)
     state_distinctness: bool = Field(default=False)
-    pairwise_energy_distance: bool = Field(default=False)
-    fisher: bool = Field(default=False)
 
 class TransformsConfig(BaseModel):
     type: str = Field(default="default_transform")
@@ -57,6 +55,7 @@ class GlobalConfig(BaseModel):
     results_dir: str = Field(default="results/training")
     run_name: str = Field(default="default_run")
     runs: int = Field(default=1, ge=1)
+    validate_data: bool = Field(default=True)
 
     @classmethod
     def from_yaml(cls, file_path: str) -> "GlobalConfig":

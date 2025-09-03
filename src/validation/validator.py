@@ -1,5 +1,6 @@
 import json
 import torch
+from typing import Any
 from src.config.config import GlobalConfig
 from src.data.data_loader import DataLoader
 from src.helpers.nmi import calculate_nmi
@@ -55,8 +56,8 @@ class Validator:
         x, y = self.data_loader.get_all_data(shuffle=False)
         if self.config.state_distinctness:
             distinctness = compute_state_distinctness(x, y, compute_fisher=True)
-            print(distinctness)
             self.data_validations = distinctness
+            # TODO: Data validations like shape, basic statistics, etc
             out_path = f"{self.global_config.results_dir}/{self.global_config.run_name}/data_validations.json"
             with open(out_path, "w") as f:
                 json.dump(self.data_validations, f, indent=2)
@@ -80,3 +81,7 @@ class Validator:
     def get_validations(self) -> dict[int, dict]:
         assert self.validations, "Validation has not been run yet."
         return self.validations
+    
+    def get_data_validations(self) -> dict[str, Any]:
+        assert self.data_validations, "Data validation has not been run yet."
+        return self.data_validations
