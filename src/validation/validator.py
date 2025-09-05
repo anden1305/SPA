@@ -57,7 +57,7 @@ class Validator:
         if self.config.state_distinctness:
             distinctness = compute_state_distinctness(x, y, compute_fisher=True)
             self.data_validations = distinctness
-            print(self.data_validations)
+            # print(self.data_validations)
             # TODO: Data validations like shape, basic statistics, etc
             out_path = f"{self.global_config.results_dir}/{self.global_config.run_name}/data_validations.json"
             with open(out_path, "w") as f:

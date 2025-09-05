@@ -1,5 +1,5 @@
 trainer:
-  epochs: 700
+  epochs: 500
   learning_rate: 0.001
   optimizer: adam
 validator:
@@ -29,9 +29,9 @@ dataset:
   id: test3
 model:
   type: hmm
-  init_strategy: kmeans
+  init_strategy: kmeans_pca
 verbose: true
 seed: 123
 results_dir: results/training
-run_name: feature_synthetic_kmeans
-runs: 5
+run_name: feature_synthetic_kmeans_pca
+runs: 2

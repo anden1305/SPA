@@ -190,12 +190,14 @@ class HMM(MLModel):
     ) -> None:
         """Short dispatcher for HMM weight initialization.
 
-        strategy in {random, random_separated, random_uniform, random_dirichlet, kmeans, kmeans_noisy}.
+        strategy in {random, random_separated, random_uniform, random_dirichlet, kmeans, kmeans_noisy, kmeans_pca}.
         - random or random_separated: separated means (approx. orthogonal), unit covariance, uniform pi/A.
         - random_uniform: fully random means, unit covariance, uniform pi/A.
         - random_dirichlet: fully random means, unit covariance, Dirichlet-sampled pi/A.
         - kmeans: k-means for emissions (and optionally pi/A).
         - kmeans_noisy: run k-means, then add small random noise to avoid plateaus.
+        - kmeans_pca: search small PCA subspaces (1–3 dims among top-L PCs), run k-means, pick best by CH score.
+        - sticky_em_warmstart: run a few EM iterations with high self-transition bias to get a reasonable starting point.
         Data is optional (not needed for random*).
         """
         s = self.global_config.model.init_strategy.lower()
@@ -210,8 +212,12 @@ class HMM(MLModel):
         elif s == "kmeans_noisy":
             self.__init_kmeans(kmeans_iters=kmeans_iters, estimate_transitions=estimate_transitions)
             self.__apply_noise_and_bias(mean_std=mean_std, cov_noise_std=cov_noise_std, init_logits_std=init_logits_std, self_transition_bias=self_transition_bias)
+        elif s == "kmeans_pca":
+            self.__init_kmeans_pca(kmeans_iters=kmeans_iters, estimate_transitions=estimate_transitions)
+        elif s == "sticky_em_warmstart":
+            self.__init_sticky_em_warmstart(n_iters=3, kappa=3.0, min_var=1e-6)
         else:
-            raise ValueError("strategy must be one of {'random','random_separated','random_uniform','random_dirichlet','kmeans','kmeans_noisy'}")
+            raise ValueError("strategy must be one of {'random','random_separated','random_uniform','random_dirichlet','kmeans','kmeans_noisy','kmeans_pca','sticky_em_warmstart'}")
         self.__clear_param_grads()
 
     def __init_random_separated(self, spread: float = 2.0, jitter_std: float = 0.05,) -> None:
@@ -406,11 +412,355 @@ class HMM(MLModel):
             self.transition_logits.diagonal().add_(float(self_transition_bias))
 
     @torch.no_grad()
+    def __init_kmeans_pca(
+        self,
+        *,
+        kmeans_iters: int,
+        estimate_transitions: bool,
+        top_l: int = 4,
+        max_dim: int = 3,
+        whiten: bool = True,
+    ) -> None:
+        """Initialize emissions via k-means in the best PCA subspace (auto-selected).
+
+        Procedure:
+        1) Flatten frames X (N,D), center, compute compact SVD -> PCs V and singular values S.
+        2) Consider all combinations of 1..max_dim PCs drawn from the top 'top_l' PCs.
+        3) For each subspace: project (and optionally whiten), run k-means, score by Calinski–Harabasz (CH).
+        4) Pick the best subspace by CH; lift assignments back to original space to compute means/covariances.
+        5) Estimate π and A from per-time hard labels (with smoothing).
+        
+        Parameters
+        ----------
+        kmeans_iters : int
+            Number of k-means iterations per candidate subspace
+        estimate_transitions : bool
+            Whether to estimate initial/transition logits from data
+        top_l : int
+            Number of top PCA components to consider for subspace search, i.e. the pool of PCs
+            from which to draw combinations. Must be at least max_dim.
+        max_dim : int
+            Maximum PCA subspace dimension to consider (up to 3). This controls the largest
+            number of PCs to combine when building candidate subspaces.
+        whiten : bool
+            Whether to whiten PCA projections before k-means. Whiten means to scale
+            each PC by 1/singular_value, so that the resulting features have unit variance. 
+            Produces more balanced clustering because distances in K-means aren't dominated
+            by high-variance PCs.
+        """
+        # Allow config to override defaults without cluttering dispatcher
+        cfg_model = getattr(self.global_config, "model", None)
+        if cfg_model is not None:
+            try:
+                top_l = int(getattr(cfg_model, "init_pca_top_l", top_l))
+            except Exception:
+                pass
+            try:
+                max_dim = int(getattr(cfg_model, "init_pca_max_dim", max_dim))
+            except Exception:
+                pass
+            try:
+                whiten = bool(getattr(cfg_model, "init_pca_whiten", whiten))
+            except Exception:
+                pass
+
+        data, _ = self.data_loader.get_all_data()
+        data = self.__validate_input(data)
+        B, T, D = data.shape
+        S = self.num_states
+        device = self.device
+        X = data.reshape(-1, D).to(device)  # (N,D)
+        N = X.size(0)
+        if N < S:
+            raise ValueError("Not enough frames for k-means init in PCA space.")
+
+        # Center and compute compact SVD
+        mean_x = X.mean(0, keepdim=True)  # (1,D)
+        Xc = X - mean_x
+        # U:(N,r), Svals:(r,), Vh:(r,D)
+        U, Svals, Vh = torch.linalg.svd(Xc, full_matrices=False)
+        V = Vh.transpose(0, 1)  # (D,r)
+        r = V.size(1)
+        L = max(1, min(int(top_l), r))
+        mmax = max(1, min(int(max_dim), L))
+
+        # Build candidate index tuples of sizes 1..mmax from [0..L-1]
+        # Use an inline combinations builder for clarity (avoid global imports)
+        candidates = []  # list[list[int]]
+        rng = list(range(L))
+        # size 1
+        for i in rng:
+            candidates.append([i])
+        # size 2
+        if mmax >= 2:
+            for i in rng:
+                for j in range(i + 1, L):
+                    candidates.append([i, j])
+        # size 3
+        if mmax >= 3:
+            for i in rng:
+                for j in range(i + 1, L):
+                    for k in range(j + 1, L):
+                        candidates.append([i, j, k])
+
+        def kpp_init(Z: torch.Tensor, K: int) -> torch.Tensor:
+            # k-means++ init
+            n, d = Z.shape
+            idx0 = torch.randint(0, n, (1,), device=Z.device)
+            centers = [Z[idx0]]
+            d2 = torch.cdist(Z, centers[0]).pow(2).squeeze(1)
+            for _ in range(1, K):
+                probs = (d2 / d2.sum().clamp_min(1e-12)).clamp_min(1e-12)
+                next_idx = torch.multinomial(probs, 1)
+                centers.append(Z[next_idx])
+                d2 = torch.minimum(d2, torch.cdist(Z, centers[-1]).pow(2).squeeze(1))
+            return torch.cat(centers, dim=0)
+
+        def ch_score(Z: torch.Tensor, assign: torch.Tensor, centers: torch.Tensor) -> float:
+            # Calinski–Harabasz score
+            # Z: (N,m); assign: (N,); centers: (K,m)
+            K = centers.size(0)
+            N = Z.size(0)
+            mu = Z.mean(dim=0, keepdim=True)  # (1,m)
+            # within scatter
+            W = (Z - centers[assign]).pow(2).sum()
+            # between scatter
+            # counts
+            counts = torch.bincount(assign, minlength=K).float().unsqueeze(1)  # (K,1)
+            B = (counts * (centers - mu).pow(2)).sum()
+            # CH = (B/(K-1)) / (W/(N-K))
+            # Guard small denominators
+            if K <= 1 or N <= K:
+                return float('-inf')
+            ch = (B / (K - 1 + 1e-12)) / (W / (N - K + 1e-12) + 1e-12)
+            return float(ch.item())
+
+        best = {
+            "score": float('-inf'),
+            "dims": None,
+            "means_z": None,
+        }
+
+        K = S
+        iters = max(1, int(kmeans_iters))
+        for dims in candidates:
+            Vsub = V[:, dims]  # (D,m)
+            Z = Xc @ Vsub      # (N,m)
+            if whiten:
+                scale = Svals[dims].clamp_min(1e-8)
+                Z = Z / scale
+
+            # k-means in Z
+            means_z = kpp_init(Z, K).clone()
+            for _ in range(iters):
+                # Assign
+                assign = torch.cdist(Z, means_z).argmin(-1)
+                counts = torch.bincount(assign, minlength=K)
+                # Re-seed empties to farthest points
+                empty = (counts == 0).nonzero(as_tuple=False).flatten()
+                if empty.numel() > 0:
+                    d2 = torch.min(torch.cdist(Z, means_z).pow(2), dim=1).values
+                    far_idx = torch.topk(d2, k=empty.numel(), largest=True).indices
+                    for j, e in enumerate(empty):
+                        means_z[e] = Z[far_idx[j]]
+                    assign = torch.cdist(Z, means_z).argmin(-1)
+                    counts = torch.bincount(assign, minlength=K)
+                # Update centers
+                new_means = torch.zeros_like(means_z)
+                new_means.scatter_add_(0, assign.view(-1, 1).expand(-1, means_z.size(1)), Z)
+                means_z = new_means / counts.clamp_min(1).view(-1, 1)
+
+            # Final assign and CH score
+            assign = torch.cdist(Z, means_z).argmin(-1)
+            score = ch_score(Z, assign, means_z)
+            if score > best["score"]:
+                best = {"score": score, "dims": dims, "means_z": means_z.clone()}
+
+        # Use best subspace
+        assert best["dims"] is not None and best["means_z"] is not None, "PCA auto-selection failed."
+        dims = best["dims"]  # type: ignore[assignment]
+        means_z = best["means_z"]  # (K,m)
+        
+        # TODO: CLEAN UP
+        # Minimal, gated logging of the chosen PCA subspace (1-based PC indices)
+        verbose = bool(getattr(self.global_config, "verbose", False))
+        pcs_1based = [int(d) + 1 for d in dims]
+        try:
+            score_val = float(best.get("score", float("nan")))
+        except Exception:
+            score_val = float("nan")
+        if verbose:
+            print(f"[HMM:init] PCA k-means init using PCs {pcs_1based} (whiten={whiten}, CH={score_val:.3f})")
+        # Persist for debugging/inspection
+        
+        try:
+            self._pca_init_info = {"dims": dims, "dims_1based": pcs_1based, "score": score_val, "whiten": bool(whiten)}
+        except Exception:
+            pass
+        Vsub = V[:, dims]
+        Z = Xc @ Vsub
+        if whiten:
+            scale = Svals[dims].clamp_min(1e-8)
+            Z = Z / scale
+        assign = torch.cdist(Z, means_z).argmin(-1)  # (N,)
+
+        # Original-space means and variances from assignments
+        D = X.size(1)
+        mu = torch.zeros(S, D, device=device)
+        counts = torch.bincount(assign, minlength=S).clamp_min(1)
+        mu.scatter_add_(0, assign.view(-1, 1).expand(-1, D), X)
+        mu = mu / counts.view(-1, 1)
+        self.emission_mean.copy_(mu)
+
+        if self.covariance_type == "diag":
+            resid = X - mu[assign]
+            var = torch.zeros(S, D, device=device)
+            var.scatter_add_(0, assign.view(-1, 1).expand(-1, D), resid.pow(2))
+            var = (var / counts.view(-1, 1)).clamp_min(1e-6)
+            self.emission_logvar.copy_(var.log())
+        elif self.covariance_type == "full":
+            # Estimate sample covariance per cluster, map to raw Cholesky params
+            raw = torch.zeros_like(self.emission_cholesky_raw)
+            I = torch.eye(D, device=device, dtype=X.dtype)
+            for k in range(S):
+                mask = (assign == k)
+                nk = int(mask.sum().item())
+                if nk <= 1:
+                    # Fallback: diagonal from pooled variance of cluster
+                    Xk = X[mask] if nk > 0 else X
+                    var_k = Xk.var(dim=0, unbiased=False).clamp_min(1e-6)
+                    Ck = torch.diag(var_k) + self.jitter * I
+                else:
+                    Xk = X[mask]
+                    # Centered covariance
+                    Xk_c = Xk - Xk.mean(0, keepdim=True)
+                    # cov = (Xk_c^T Xk_c)/(nk-1)
+                    Ck = (Xk_c.T @ Xk_c) / max(nk - 1, 1)
+                    Ck = Ck + self.jitter * I
+                # Cholesky and map to raw: off-diag copy, diag uses inverse softplus on (Ldiag - jitter)
+                try:
+                    Lk = torch.linalg.cholesky(Ck)
+                except RuntimeError:
+                    # Ensure PSD via small ridge if needed
+                    Lk = torch.linalg.cholesky(Ck + 1e-4 * I)
+                # Fill lower triangle
+                raw[k].copy_(torch.tril(Lk))
+                # Correct diagonals to be pre-softplus values: softplus(raw_diag) + jitter = L_diag
+                diag_L = torch.diagonal(Lk)
+                target = (diag_L - self.jitter).clamp_min(1e-8)
+                diag_raw = torch.log(torch.expm1(target))
+                raw[k].diagonal().copy_(diag_raw)
+            self.emission_cholesky_raw.copy_(raw)
+        else:
+            # meanonly -> nothing to set for covariance
+            pass
+
+        # Transitions and initial distribution from per-time assignments
+        if estimate_transitions:
+            z = assign.view(B, T)  # (B,T), same flattening order as reshape(-1, D)
+            pi_counts = torch.bincount(z[:, 0], minlength=S).float() + 1e-3
+            pi = pi_counts / pi_counts.sum()
+            prev = z[:, :-1].reshape(-1)
+            nxt = z[:, 1:].reshape(-1)
+            joint_idx = prev * S + nxt
+            trans_counts = torch.bincount(joint_idx, minlength=S * S).float().reshape(S, S) + 1e-3
+            A = trans_counts / trans_counts.sum(-1, keepdim=True)
+        else:
+            pi = torch.full((S,), 1.0 / S, device=device)
+            A = torch.full((S, S), 1.0 / S, device=device)
+
+        self.initial_logits.copy_(pi.clamp_min(1e-12).log())
+        self.transition_logits.copy_(A.clamp_min(1e-12).log())
+    
+    @torch.no_grad()
+    def __init_sticky_em_warmstart(self, n_iters: int = 10, kappa: float = 3.0, min_var: float = 1e-6):
+        """Run a few EM iterations with stickiness (κ added to self-transitions)."""
+        data, _ = self.data_loader.get_all_data()
+        x = self.__validate_input(data)                 # (B,T,D)
+        B, T, D = x.shape
+        S = self.num_states
+        device = self.device
+
+        for _ in range(n_iters):
+            # ----- E-step: forward-backward -> gammas and xis -----
+            log_pi = torch.log_softmax(self.initial_logits, dim=-1)        # (S,)
+            log_A  = torch.log_softmax(self.transition_logits, dim=-1)     # (S,S)
+            log_em = self.__emission_log_prob(x)                           # (B,T,S)
+
+            # forward
+            log_alpha = x.new_empty(B, T, S)
+            log_alpha[:, 0, :] = log_pi + log_em[:, 0, :]
+            for t in range(1, T):
+                # alpha_t(i) = log_em + logsumexp_j alpha_{t-1}(j) + logA_{j->i}
+                prev = log_alpha[:, t-1, :].unsqueeze(2) + log_A.unsqueeze(0)    # (B,S,S)
+                log_alpha[:, t, :] = log_em[:, t, :] + torch.logsumexp(prev, dim=1)
+
+            # backward
+            log_beta = x.new_zeros(B, T, S)
+            for t in range(T - 2, -1, -1):
+                nxt = log_beta[:, t+1, :].unsqueeze(1) + log_em[:, t+1, :].unsqueeze(1) + log_A.unsqueeze(0)  # (B,S,S)
+                log_beta[:, t, :] = torch.logsumexp(nxt, dim=2)
+
+            # posteriors
+            log_gamma = log_alpha + log_beta
+            log_gamma = log_gamma - torch.logsumexp(log_gamma, dim=2, keepdim=True)
+            gamma = log_gamma.exp()                                         # (B,T,S)
+
+            # pairwise posteriors ξ_t(i,j)
+            xi = x.new_empty(B, T - 1, S, S)
+            for t in range(T - 1):
+                term = (log_alpha[:, t, :].unsqueeze(2) + log_A.unsqueeze(0)
+                        + log_em[:, t+1, :].unsqueeze(1) + log_beta[:, t+1, :].unsqueeze(1))  # (B,S,S)
+                term = term - torch.logsumexp(term.reshape(B, -1), dim=1, keepdim=True).unsqueeze(-1)
+                xi[:, t, :, :] = term.exp()
+
+            # ----- M-step: emissions -----
+            # weights per state
+            w = gamma.sum(dim=1)                                           # (B,S) -> per sequence
+            N_s = w.sum(dim=0).clamp_min(1e-8)                              # (S,)
+
+            # means
+            x_expanded = x.unsqueeze(2)                                     # (B,T,1,D)
+            mu_num = (gamma.unsqueeze(-1) * x_expanded).sum(dim=(0,1))      # (S,D)
+            mu = mu_num / N_s.unsqueeze(1)
+            self.emission_mean.copy_(mu)
+
+            # covariances
+            if self.covariance_type == "diag":
+                diff2 = (x_expanded - mu.unsqueeze(0).unsqueeze(0)).pow(2)  # (B,T,S,D)
+                var_num = (gamma.unsqueeze(-1) * diff2).sum(dim=(0,1))      # (S,D)
+                var = (var_num / N_s.unsqueeze(1)).clamp_min(min_var)
+                self.emission_logvar.copy_(var.log())
+            elif self.covariance_type == "full":
+                # simple weighted covariance (could be optimized if D large)
+                raw = torch.zeros_like(self.emission_cholesky_raw)
+                Xbt = x.reshape(B*T, D)
+                G = gamma.reshape(B*T, S)                                   # (N,S)
+                for s in range(S):
+                    mu_s = mu[s]
+                    diff = Xbt - mu_s
+                    w_s = G[:, s].unsqueeze(1)
+                    C = (w_s * diff).T @ diff / N_s[s]
+                    C = C + self.jitter * torch.eye(D, device=device)
+                    raw[s] = torch.linalg.cholesky(C)
+                self.emission_cholesky_raw.copy_(raw)
+
+            # ----- M-step: π and A with stickiness κ -----
+            pi = gamma[:, 0, :].sum(0) + 1e-3
+            pi = pi / pi.sum()
+
+            A_num = xi.sum(dim=(0,1)) + kappa * torch.eye(S, device=device) + 1e-6
+            A_den = A_num.sum(dim=1, keepdim=True)
+            A = A_num / A_den
+
+            self.initial_logits.copy_(pi.clamp_min(1e-12).log())
+            self.transition_logits.copy_(A.clamp_min(1e-12).log())
+
+    @torch.no_grad()
     def __clear_param_grads(self) -> None:
         for p in self.parameters():
             if p.grad is not None:
                 p.grad.zero_()
-
     def __validate_input(self, x: Tensor) -> Tensor:
         """Validate that x has shape (B,T,D) with D == self.num_features.
         Returns the tensor moved to the model device.
