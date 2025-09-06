@@ -10,7 +10,6 @@ visualizer:
   losses: True
   pca_tripanel: True
   confusion_matrix: True
-  pca_top_k: 4
   state_distinctness: True
 dataloader:
   batch_size: 16384
