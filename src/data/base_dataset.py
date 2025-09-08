@@ -88,3 +88,6 @@ class BaseDataset(ABC):
     def __str__(self):
         """Returns a string representation of the dataset."""
         raise NotImplementedError('This method has to be implemented.')
+    
+    def get_state_names(self):
+        return self.config.get('stage_names', None)

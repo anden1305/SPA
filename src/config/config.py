@@ -11,17 +11,18 @@ class TrainerConfig(BaseModel):
     grad_clip: float | None = Field(default=None, ge=0, description="Gradient clipping value. If None, no clipping is applied.")
 
 class ValidatorConfig(BaseModel):
-    prior_validation: bool = Field(default=True)
     nmi: bool = Field(default=True)
+    accuracy: bool = Field(default=True)
     cross_nmi: bool = Field(default=True)
-    state_distinctness: bool = Field(default=True) #TODO refactor
+    state_distinctness: bool = Field(default=True)
+    summary_statistics: bool = Field(default=True)
 
 class VisualizerConfig(BaseModel):
     losses: bool = Field(default=True)
-    pca_tripanel: bool = Field(default=False)
-    confusion_matrix: bool = Field(default=False)
-    pca_top_k: int = Field(default=4, ge=2)
-    state_distinctness: bool = Field(default=False)
+    pca_tripanel: bool = Field(default=True)
+    confusion_matrix: bool = Field(default=True)
+    state_distinctness: bool = Field(default=True)
+    summary_statistics: bool = Field(default=True)
 
 class TransformsConfig(BaseModel):
     type: str = Field(default="default_transform")
