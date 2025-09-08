@@ -1,6 +1,6 @@
 trainer:
-  epochs: 700
-  learning_rate: 0.001
+  epochs: 300
+  learning_rate: 0.0005
   optimizer: adam
 validator:
   nmi: True
@@ -25,12 +25,12 @@ dataloader:
       }
 dataset:
   type: synthetic
-  id: test3
+  id: adversarial_kmeans_hmm
 model:
   type: hmm
-  init_strategy: kmeans
+  init_strategy: kmeans_pca
 verbose: true
-seed: 123
+seed: 1234
 results_dir: results/training
-run_name: feature_synthetic_kmeans
-runs: 5
+run_name: feature_synthetic_kmeans_pca_adversarial2
+runs: 1

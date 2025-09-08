@@ -42,7 +42,7 @@ class DatasetConfig(BaseModel):
 
 class ModelConfig(BaseModel):
     type: str = Field(default="hmm", pattern="^(hmm|new_hmm)$")
-    init_strategy: str = Field(default="random", pattern="^(random_separated|random_uniform|random_dirichlet|kmeans|kmeans_noisy)$")
+    init_strategy: str = Field(default="random", pattern="^(random_uniform|random_dirichlet|random_separated|kmeans|kmeans_pca)$")
 
 class GlobalConfig(BaseModel):
     trainer: TrainerConfig = Field(default_factory=TrainerConfig)
