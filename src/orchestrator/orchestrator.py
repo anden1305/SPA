@@ -10,7 +10,7 @@ from src.data.base_dataset import BaseDataset
 from src.data.data_loader import DataLoader
 from src.data.mssv_dataset import MSSVDataset
 from src.data.synthetic_dataset import SyntheticDataset
-from src.models.base_model import MLModel
+from src.models.base_model import BaseModel
 from src.models.hmm import HMM
 from src.orchestrator.train_details import TrainDetails
 from src.training.trainer import Trainer
