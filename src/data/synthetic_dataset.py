@@ -40,4 +40,4 @@ class SyntheticDataset(BaseDataset):
         return config
     
     def __str__(self):
-        return f"SyntheticDataset(id={self.config['name']})"
+        return f"Synthetic(id={self.config['name']})"

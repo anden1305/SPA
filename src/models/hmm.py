@@ -181,11 +181,11 @@ class HMM(MLModel):
         self,
         kmeans_iters: int = 150,
         estimate_transitions: bool = True,
-        mean_std: float = 1.5,
-        cov_noise_std: float = 1.5,
-        init_logits_std: float = 0.5,
-        self_transition_bias: float = 0.5,
-        spread: float = 2.0,
+        mean_std: float = 0.05,
+        cov_noise_std: float = 0.05,
+        init_logits_std: float = 0.05,
+        self_transition_bias: float = 0.05,
+        spread: float = 0.05,
         jitter_std: float = 0.05,
     ) -> None:
         """Short dispatcher for HMM weight initialization.
@@ -213,9 +213,8 @@ class HMM(MLModel):
         else:
             raise ValueError("strategy must be one of {'random','random_separated','random_uniform','random_dirichlet','kmeans','kmeans_noisy','kmeans_pca','sticky_em_warmstart'}")
 
-        # init_noisy = self.global_config.model.init_noisy
-        # if init_noisy:
-        #     self.__apply_noise_and_bias(mean_std=mean_std, cov_noise_std=cov_noise_std, init_logits_std=init_logits_std, self_transition_bias=self_transition_bias)
+        
+        self.__apply_noise_and_bias(mean_std=mean_std, cov_noise_std=cov_noise_std, init_logits_std=init_logits_std, self_transition_bias=self_transition_bias)
         self.__clear_param_grads()
 
     def __init_random_separated(self, spread: float = 2.0, jitter_std: float = 0.05,) -> None:

@@ -28,10 +28,14 @@ class Orchestrator:
     ### public methods ###
     
     def run(self):
+        if self.global_config.verbose:
+            self.__initial_print()
         if self.global_config.validate_data:
             self.validator.validate_data()
             self.visualizer.visualize_data()
         for i in range(self.global_config.runs):
+            if self.global_config.verbose:
+                self.__print_run()
             self.run_number = i + 1
             self.model.reset()
             self.trainer.reset()
@@ -44,6 +48,8 @@ class Orchestrator:
             self.global_config.seed += 1
             self.validator.reset()
         if self.global_config.runs > 1:
+            if self.global_config.verbose:
+                self.__print_end()
             validations = self.validator.validate_runs(train_details=self.train_details)
             self.visualizer.visualize_runs(train_details=self.train_details, validations=validations)
     
@@ -113,6 +119,29 @@ class Orchestrator:
             case _:
                 raise ValueError(f"Unknown model type: {self.global_config.model.type}")
     
+    def __initial_print(self):
+        print("\n" + "=" * 60)
+        print(f"🚀 Starting: {self.global_config.run_name}")
+        print("=" * 60)
+        print(f"🖥️  Device:      {self.device}")
+        print(f"📚 Dataset:     {self.dataset}")
+        print(f"🔄 DataLoader:  {self.data_loader}")
+        print(f"🧠 Model:       {self.model}")
+        print(f"🏋️ Trainer:      {self.trainer}")
+        print("=" * 60)
+
+    def __print_run(self):
+        print("\n" + "=" * 60)
+        print(f"🏃 Starting Run {self.run_number} of {self.global_config.runs}")
+        print("=" * 60)  
+        
+    def __print_end(self):
+        print("\n" + "=" * 60)
+        print("✅ All runs completed successfully!")
+        print("=" * 60)
+        print(f"📁 Final results saved to:\n   {self.global_config.results_dir}/{self.global_config.run_name}")
+        print("=" * 60 + "\n")
+
     def __str__(self):
         return (f"Orchestrator(config_path={self.config_path}, "
                 f"dataset={self.dataset}, "

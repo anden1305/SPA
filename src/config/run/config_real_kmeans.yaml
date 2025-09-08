@@ -17,10 +17,20 @@ dataloader:
   transforms:
     - type: reshape
       params: {}
+    - type: percentile_clipping
+      params: {
+        "percentile": 5
+      }
+    - type: high_pass_filter
+      params: {
+        "low_cutoff": 0.5,
+        "high_cutoff": 45,
+        "sampling_rate": 128
+      }
     - type: fft
       params: {
         "window_size": 512,
-        "feature": "band_power",
+        "feature": "power",
       }
 dataset:
   type: mssv
@@ -33,3 +43,4 @@ seed: 123
 results_dir: results/training
 run_name: feature_mssv_kmeans
 runs: 1
+validate_data: false

@@ -4,45 +4,43 @@ from typing import Any
 import yaml
 
 class TrainerConfig(BaseModel):
-    epochs: int = Field(default=100, ge=1)
-    batch_size: int = Field(default=32, ge=1)
-    learning_rate: float = Field(default=1e-3, gt=0)
-    optimizer: str = Field(default="adam", pattern="^(adam|sgd|rmsprop)$")
+    epochs: int = Field(..., ge=1)
+    learning_rate: float = Field(..., gt=0)
+    optimizer: str = Field(..., pattern="^(adam|sgd|rmsprop)$")
     grad_clip: float | None = Field(default=None, ge=0, description="Gradient clipping value. If None, no clipping is applied.")
 
 class ValidatorConfig(BaseModel):
-    nmi: bool = Field(default=True)
-    accuracy: bool = Field(default=True)
-    cross_nmi: bool = Field(default=True)
-    state_distinctness: bool = Field(default=True)
-    summary_statistics: bool = Field(default=True)
+    nmi: bool = Field(..., description="Whether to compute NMI.")
+    accuracy: bool = Field(..., description="Whether to compute accuracy.")
+    cross_nmi: bool = Field(..., description="Whether to compute cross NMI.")
+    state_distinctness: bool = Field(..., description="Whether to compute state distinctness.")
+    summary_statistics: bool = Field(..., description="Whether to compute summary statistics.")
 
 class VisualizerConfig(BaseModel):
-    losses: bool = Field(default=True)
-    pca_tripanel: bool = Field(default=True)
-    confusion_matrix: bool = Field(default=True)
-    state_distinctness: bool = Field(default=True)
-    summary_statistics: bool = Field(default=True)
+    losses: bool = Field(..., description="Whether to visualize losses.")
+    pca_tripanel: bool = Field(..., description="Whether to visualize PCA tripanel.")
+    confusion_matrix: bool = Field(..., description="Whether to visualize confusion matrix.")
+    state_distinctness: bool = Field(..., description="Whether to visualize state distinctness.")
+    summary_statistics: bool = Field(..., description="Whether to visualize summary statistics.")
 
 class TransformsConfig(BaseModel):
-    type: str = Field(default="default_transform")
-    params: dict[str, Any] = Field(default_factory=dict)
+    type: str = Field(..., description="Type of transform, e.g., 'fft'.")
+    params: dict[str, Any] = Field(...)
 
 class DataLoaderConfig(BaseModel):
-    batch_size: int = Field(default=32, ge=1)
+    batch_size: int = Field(..., ge=1)
     transforms: list[TransformsConfig] = Field(default_factory=list)
-    shuffle: bool = Field(default=True)
-    normalize: bool = Field(default=True)
+    shuffle: bool = Field(..., description="Whether to shuffle data each epoch.")
+    normalize: bool = Field(..., description="Whether to normalize data using mean and std.")
 
 class DatasetConfig(BaseModel):
-    type: str = Field(default="synthetic", pattern="^(synthetic|mssv)$")
-    id: str = Field(default="default_dataset")
-    normalize: bool = Field(default=True)
+    type: str = Field(..., pattern="^(synthetic|mssv)$")
+    id: str = Field(..., description="Dataset identifier or path.")
     run: int | None = Field(default=None, ge=1)
 
 class ModelConfig(BaseModel):
-    type: str = Field(default="hmm", pattern="^(hmm|new_hmm)$")
-    init_strategy: str = Field(default="random", pattern="^(random_uniform|random_dirichlet|random_separated|kmeans|kmeans_pca)$")
+    type: str = Field(..., pattern="^(hmm)$", description="Type of model, e.g., 'hmm'.")
+    init_strategy: str = Field(..., pattern="^(random_uniform|random_dirichlet|random_separated|kmeans|kmeans_pca)$", description="Initialization strategy for the model.")
 
 class GlobalConfig(BaseModel):
     trainer: TrainerConfig = Field(default_factory=TrainerConfig)
@@ -51,12 +49,12 @@ class GlobalConfig(BaseModel):
     dataloader: DataLoaderConfig = Field(default_factory=DataLoaderConfig)
     dataset: DatasetConfig = Field(default_factory=DatasetConfig)
     model: ModelConfig = Field(default_factory=ModelConfig)
-    verbose: bool = Field(default=False)
-    seed: int = Field(default=42, ge=0)
-    results_dir: str = Field(default="results/training")
-    run_name: str = Field(default="default_run")
-    runs: int = Field(default=1, ge=1)
-    validate_data: bool = Field(default=True)
+    verbose: bool = Field(..., description="Whether to print detailed logs.")
+    seed: int = Field(..., ge=0, description="Random seed for reproducibility.")
+    results_dir: str = Field(default="results/training", description="Directory to save results.")
+    run_name: str = Field(..., description="Name of the current run.")
+    runs: int = Field(..., ge=1, description="Number of runs to execute.")
+    validate_data: bool = Field(..., description="Whether to perform data validation before training.")
 
     @classmethod
     def from_yaml(cls, file_path: str) -> "GlobalConfig":

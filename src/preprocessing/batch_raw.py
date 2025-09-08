@@ -9,10 +9,12 @@ class BatchRaw(BaseTransform):
 
     def __init__(self, config: TransformsConfig):
         super().__init__(config)
-
-    def validate_config(self, _: TransformsConfig):
         self.window_size: int = self.config.params['window_size']
-    
+
+    def validate_config(self, config: TransformsConfig):
+        assert 'window_size' in config.params, "BatchRaw transform requires 'window_size' parameter."
+        assert isinstance(config.params['window_size'], int) and config.params['window_size'] > 0, "Window size must be a positive integer."
+
     def __batch(self, x: np.ndarray, y: np.ndarray):
         T, C = x.shape
         W = self.window_size

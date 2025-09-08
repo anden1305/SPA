@@ -12,6 +12,7 @@ from src.orchestrator.train_details import TrainDetails
 from src.training.trainer import Trainer
 from src.helpers.state_distinctness import compute_state_distinctness
 
+
 class Validator:
     def __init__(self,
                  data_loader: DataLoader,
@@ -40,14 +41,16 @@ class Validator:
             preds = predst.detach().cpu().numpy().flatten()
             if self.config.nmi:
                 nmi = calculate_nmi(preds, y)
-                print(f"NMI: {nmi}")
                 self.validations[epoch]["nmi"] = nmi
             if self.config.accuracy:
-                aligned_preds = align_labels_hungarian(y, preds)
-                acc = accuracy(aligned_preds, y)
-                print(f"Accuracy: {acc}")
-                self.validations[epoch]["accuracy"] = acc
+                try:
+                    aligned_preds = align_labels_hungarian(y, preds)
+                    acc = accuracy(aligned_preds, y)
+                    self.validations[epoch]["accuracy"] = acc
+                except Exception as e:
+                    print(f"Error occurred while calculating accuracy: {e}")
             self.predictions[epoch] = preds.tolist()
+        self.__print_validation()
     
     def validate_runs(self, train_details: list[TrainDetails]):
         validations = {}
@@ -92,6 +95,23 @@ class Validator:
     
     
     ####### PUBLIC HELPER METHODS #######
+    
+    def __print_validation(self):
+        epoch = self.trainer.current_epoch
+        val = self.validations[epoch]
+
+        print("\n" + "=" * 60)
+        print(f"🔍 Validation Results At Epoch {epoch + 1} ".center(60, "="))
+        print("=" * 60)
+        if not val:
+            print("No validation results available.")
+        else:
+            for key, value in val.items():
+                if isinstance(value, float):
+                    print(f"  {key:<20}: {value:>15.6f}")
+                else:
+                    print(f"  {key:<20}: {str(value):>15}")
+        print("=" * 60 + "\n")
     
     def reset(self):
         self.validations = {}
