@@ -21,7 +21,6 @@ class VisualizerConfig(BaseModel):
     losses: bool = Field(default=True)
     pca_tripanel: bool = Field(default=True)
     confusion_matrix: bool = Field(default=True)
-    pca_top_k: int = Field(default=4, ge=2)
     state_distinctness: bool = Field(default=True)
     summary_statistics: bool = Field(default=True)
 
@@ -43,7 +42,7 @@ class DatasetConfig(BaseModel):
 
 class ModelConfig(BaseModel):
     type: str = Field(default="hmm", pattern="^(hmm|new_hmm)$")
-    init_strategy: str = Field(default="random", pattern="^(random|random_separated|random_uniform|random_dirichlet|kmeans|kmeans_noisy)$")
+    init_strategy: str = Field(default="random", pattern="^(random_separated|random_uniform|random_dirichlet|kmeans|kmeans_noisy)$")
 
 class GlobalConfig(BaseModel):
     trainer: TrainerConfig = Field(default_factory=TrainerConfig)
