@@ -23,7 +23,7 @@ class HMM(MLModel):
                  device: torch.device) -> None:
         super().__init__(data_loader, config, device)
         self.__initialize_parameters()
-        self.__initialise_weights()
+        self.__initialize_weights()
 
     def __initialize_parameters(self) -> None:
         self.seed = self.global_config.seed
@@ -168,7 +168,7 @@ class HMM(MLModel):
         for t in range(T - 2, -1, -1):
             path[:, t] = backptr[torch.arange(B), t + 1, path[:, t + 1]]
         return path
-
+    
     def prepare_for_training(self):
         self.train()
 
@@ -177,7 +177,7 @@ class HMM(MLModel):
 
     # ----------------------- Initialization helpers -----------------------
     @torch.no_grad()
-    def __initialise_weights(
+    def __initialize_weights(
         self,
         kmeans_iters: int = 150,
         estimate_transitions: bool = True,
@@ -422,6 +422,9 @@ class HMM(MLModel):
                 f"Feature dimension mismatch: got D={x.shape[2]}, expected {self.num_features} (obs_dim)."
             )
         return x.to(self.device) 
+
+    def reset(self):
+        self.__initialize_weights()
 
     def __str__(self):
         return f"HMM(num_states={self.num_states}, num_features={self.num_features})"

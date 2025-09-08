@@ -33,7 +33,7 @@ dataloader:
       }
 dataset:
   type: mssv
-  id: sub-038
+  id: sub-050
 model:
   type: hmm
   init_strategy: random

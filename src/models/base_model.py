@@ -41,6 +41,10 @@ class MLModel(nn.Module, ABC):
     def prepare_for_training(self):
         raise NotImplementedError('This method has to be implemented.')
     
+    @abstractmethod
+    def reset(self):
+        raise NotImplementedError('This method has to be implemented.')
+
     ### INFERENCE ###
     @abstractmethod
     def prepare_for_inference(self):
