@@ -190,38 +190,32 @@ class HMM(MLModel):
     ) -> None:
         """Short dispatcher for HMM weight initialization.
 
-        strategy in {random, random_separated, random_uniform, random_dirichlet, kmeans, kmeans_noisy, kmeans_pca}.
-        - random or random_separated: separated means (approx. orthogonal), unit covariance, uniform pi/A.
+        strategy in {random_uniform, random_dirichlet, random_separated, kmeans, kmeans_pca}.
         - random_uniform: fully random means, unit covariance, uniform pi/A.
         - random_dirichlet: fully random means, unit covariance, Dirichlet-sampled pi/A.
+        - random_separated: separated means (approx. orthogonal), unit covariance, uniform pi/A.
         - kmeans: k-means for emissions (and optionally pi/A).
-        - kmeans_noisy: run k-means, then add small random noise to avoid plateaus.
-        - kmeans_pca: search small PCA subspaces (1–3 dims among top-L PCs), run k-means, pick best by CH score.
-        - sticky_em_warmstart: run a few EM iterations with high self-transition bias to get a reasonable starting point.
-        - kmeans_pca_warmstart: kmeans_pca followed by sticky_em_warmstart.
+        - kmeans_pca: search small PCA subspaces (3D among top 4 PCs) for best k-means clustering (by Calinski-Harabasz score).
         Data is optional (not needed for random*).
         """
         s = self.global_config.model.init_strategy.lower()
-        if s in ("random", "random_separated"):
-            self.__init_random_separated(spread=spread, jitter_std=jitter_std)
-        elif s == "random_uniform":
+        
+        if s == "random_uniform":
             self.__init_random_uniform(mean_std=mean_std, jitter_std=jitter_std)
         elif s == "random_dirichlet":
             self.__init_random_dirichlet(mean_std=mean_std, alpha=1.0, self_transition_bias=self_transition_bias)
+        elif s == "random_separated":
+            self.__init_random_separated(spread=spread, jitter_std=jitter_std)
         elif s == "kmeans":
             self.__init_kmeans(kmeans_iters=kmeans_iters, estimate_transitions=estimate_transitions)
-        elif s == "kmeans_noisy":
-            self.__init_kmeans(kmeans_iters=kmeans_iters, estimate_transitions=estimate_transitions)
-            self.__apply_noise_and_bias(mean_std=mean_std, cov_noise_std=cov_noise_std, init_logits_std=init_logits_std, self_transition_bias=self_transition_bias)
         elif s == "kmeans_pca":
             self.__init_kmeans_pca(kmeans_iters=kmeans_iters, estimate_transitions=estimate_transitions)
-        elif s == "sticky_em_warmstart":
-            self.__init_sticky_em_warmstart(n_iters=5, kappa=3.0, min_var=1e-6)
-        elif s == "kmeans_pca_warmstart":
-            self.__init_kmeans_pca(kmeans_iters=kmeans_iters, estimate_transitions=estimate_transitions)
-            self.__init_sticky_em_warmstart(n_iters=5, kappa=3.0, min_var=1e-6)
         else:
             raise ValueError("strategy must be one of {'random','random_separated','random_uniform','random_dirichlet','kmeans','kmeans_noisy','kmeans_pca','sticky_em_warmstart'}")
+
+        # init_noisy = self.global_config.model.init_noisy
+        # if init_noisy:
+        #     self.__apply_noise_and_bias(mean_std=mean_std, cov_noise_std=cov_noise_std, init_logits_std=init_logits_std, self_transition_bias=self_transition_bias)
         self.__clear_param_grads()
 
     def __init_random_separated(self, spread: float = 2.0, jitter_std: float = 0.05,) -> None:
@@ -376,33 +370,6 @@ class HMM(MLModel):
             self.__set_transition_params(z_temporal.reshape(-1), B, T, S, estimate_transitions, device)
         else:
             self.__set_transition_params(assign, B, T, S, estimate_transitions, device)
-
-    @torch.no_grad()
-    def __apply_noise_and_bias(
-        self,
-        *,
-        mean_std: float,
-        cov_noise_std: float,
-        init_logits_std: float,
-        self_transition_bias: float,
-    ) -> None:
-        """Apply small Gaussian noise to emissions and logits, and add optional self-transition bias."""
-        if mean_std > 0:
-            noise = torch.randn(self.emission_mean.shape, device=self.emission_mean.device)
-            self.emission_mean.add_(mean_std * noise)
-        if cov_noise_std > 0:
-            if self.covariance_type == "diag":
-                noise = torch.randn(self.emission_logvar.shape, device=self.emission_logvar.device)
-                self.emission_logvar.add_(cov_noise_std * noise)
-            elif self.covariance_type == "full":
-                noise = cov_noise_std * torch.randn(self.emission_cholesky_raw.shape, device=self.emission_cholesky_raw.device)
-                tril_mask = torch.tril(torch.ones_like(self.emission_cholesky_raw)).bool()
-                self.emission_cholesky_raw[tril_mask] = self.emission_cholesky_raw[tril_mask] + noise[tril_mask]
-        if init_logits_std > 0:
-            self.initial_logits.add_(init_logits_std * torch.randn(self.initial_logits.shape, device=self.initial_logits.device))
-            self.transition_logits.add_(init_logits_std * torch.randn(self.transition_logits.shape, device=self.transition_logits.device))
-        if self_transition_bias != 0.0:
-            self.transition_logits.diagonal().add_(float(self_transition_bias))
 
     @torch.no_grad()
     def __init_kmeans_pca(self, kmeans_iters: int, estimate_transitions: bool) -> None:
@@ -590,96 +557,40 @@ class HMM(MLModel):
             raw[k].diagonal().copy_(diag_raw)
         
         self.emission_cholesky_raw.copy_(raw)
-    
+
     @torch.no_grad()
-    def __init_sticky_em_warmstart(self, n_iters: int = 10, kappa: float = 3.0, min_var: float = 1e-6):
-        """Run a few EM iterations with stickiness (κ added to self-transitions)."""
-        data, _ = self.data_loader.get_all_data()
-        x = self.__validate_input(data)                 # (B,T,D)
-        B, T, D = x.shape
-        S = self.num_states
-        device = self.device
-
-        for _ in range(n_iters):
-            # ----- E-step: forward-backward -> gammas and xis -----
-            log_pi = torch.log_softmax(self.initial_logits, dim=-1)        # (S,)
-            log_A  = torch.log_softmax(self.transition_logits, dim=-1)     # (S,S)
-            log_em = self.__emission_log_prob(x)                           # (B,T,S)
-
-            # forward
-            log_alpha = x.new_empty(B, T, S)
-            log_alpha[:, 0, :] = log_pi + log_em[:, 0, :]
-            for t in range(1, T):
-                # alpha_t(i) = log_em + logsumexp_j alpha_{t-1}(j) + logA_{j->i}
-                prev = log_alpha[:, t-1, :].unsqueeze(2) + log_A.unsqueeze(0)    # (B,S,S)
-                log_alpha[:, t, :] = log_em[:, t, :] + torch.logsumexp(prev, dim=1)
-
-            # backward
-            log_beta = x.new_zeros(B, T, S)
-            for t in range(T - 2, -1, -1):
-                nxt = log_beta[:, t+1, :].unsqueeze(1) + log_em[:, t+1, :].unsqueeze(1) + log_A.unsqueeze(0)  # (B,S,S)
-                log_beta[:, t, :] = torch.logsumexp(nxt, dim=2)
-
-            # posteriors
-            log_gamma = log_alpha + log_beta
-            log_gamma = log_gamma - torch.logsumexp(log_gamma, dim=2, keepdim=True)
-            gamma = log_gamma.exp()                                         # (B,T,S)
-
-            # pairwise posteriors ξ_t(i,j)
-            xi = x.new_empty(B, T - 1, S, S)
-            for t in range(T - 1):
-                term = (log_alpha[:, t, :].unsqueeze(2) + log_A.unsqueeze(0)
-                        + log_em[:, t+1, :].unsqueeze(1) + log_beta[:, t+1, :].unsqueeze(1))  # (B,S,S)
-                term = term - torch.logsumexp(term.reshape(B, -1), dim=1, keepdim=True).unsqueeze(-1)
-                xi[:, t, :, :] = term.exp()
-
-            # ----- M-step: emissions -----
-            # weights per state
-            w = gamma.sum(dim=1)                                           # (B,S) -> per sequence
-            N_s = w.sum(dim=0).clamp_min(1e-8)                              # (S,)
-
-            # means
-            x_expanded = x.unsqueeze(2)                                     # (B,T,1,D)
-            mu_num = (gamma.unsqueeze(-1) * x_expanded).sum(dim=(0,1))      # (S,D)
-            mu = mu_num / N_s.unsqueeze(1)
-            self.emission_mean.copy_(mu)
-
-            # covariances
+    def __apply_noise_and_bias(
+        self,
+        *,
+        mean_std: float,
+        cov_noise_std: float,
+        init_logits_std: float,
+        self_transition_bias: float,
+    ) -> None:
+        """Apply small Gaussian noise to emissions and logits, and add optional self-transition bias."""
+        if mean_std > 0:
+            noise = torch.randn(self.emission_mean.shape, device=self.emission_mean.device)
+            self.emission_mean.add_(mean_std * noise)
+        if cov_noise_std > 0:
             if self.covariance_type == "diag":
-                diff2 = (x_expanded - mu.unsqueeze(0).unsqueeze(0)).pow(2)  # (B,T,S,D)
-                var_num = (gamma.unsqueeze(-1) * diff2).sum(dim=(0,1))      # (S,D)
-                var = (var_num / N_s.unsqueeze(1)).clamp_min(min_var)
-                self.emission_logvar.copy_(var.log())
+                noise = torch.randn(self.emission_logvar.shape, device=self.emission_logvar.device)
+                self.emission_logvar.add_(cov_noise_std * noise)
             elif self.covariance_type == "full":
-                # simple weighted covariance (could be optimized if D large)
-                raw = torch.zeros_like(self.emission_cholesky_raw)
-                Xbt = x.reshape(B*T, D)
-                G = gamma.reshape(B*T, S)                                   # (N,S)
-                for s in range(S):
-                    mu_s = mu[s]
-                    diff = Xbt - mu_s
-                    w_s = G[:, s].unsqueeze(1)
-                    C = (w_s * diff).T @ diff / N_s[s]
-                    C = C + self.jitter * torch.eye(D, device=device)
-                    raw[s] = torch.linalg.cholesky(C)
-                self.emission_cholesky_raw.copy_(raw)
-
-            # ----- M-step: π and A with stickiness κ -----
-            pi = gamma[:, 0, :].sum(0) + 1e-3
-            pi = pi / pi.sum()
-
-            A_num = xi.sum(dim=(0,1)) + kappa * torch.eye(S, device=device) + 1e-6
-            A_den = A_num.sum(dim=1, keepdim=True)
-            A = A_num / A_den
-
-            self.initial_logits.copy_(pi.clamp_min(1e-12).log())
-            self.transition_logits.copy_(A.clamp_min(1e-12).log())
+                noise = cov_noise_std * torch.randn(self.emission_cholesky_raw.shape, device=self.emission_cholesky_raw.device)
+                tril_mask = torch.tril(torch.ones_like(self.emission_cholesky_raw)).bool()
+                self.emission_cholesky_raw[tril_mask] = self.emission_cholesky_raw[tril_mask] + noise[tril_mask]
+        if init_logits_std > 0:
+            self.initial_logits.add_(init_logits_std * torch.randn(self.initial_logits.shape, device=self.initial_logits.device))
+            self.transition_logits.add_(init_logits_std * torch.randn(self.transition_logits.shape, device=self.transition_logits.device))
+        if self_transition_bias != 0.0:
+            self.transition_logits.diagonal().add_(float(self_transition_bias))
 
     @torch.no_grad()
     def __clear_param_grads(self) -> None:
         for p in self.parameters():
             if p.grad is not None:
                 p.grad.zero_()
+
     def __validate_input(self, x: Tensor) -> Tensor:
         """Validate that x has shape (B,T,D) with D == self.num_features.
         Returns the tensor moved to the model device.
