@@ -1,18 +1,19 @@
 trainer:
-  epochs: 100  # Reduced for testing
+  epochs: 200
   learning_rate: 0.001
   optimizer: adam
+  grad_clip: null
 validator:
-  nmi: True
   accuracy: True
-  cross_nmi: False  # Disabled to reduce computation
-  state_distinctness: False  # Disabled to avoid CUDA memory issues
+  nmi: True
+  cross_nmi: True
+  state_distinctness: True
   summary_statistics: True
 visualizer:
   losses: True
-  pca_tripanel: True  # Disabled to reduce computation
+  pca_tripanel: True
   confusion_matrix: True
-  state_distinctness: False  # Disabled to avoid CUDA memory issues
+  state_distinctness: True
   summary_statistics: True
 dataloader:
   batch_size: 16384
@@ -24,8 +25,7 @@ dataloader:
     - type: fft
       params: {
         "window_size": 512,
-        "feature": "band_power",
-        "sampling_rate": 128,
+        "feature": "power",
       }
 dataset:
   type: synthetic
@@ -37,7 +37,8 @@ model:
   params:
     lags: [1, 2, 4]  # Fewer lags to reduce computation
     normalize_time: false
-    ridge: 0.1
+    ridge: 0.01  # Reduced ridge regularization
+    var_reg: 0.001  # Add variance regularization
     ignore_prefix: true
     drop_prefix_from_normalization: true
 verbose: True
