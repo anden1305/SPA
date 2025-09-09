@@ -1,6 +1,6 @@
 trainer:
-  epochs: 200
-  learning_rate: 0.001
+  epochs: 100
+  learning_rate: 0.05
   optimizer: adam
   grad_clip: null
 validator:
@@ -16,7 +16,7 @@ visualizer:
   state_distinctness: True
   summary_statistics: True
 dataloader:
-  batch_size: 16384
+  batch_size: null
   shuffle: True
   normalize: True
   transforms:
@@ -25,7 +25,9 @@ dataloader:
     - type: fft
       params: {
         "window_size": 512,
-        "feature": "power",
+        "feature": "band_power",
+        "bands": [[0.5,4],[4,8],[8,12],[12,30],[30,70]],
+        "sampling_rate": 128
       }
 dataset:
   type: synthetic
@@ -33,11 +35,11 @@ dataset:
 model:
   type: hmm
   init_strategy: random_uniform
-  init_noisy: False
+  init_noisy: True
   params: {}
 verbose: true
 seed: 123
 results_dir: results/training/hmm
 run_name: feature_synthetic_uniform
-runs: 5
+runs: 2
 validate_data: True
