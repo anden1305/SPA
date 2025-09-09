@@ -16,16 +16,25 @@ visualizer:
   state_distinctness: True
   summary_statistics: True
 dataloader:
-  batch_size: 16384
-  shuffle: False
+  batch_size: 4096
+  shuffle: True
   normalize: True
   transforms:
     - type: reshape
       params: {}
-    - type: fft
+    - type: percentile_clipping
       params: {
-        "window_size": 512,
-        "feature": "power",
+        "percentile": 5
+      }
+    - type: high_pass_filter
+      params: {
+        "low_cutoff": 0.5,
+        "high_cutoff": 45,
+        "sampling_rate": 128
+      }
+    - type: batch_raw
+      params: {
+        "window_size": 512
       }
 dataset:
   type: synthetic
@@ -35,15 +44,15 @@ model:
   init_strategy: random_uniform
   init_noisy: false
   params:
-    lags: [1, 2, 4, 8]  # Fewer lags to reduce computation
+    lags: [1, 2, 4]  # Fewer lags to reduce computation
     normalize_time: false
     ridge: 0.001  # Reduced ridge regularization
     var_reg: 0.001  # Add variance regularization
     ignore_prefix: true
     drop_prefix_from_normalization: false
-verbose: True
-seed: 42
+verbose: true
+seed: 123
 results_dir: results/training/marhmm
-run_name: feature_synthetic_uniform
+run_name: raw_synthetic_uniform
 runs: 1
-validate_data: True
+validate_data: False

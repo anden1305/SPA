@@ -140,26 +140,27 @@ class MARHMM(BaseModel):
 		variances which can cause state collapse or numerical issues.
 		"""
 		reg = torch.zeros((), device=self.coeffs.device)
-		if self.ridge > 0:
-			reg = reg + self.ridge * self.coeffs.pow(2).sum()
-		
-		# Add variance regularization to prevent collapse
-		var_reg = getattr(self, "var_reg", 0.0)
-		if var_reg > 0:
-			var = torch.exp(self.log_var)  # (S,D)
-			min_var = 1e-3  # More conservative minimum variance
-			max_var = 1e3   # More conservative maximum variance
-			small_pen = torch.clamp(min_var - var, min=0).div(min_var).pow(2)
-			large_pen = torch.clamp(var - max_var, min=0).div(max_var).pow(2)
-			reg = reg + var_reg * (small_pen.sum() + large_pen.sum())
-		else:
-			# Even without explicit var_reg, add minimal variance regularization
-			var = torch.exp(self.log_var)
-			# Penalty for very small variances (< 1e-4) to prevent numerical issues
-			small_pen = torch.clamp(1e-4 - var, min=0).pow(2)
-			reg = reg + 0.01 * small_pen.sum()
-		
 		return reg
+		# if self.ridge > 0:
+		# 	reg = reg + self.ridge * self.coeffs.pow(2).sum()
+		
+		# # Add variance regularization to prevent collapse
+		# var_reg = getattr(self, "var_reg", 0.0)
+		# if var_reg > 0:
+		# 	var = torch.exp(self.log_var)  # (S,D)
+		# 	min_var = 1e-3  # More conservative minimum variance
+		# 	max_var = 1e3   # More conservative maximum variance
+		# 	small_pen = torch.clamp(min_var - var, min=0).div(min_var).pow(2)
+		# 	large_pen = torch.clamp(var - max_var, min=0).div(max_var).pow(2)
+		# 	reg = reg + var_reg * (small_pen.sum() + large_pen.sum())
+		# else:
+		# 	# Even without explicit var_reg, add minimal variance regularization
+		# 	var = torch.exp(self.log_var)
+		# 	# Penalty for very small variances (< 1e-4) to prevent numerical issues
+		# 	small_pen = torch.clamp(1e-4 - var, min=0).pow(2)
+		# 	reg = reg + 0.01 * small_pen.sum()
+		
+		# return reg
 
 	@torch.no_grad()
 	def predict(self, x: Tensor) -> Tensor:
