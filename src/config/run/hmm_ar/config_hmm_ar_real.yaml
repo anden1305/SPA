@@ -1,0 +1,49 @@
+trainer:
+  epochs: 300
+  learning_rate: 0.001
+  optimizer: adam
+  grad_clip: 0.5
+validator:
+  nmi: True
+  accuracy: True
+  cross_nmi: True
+  state_distinctness: True
+  summary_statistics: True
+visualizer:
+  losses: True
+  pca_tripanel: True
+  confusion_matrix: True
+  state_distinctness: True
+  summary_statistics: True
+dataloader:
+  batch_size: 256
+  shuffle: True
+  normalize: True
+  transforms:
+    - type: reshape
+      params: {}
+    - type: fft
+      params: {
+        "window_size": 512,
+        "feature": "power",
+      }
+dataset:
+  type: mssv
+  id: real_sleep_data
+  normalize: True
+model:
+  type: hmm_ar
+  init_strategy: random_separated
+  init_noisy: False
+  # HMMAR-specific parameters
+  lags: [1, 2, 4]  # Shorter lags for real data
+  normalize_time: False
+  ridge: 0.005  # Moderate regularization
+  ignore_prefix: True
+  drop_prefix_from_normalization: True
+verbose: True
+seed: 999
+results_dir: results/training
+run_name: hmm_ar_real_data
+runs: 5
+validate_data: True

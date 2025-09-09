@@ -1,0 +1,44 @@
+trainer:
+  epochs: 800
+  learning_rate: 0.0005
+  optimizer: adam
+  grad_clip: 1.0
+validator:
+  nmi: True
+  accuracy: True
+  cross_nmi: True
+  state_distinctness: True
+  summary_statistics: True
+visualizer:
+  losses: True
+  pca_tripanel: True
+  confusion_matrix: True
+  state_distinctness: True
+  summary_statistics: True
+dataloader:
+  batch_size: 1024
+  shuffle: True
+  normalize: True
+  transforms:
+    - type: reshape
+      params: {}
+dataset:
+  type: synthetic
+  id: realistic_sleep
+  normalize: True
+model:
+  type: hmm_ar
+  init_strategy: kmeans
+  init_noisy: True
+  # HMMAR-specific parameters
+  lags: [1, 2, 4, 8, 16]  # More lags for complex dependencies
+  normalize_time: True  # Normalize log-likelihood by valid time steps
+  ridge: 0.01  # Higher regularization
+  ignore_prefix: True  # Ignore first max_lag frames
+  drop_prefix_from_normalization: True  # Use valid frames for normalization
+verbose: True
+seed: 123
+results_dir: results/training
+run_name: hmm_ar_kmeans_complex
+runs: 3
+validate_data: True
