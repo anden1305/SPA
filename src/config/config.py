@@ -39,16 +39,10 @@ class DatasetConfig(BaseModel):
     run: int | None = Field(default=None, ge=1)
 
 class ModelConfig(BaseModel):
-    type: str = Field(..., pattern="^(hmm|hmm_ar)$", description="Type of model, e.g., 'hmm'.")
+    type: str = Field(..., pattern="^(hmm|marhmm)$", description="Type of model, e.g., 'hmm'.")
     init_strategy: str = Field(..., pattern="^(random_uniform|random_dirichlet|random_separated|kmeans|kmeans_pca)$", description="Initialization strategy for the model.")
     init_noisy: bool = Field(...)
-    
-    # HMMAR-specific parameters
-    lags: list[int] = Field(default=[1, 2, 4, 8], description="AR lags for HMMAR model")
-    normalize_time: bool = Field(default=False, description="Normalize by time steps in HMMAR")
-    ridge: float = Field(default=0.0, ge=0, description="Ridge regularization for AR coefficients")
-    ignore_prefix: bool = Field(default=True, description="Ignore prefix frames without full lag context")
-    drop_prefix_from_normalization: bool = Field(default=True, description="Drop prefix from time normalization")
+    params: dict[str, Any] = Field(..., description="Model-specific parameters.")
 
 class GlobalConfig(BaseModel):
     trainer: TrainerConfig = Field(default_factory=TrainerConfig)

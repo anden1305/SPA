@@ -12,7 +12,7 @@ from src.data.mssv_dataset import MSSVDataset
 from src.data.synthetic_dataset import SyntheticDataset
 from src.models.base_model import BaseModel
 from src.models.hmm import HMM
-from src.models.hmm_ar import HMMAR
+from src.models.marhmm import MARHMM
 from src.orchestrator.train_details import TrainDetails
 from src.training.trainer import Trainer
 from src.validation.validator import Validator
@@ -117,17 +117,8 @@ class Orchestrator:
         match self.global_config.model.type:
             case "hmm":
                 return HMM(data_loader=self.data_loader, config=self.global_config, device=device)
-            case "hmm_ar":
-                return HMMAR(
-                    data_loader=self.data_loader, 
-                    config=self.global_config, 
-                    device=device,
-                    lags=self.global_config.model.lags,
-                    normalize_time=self.global_config.model.normalize_time,
-                    ridge=self.global_config.model.ridge,
-                    ignore_prefix=self.global_config.model.ignore_prefix,
-                    drop_prefix_from_normalization=self.global_config.model.drop_prefix_from_normalization
-                )
+            case "marhmm":
+                return MARHMM(data_loader=self.data_loader, config=self.global_config, device=device)
             case _:
                 raise ValueError(f"Unknown model type: {self.global_config.model.type}")
     

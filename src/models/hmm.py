@@ -29,6 +29,7 @@ class HMM(BaseModel):
                  config: GlobalConfig,
                  device: torch.device) -> None:
         super().__init__(data_loader, config, device)
+        
         self.__initialize_parameters()
         self.__initialize_weights()
 
@@ -184,6 +185,27 @@ class HMM(BaseModel):
 
     def reset(self):
         self.__initialize_weights()
+
+    def regularization_loss(self) -> torch.Tensor:
+        """Regularize emission variances to avoid too small or too large values."""
+        
+        max_var_threshold = 10.0
+        min_variance_threshold = 1
+        factor = 1
+        
+        reg_loss = torch.zeros((), device=self.device)
+        if self.covariance_type == "diag":
+            variance = torch.exp(self.emission_logvar)
+            min_var_penalty = torch.clamp(min_variance_threshold - variance, min=0.0).pow(2)
+            max_var_penalty = torch.clamp(variance - max_var_threshold, min=0.0).pow(2)
+            reg_loss = (min_var_penalty.sum() + max_var_penalty.sum()) * factor
+        elif self.covariance_type == "full":
+            L = self.__full_cov_cholesky()
+            diag = torch.diagonal(L, dim1=1, dim2=2)
+            min_diag_penalty = torch.clamp(min_variance_threshold - diag, min=0.0).pow(2)
+            max_diag_penalty = torch.clamp(diag - max_var_threshold, min=0.0).pow(2)
+            reg_loss = (min_diag_penalty.sum() + max_diag_penalty.sum()) * factor
+        return reg_loss
 
     def __validate_input(self, x: Tensor) -> Tensor:
         """Validate that x has shape (B,T,D) with D == self.num_features.

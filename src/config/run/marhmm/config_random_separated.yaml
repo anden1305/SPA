@@ -1,0 +1,43 @@
+trainer:
+  epochs: 50
+  learning_rate: 0.001
+  optimizer: adam
+validator:
+  nmi: True
+  cross_nmi: True
+  state_distinctness: True
+visualizer:
+  losses: True
+  pca_tripanel: True
+  confusion_matrix: True
+  state_distinctness: True
+dataloader:
+  batch_size: 16384
+  shuffle: True
+  normalize: True
+  transforms:
+    - type: reshape
+      params: {}
+    - type: fft
+      params: {
+        "window_size": 512,
+        "feature": "power",
+      }
+dataset:
+  type: synthetic
+  id: test3
+model:
+  type: marhmm
+  init_strategy: random_separated
+  init_noisy: false
+  params:
+    lags: [1, 2, 4]
+    normalize_time: true
+    ridge: 0.0
+    ignore_prefix: true
+    drop_prefix_from_normalization: true
+verbose: true
+seed: 123
+results_dir: results/training
+run_name: feature_synthetic_marhmm_separated
+runs: 5

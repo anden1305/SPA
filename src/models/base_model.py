@@ -44,6 +44,11 @@ class BaseModel(nn.Module, ABC):
     @abstractmethod
     def reset(self):
         raise NotImplementedError('This method has to be implemented.')
+    
+    @abstractmethod
+    def regularization_loss(self) -> torch.Tensor:
+        """Default regularization loss (zero). Override in subclasses if needed."""
+        raise NotImplementedError('This method has to be implemented.')
 
     ### INFERENCE ###
     @abstractmethod
