@@ -46,4 +46,4 @@ seed: 999
 results_dir: results/training
 run_name: hmm_ar_real_data
 runs: 5
-validate_data: True
+validate_data: False

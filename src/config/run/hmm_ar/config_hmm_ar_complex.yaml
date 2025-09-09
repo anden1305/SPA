@@ -41,4 +41,4 @@ seed: 123
 results_dir: results/training
 run_name: hmm_ar_kmeans_complex
 runs: 3
-validate_data: True
+validate_data: False
