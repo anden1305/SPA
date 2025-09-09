@@ -10,7 +10,7 @@ validator:
   summary_statistics: True
 visualizer:
   losses: True
-  pca_tripanel: False  # Disabled to reduce computation
+  pca_tripanel: True  # Disabled to reduce computation
   confusion_matrix: True
   state_distinctness: False  # Disabled to avoid CUDA memory issues
   summary_statistics: True
@@ -25,11 +25,11 @@ dataloader:
       params: {
         "window_size": 512,
         "feature": "band_power",
+        "sampling_rate": 128,
       }
 dataset:
   type: synthetic
   id: test3
-  normalize: True
 model:
   type: marhmm
   init_strategy: random_uniform
@@ -45,4 +45,4 @@ seed: 42
 results_dir: results/training/marhmm
 run_name: feature_synthetic_uniform
 runs: 1
-validate_data: False
+validate_data: True

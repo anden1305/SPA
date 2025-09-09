@@ -191,7 +191,7 @@ class HMM(BaseModel):
         
         max_var_threshold = 10.0
         min_variance_threshold = 1
-        factor = 1
+        factor = 10
         
         reg_loss = torch.zeros((), device=self.device)
         if self.covariance_type == "diag":

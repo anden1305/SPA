@@ -1,10 +1,11 @@
 trainer:
-  epochs: 150
-  learning_rate: 0.0005
+  epochs: 200
+  learning_rate: 0.001
   optimizer: adam
+  grad_clip: null
 validator:
-  nmi: True
   accuracy: True
+  nmi: True
   cross_nmi: True
   state_distinctness: True
   summary_statistics: True
@@ -32,11 +33,11 @@ dataset:
 model:
   type: hmm
   init_strategy: random_uniform
-  init_noisy: false
+  init_noisy: False
   params: {}
 verbose: true
 seed: 123
-results_dir: results/training/hmm
+results_dir: results/training
 run_name: feature_synthetic_uniform
-runs: 1
-validate_data: False
+runs: 5
+validate_data: True

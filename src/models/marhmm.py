@@ -124,12 +124,10 @@ class MARHMM(BaseModel):
 		number of *valid* frames (T - max_lag) instead of T.
 	"""
 
-	def __init__(
-		self,
-		data_loader: DataLoader,
-		config: GlobalConfig,
-		device: torch.device,
-	) -> None:
+	def __init__(self,
+			  	 data_loader: DataLoader,
+				 config: GlobalConfig,
+				 device: torch.device) -> None:
 		super().__init__(data_loader, config, device)
 		
 		# MARHMM supports multivariate data

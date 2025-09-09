@@ -28,7 +28,7 @@ class FFT(BaseTransform):
         if config.params['feature'].lower() == 'band_power':
             assert 'sampling_rate' in config.params, "Sampling rate must be specified in params for band_power feature."
             assert isinstance(config.params['sampling_rate'], (int, float))
-            assert 'brands' in config.params, "Frequency bands must be specified in params for band_power feature."
+            assert 'bands' in config.params, "Frequency bands must be specified in params for band_power feature."
             assert isinstance(config.params['bands'], list) and all(isinstance(band, list) and len(band) == 2 for band in config.params['bands']), "Bands must be a list of [low, high] pairs."
         
 
