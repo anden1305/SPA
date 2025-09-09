@@ -1,7 +1,7 @@
 
 import json
 from src.data.data_loader import DataLoader
-from src.models.base_model import MLModel
+from src.models.base_model import BaseModel
 from src.config.config import GlobalConfig, TrainerConfig
 from torch.optim import Adam, SGD, RMSprop
 import torch
@@ -10,7 +10,7 @@ class Trainer:
     
     def __init__(self,
                  data_loader: DataLoader,
-                 model: MLModel,
+                 model: BaseModel,
                  config: GlobalConfig):
         self.data_loader = data_loader
         self.model = model

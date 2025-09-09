@@ -42,7 +42,9 @@ import torch
 from torch import Tensor
 import torch.nn as nn
 
-from .hmm import HMM
+from .base_model import BaseModel
+from src.config.config import GlobalConfig
+from src.data.data_loader import DataLoader
 
 
 def exponential_lags(max_lag: int | None = None, num: int | None = None) -> list[int]:
@@ -101,13 +103,11 @@ def fit_ar_ls(x: Tensor, lags: Sequence[int], ridge: float = 0.0) -> tuple[Tenso
 	return coeffs, var
 
 
-class HMMAR(HMM):
+class HMMAR(BaseModel):
 	"""Autoregressive HMM (univariate) with state‑specific AR(p) emissions.
 
 	Parameters
 	----------
-	num_states : int
-		Number of latent states.
 	lags : Sequence[int]
 		Positive lag values (duplicates removed, sorted).
 	normalize_time : bool
@@ -126,31 +126,46 @@ class HMMAR(HMM):
 
 	def __init__(
 		self,
-		num_states: int,
-		lags: Iterable[int],
-		device: str | torch.device | None = None,
+		data_loader: DataLoader,
+		config: GlobalConfig,
+		device: torch.device,
+		lags: Iterable[int] = (1, 2, 4, 8),
 		normalize_time: bool = False,
 		ridge: float = 0.0,
 		ignore_prefix: bool = True,
 		drop_prefix_from_normalization: bool = True,
 	) -> None:
-		super().__init__(
-			num_states=num_states,
-			obs_dim=1,                 # univariate for simplicity
-			covariance_type="meanonly",  # emissions overridden
-			device=device,
-			normalize_time=normalize_time,
-		)
+		super().__init__(data_loader, config, device)
+		
+		# Validate that this is univariate data
+		if self.num_features != 1:
+			raise ValueError(f"HMMAR expects univariate data (num_features=1), got {self.num_features}")
+		
 		lags = sorted({int(l) for l in lags if l > 0})
 		if not lags:
 			raise ValueError("Provide at least one positive lag")
 		self.lags: list[int] = lags
 		self.max_lag: int = max(lags)
-		self.coeffs = nn.Parameter(torch.zeros(self.num_states, len(lags)))  # (S,L)
-		self.log_var = nn.Parameter(torch.zeros(self.num_states))            # (S,)
+		
+		# AR parameters
+		default_dtype = torch.get_default_dtype()
+		self.coeffs = nn.Parameter(torch.zeros(self.num_states, len(lags), dtype=default_dtype))  # (S,L)
+		self.log_var = nn.Parameter(torch.zeros(self.num_states, dtype=default_dtype))            # (S,)
+		
+		# HMM transition parameters
+		self.initial_logits = nn.Parameter(torch.zeros(self.num_states, dtype=default_dtype))                 # (S,)
+		self.transition_logits = nn.Parameter(torch.zeros(self.num_states, self.num_states, dtype=default_dtype))  # (S,S)
+		
+		self.normalize_time = normalize_time
 		self.ridge = float(ridge)
 		self.ignore_prefix = bool(ignore_prefix)
 		self.drop_prefix_from_normalization = bool(drop_prefix_from_normalization)
+		
+		# Constant buffer for numerical expressions
+		self.register_buffer("_log_2pi", torch.tensor(math.log(2 * math.pi), dtype=default_dtype))
+		
+		self.__initialize_weights()
+		self.to(self.device)
 
 	# ---------------------------- Input handling ----------------------------
 	def _standardize_input(self, x: Tensor) -> Tensor:  # type: ignore[override]
@@ -179,17 +194,20 @@ class HMMAR(HMM):
 			# Not enough context for any full lag row -> return zeros (neutral)
 			return x.new_zeros(B, T, S)
 		# Build lag stack: (B,T,L) with zeros for unavailable history
-		lag_stack = x.new_zeros(B, T, L)
+		lag_stack = x.new_zeros(B, T, L, dtype=x.dtype)
 		x_flat = x[:, :, 0]  # (B,T)
 		for j, lag in enumerate(self.lags):
 			if lag < T:
 				lag_stack[:, lag:, j] = x_flat[:, :-lag]
 		# Prediction: (B,T,S) = (B,T,L) @ (L,S)
-		pred = torch.einsum("btl,sl->bts", lag_stack, self.coeffs)  # (B,T,S)
+		# Ensure dtype compatibility
+		coeffs = self.coeffs.to(dtype=lag_stack.dtype)
+		pred = torch.einsum("btl,sl->bts", lag_stack, coeffs)  # (B,T,S)
 		resid = x_flat.unsqueeze(-1) - pred  # (B,T,S)
-		log_var = self.log_var.view(1, 1, S)
+		log_var = self.log_var.view(1, 1, S).to(dtype=x.dtype)
 		inv_var = torch.exp(-log_var)
-		lp = -0.5 * (resid.pow(2) * inv_var + log_var + math.log(2 * math.pi))  # (B,T,S)
+		log_2pi = self._log_2pi.to(dtype=x.dtype)
+		lp = -0.5 * (resid.pow(2) * inv_var + log_var + log_2pi)  # (B,T,S)
 		if self.ignore_prefix:
 			if self.max_lag > 0:
 				lp[:, : self.max_lag, :] = 0.0
@@ -198,8 +216,8 @@ class HMMAR(HMM):
 	# ------------------------------ Forward pass ----------------------------
 	def forward(self, x: Tensor) -> Tensor:  # type: ignore[override]
 		x_std = self._standardize_input(x.to(self.device))  # (B,T,1)
-		log_pi = self.log_initial()
-		log_A = self.log_transition()
+		log_pi = torch.log_softmax(self.initial_logits, dim=-1)
+		log_A = torch.log_softmax(self.transition_logits, dim=-1)
 		log_emiss = self.emission_log_prob(x_std)  # (B,T,S)
 		logp = self._forward_algorithm(log_emiss, log_pi, log_A)  # (B,)
 		if self.normalize_time:
@@ -209,13 +227,99 @@ class HMMAR(HMM):
 			logp = logp / denom
 		return logp
 
+	def _forward_algorithm(self, log_emiss: Tensor, log_pi: Tensor, log_A: Tensor) -> Tensor:
+		"""Run forward algorithm.
+
+		Parameters
+		----------
+		log_emiss : (B,T,S)
+		log_pi : (S,)
+		log_A : (S,S)
+		Returns
+		-------
+		log_likelihood : (B,)
+		"""
+		B, T, S = log_emiss.shape
+		# alpha_0
+		alpha = log_pi.unsqueeze(0) + log_emiss[:, 0, :]  # (B,S)
+		for t in range(1, T):
+			# (B,S,S): previous alpha_j + log_A_{j->i}
+			prev = alpha.unsqueeze(2) + log_A.unsqueeze(0)
+			alpha = log_emiss[:, t, :] + torch.logsumexp(prev, dim=1)
+		return torch.logsumexp(alpha, dim=1)  # (B,)
+
 	# --------------------------- Regularization -----------------------------
 	def regularization_loss(self) -> Tensor:
 		if self.ridge <= 0:
 			return torch.zeros((), device=self.coeffs.device)
 		return self.ridge * self.coeffs.pow(2).sum()
 
+	# --------------------------- Abstract method implementations -------------
+	@torch.no_grad()
+	def predict(self, x: Tensor) -> Tensor:
+		"""Viterbi decoding for most likely state sequence."""
+		return self._decode_viterbi(x)
+
+	@torch.no_grad()
+	def _decode_viterbi(self, x: Tensor) -> Tensor:
+		"""Most likely state sequence (Viterbi path).
+
+		Expects input of shape (B,T,1); returns (B,T) int64.
+		"""
+		x = self._standardize_input(x.to(self.device))
+		B, T, _ = x.shape
+		log_pi = torch.log_softmax(self.initial_logits, dim=-1)
+		log_A = torch.log_softmax(self.transition_logits, dim=-1)
+		log_emiss = self.emission_log_prob(x)  # (B,T,S)
+		
+		backptr = x.new_zeros((B, T, self.num_states), dtype=torch.long)
+		delta = log_pi.unsqueeze(0) + log_emiss[:, 0, :]  # (B,S)
+		
+		for t in range(1, T):
+			scores = delta.unsqueeze(2) + log_A.unsqueeze(0)  # (B,S,S)
+			delta, idx = torch.max(scores, dim=1)            # (B,S)
+			delta = delta + log_emiss[:, t, :]
+			backptr[:, t, :] = idx
+		
+		last = torch.argmax(delta, dim=1)  # (B,)
+		path = x.new_zeros((B, T), dtype=torch.long)
+		path[:, -1] = last
+		
+		for t in range(T - 2, -1, -1):
+			path[:, t] = backptr[torch.arange(B), t + 1, path[:, t + 1]]
+		
+		return path
+
+	def prepare_for_training(self):
+		self.train()
+
+	def prepare_for_inference(self):
+		self.eval()
+
+	def reset(self):
+		self.__initialize_weights()
+
+	def __str__(self) -> str:
+		return (
+			f"HMMAR(states={self.num_states}, lags={self.lags}, max_lag={self.max_lag}, "
+			f"normalize_time={self.normalize_time}, ignore_prefix={self.ignore_prefix}, "
+			f"drop_prefix_norm={self.drop_prefix_from_normalization}, ridge={self.ridge})"
+		)
+
 	# ------------------------------ Warm start ------------------------------
+	@torch.no_grad()
+	def __initialize_weights(self) -> None:
+		"""Initialize AR-HMM parameters."""
+		# Initialize transition parameters uniformly
+		self.initial_logits.zero_()
+		self.transition_logits.zero_()
+		
+		# Initialize AR coefficients to small random values
+		torch.nn.init.normal_(self.coeffs, mean=0.0, std=0.1)
+		
+		# Initialize log variance to reasonable values (log(1.0) = 0)
+		self.log_var.zero_()
+
 	@torch.no_grad()
 	def warm_start_from_paths(
 		self,

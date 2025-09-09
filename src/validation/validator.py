@@ -7,7 +7,7 @@ from src.helpers.accuracy import accuracy
 from src.helpers.align_labels import align_labels_hungarian
 from src.helpers.nmi import calculate_nmi
 from src.helpers.summary_statistics import compute_summary_statistics
-from src.models.base_model import MLModel
+from src.models.base_model import BaseModel
 from src.orchestrator.train_details import TrainDetails
 from src.training.trainer import Trainer
 from src.helpers.state_distinctness import compute_state_distinctness
@@ -16,7 +16,7 @@ from src.helpers.state_distinctness import compute_state_distinctness
 class Validator:
     def __init__(self,
                  data_loader: DataLoader,
-                 model: MLModel,
+                 model: BaseModel,
                  trainer: Trainer,
                  config: GlobalConfig):
         self.data_loader = data_loader

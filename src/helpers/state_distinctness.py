@@ -47,19 +47,45 @@ def _align_samples_and_labels(X: torch.Tensor, Y: torch.Tensor) -> Tuple[torch.T
         "Ensure counts are compatible or expose a mapping from transforms."
     )
 
-def _mean_within_distance(A: torch.Tensor) -> float:
+def _mean_within_distance(A: torch.Tensor, chunk_size: int = 1000) -> float:
     m = A.shape[0]
     if m <= 1:
-        return 0.0
-    # Unbiased estimator of E||X - X'|| with i != j
-    pw = torch.pdist(A, p=2)
-    return float((2.0 / (m * (m - 1))) * pw.sum())
+        return 0.0     
+    # Memory-efficient computation for large tensors
+    if m > chunk_size:
+        # For very large tensors, sample a subset to estimate within-distance
+        indices = torch.randperm(m)[:min(chunk_size, m)]
+        A_sample = A[indices]
+        pw = torch.pdist(A_sample, p=2)
+        return float((2.0 / (A_sample.shape[0] * (A_sample.shape[0] - 1))) * pw.sum())
+    else:
+        # Unbiased estimator of E||X - X'|| with i != j
+        pw = torch.pdist(A, p=2)
+        return float((2.0 / (m * (m - 1))) * pw.sum())
 
-def _mean_cross_distance(A: torch.Tensor, B: torch.Tensor) -> float:
+
+def _mean_cross_distance(A: torch.Tensor, B: torch.Tensor, chunk_size: int = 1000) -> float:
     if A.numel() == 0 or B.numel() == 0:
         return 0.0
-    cd = torch.cdist(A, B, p=2)
-    return float(cd.mean())
+    
+    # Memory-efficient chunked computation for large tensors
+    m, n = A.shape[0], B.shape[0]
+    if m * n > 1e6:  # Use chunking for large matrices to avoid OOM
+        total_distance = 0.0
+        total_pairs = 0
+        
+        for i in range(0, m, chunk_size):
+            A_chunk = A[i:i+chunk_size]
+            for j in range(0, n, chunk_size):
+                B_chunk = B[j:j+chunk_size]
+                cd_chunk = torch.cdist(A_chunk, B_chunk, p=2)
+                total_distance += cd_chunk.sum().item()
+                total_pairs += cd_chunk.numel()
+        
+        return total_distance / total_pairs if total_pairs > 0 else 0.0
+    else:
+        cd = torch.cdist(A, B, p=2)
+        return float(cd.mean())
 
 def _energy_distance(A: torch.Tensor, B: torch.Tensor) -> float:
     # ED = 2 E||A-B|| - E||A-A'|| - E||B-B'||

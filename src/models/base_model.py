@@ -12,7 +12,7 @@ from src.data.data_loader import DataLoader
 from src.orchestrator.train_details import TrainDetails
 
 
-class MLModel(nn.Module, ABC):
+class BaseModel(nn.Module, ABC):
     """Common base class for models.
 
     Currently only enforces that subclasses implement `forward`.
@@ -63,3 +63,10 @@ class MLModel(nn.Module, ABC):
     @abstractmethod
     def __str__(self) -> str:
         raise NotImplementedError('This method has to be implemented.')
+    
+    ### UTILITY METHODS ###
+    @torch.no_grad()
+    def clear_param_grads(self) -> None:
+        for p in self.parameters():
+            if p.grad is not None:
+                p.grad.zero_()

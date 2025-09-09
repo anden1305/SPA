@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from src.config.config import GlobalConfig
 from src.data.data_loader import DataLoader
 from src.helpers.align_labels import align_labels_hungarian
-from src.models.base_model import MLModel
+from src.models.base_model import BaseModel
 from src.orchestrator import train_details
 from src.orchestrator.train_details import TrainDetails
 from src.training.trainer import Trainer

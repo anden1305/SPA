@@ -1,0 +1,25 @@
+import torch
+from src.models.base_model import BaseModel
+from src.initializations.random_uniform import set_identity_covariance
+
+def init_random_separated(model: BaseModel, spread: float = 2.0, jitter_std: float = 0.05) -> None:
+    """Structured random initialization that separates state means."""
+    S, D = model.num_states, model.num_features
+    device = model.emission_mean.device
+    
+    # Create orthogonal directions
+    if D >= S:
+        dirs, _ = torch.linalg.qr(torch.randn(D, S, device=device), mode='reduced')
+        dirs = dirs.T
+    else:
+        dirs = torch.randn(S, D, device=device)
+        dirs = dirs / dirs.norm(dim=1, keepdim=True).clamp_min(1e-8)
+    
+    # Separated means with jitter
+    means = spread * dirs + jitter_std * torch.randn(S, D, device=device)
+    model.emission_mean.copy_(means)
+    
+    # Identity covariance and uniform transitions
+    set_identity_covariance(model)
+    model.initial_logits.zero_()
+    model.transition_logits.zero_()

@@ -1,0 +1,49 @@
+trainer:
+  epochs: 100  # Reduced for testing
+  learning_rate: 0.001
+  optimizer: adam
+  grad_clip: 1.0
+validator:
+  nmi: True
+  accuracy: True
+  cross_nmi: False  # Disabled to reduce computation
+  state_distinctness: False  # Disabled to avoid CUDA memory issues
+  summary_statistics: True
+visualizer:
+  losses: True
+  pca_tripanel: False  # Disabled to reduce computation
+  confusion_matrix: True
+  state_distinctness: False  # Disabled to avoid CUDA memory issues
+  summary_statistics: True
+dataloader:
+  batch_size: 16384
+  shuffle: True
+  normalize: True
+  transforms:
+    - type: reshape
+      params: {}
+    - type: fft
+      params: {
+        "window_size": 512,
+        "feature": "band_power",
+      }
+dataset:
+  type: synthetic
+  id: test3
+  normalize: True
+model:
+  type: hmm_ar
+  init_strategy: random_uniform
+  init_noisy: False
+  # HMMAR-specific parameters
+  lags: [1, 2, 4]  # Fewer lags to reduce computation
+  normalize_time: False
+  ridge: 0.001
+  ignore_prefix: True
+  drop_prefix_from_normalization: True
+verbose: True
+seed: 42
+results_dir: results/training
+run_name: hmm_ar_memory_efficient
+runs: 1
+validate_data: False  # Skip data validation to avoid memory issues

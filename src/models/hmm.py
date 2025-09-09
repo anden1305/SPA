@@ -9,14 +9,21 @@
 from __future__ import annotations
 
 import math
+from pyexpat import model
 import torch
 from torch import Tensor
 import torch.nn as nn
 from src.config.config import GlobalConfig
 from src.data.data_loader import DataLoader
-from .base_model import MLModel
+from .base_model import BaseModel
+from src.initializations.random_uniform import init_random_uniform
+from src.initializations.random_dirichlet import init_random_dirichlet
+from src.initializations.random_separated import init_random_separated
+from src.initializations.kmeans import init_kmeans
+from src.initializations.kmeans_pca import init_kmeans_pca
+from src.initializations.apply_noise import apply_noise_and_bias
 
-class HMM(MLModel):
+class HMM(BaseModel):
     def __init__(self,
                  data_loader: DataLoader,
                  config: GlobalConfig,
@@ -175,7 +182,24 @@ class HMM(MLModel):
     def prepare_for_inference(self):
         self.eval()
 
-    # ----------------------- Initialization helpers -----------------------
+    def reset(self):
+        self.__initialize_weights()
+
+    def __validate_input(self, x: Tensor) -> Tensor:
+        """Validate that x has shape (B,T,D) with D == self.num_features.
+        Returns the tensor moved to the model device.
+        """
+        if x.dim() != 3:
+            raise ValueError(f"Expected input of rank 3 (B,T,D); got shape {tuple(x.shape)}")
+        if x.shape[2] != self.num_features:
+            raise ValueError(
+                f"Feature dimension mismatch: got D={x.shape[2]}, expected {self.num_features} (obs_dim)."
+            )
+        return x.to(self.device) 
+
+    def __str__(self):
+        return f"HMM(num_states={self.num_states}, num_features={self.num_features})"
+
     @torch.no_grad()
     def __initialize_weights(
         self,
@@ -198,25 +222,29 @@ class HMM(MLModel):
         - kmeans_pca: search small PCA subspaces (3D among top 4 PCs) for best k-means clustering (by Calinski-Harabasz score).
         Data is optional (not needed for random*).
         """
-        s = self.global_config.model.init_strategy.lower()
-        
-        if s == "random_uniform":
-            self.__init_random_uniform(mean_std=mean_std, jitter_std=jitter_std)
-        elif s == "random_dirichlet":
-            self.__init_random_dirichlet(mean_std=mean_std, alpha=1.0, self_transition_bias=self_transition_bias)
-        elif s == "random_separated":
-            self.__init_random_separated(spread=spread, jitter_std=jitter_std)
-        elif s == "kmeans":
-            self.__init_kmeans(kmeans_iters=kmeans_iters, estimate_transitions=estimate_transitions)
-        elif s == "kmeans_pca":
-            self.__init_kmeans_pca(kmeans_iters=kmeans_iters, estimate_transitions=estimate_transitions)
+        strategy = self.global_config.model.init_strategy.lower()
+        if strategy in {"kmeans", "kmeans_pca"}:
+            data, _ = self.data_loader.get_all_data()
+            data = self.__validate_input(data)
+
+        if strategy == "random_uniform":
+            init_random_uniform(self, mean_std=mean_std, jitter_std=jitter_std)
+        elif strategy == "random_dirichlet":
+            init_random_dirichlet(self, mean_std=mean_std, alpha=1.0, self_transition_bias=self_transition_bias)
+        elif strategy == "random_separated":
+            init_random_separated(self, spread=spread, jitter_std=jitter_std)
+        elif strategy == "kmeans":
+            init_kmeans(self, data, kmeans_iters=kmeans_iters, estimate_transitions=estimate_transitions)
+        elif strategy == "kmeans_pca":
+            init_kmeans_pca(self, data, kmeans_iters=kmeans_iters, estimate_transitions=estimate_transitions)
         else:
             raise ValueError("strategy must be one of {'random','random_separated','random_uniform','random_dirichlet','kmeans','kmeans_noisy','kmeans_pca','sticky_em_warmstart'}")
 
-        
-        self.__apply_noise_and_bias(mean_std=mean_std, cov_noise_std=cov_noise_std, init_logits_std=init_logits_std, self_transition_bias=self_transition_bias)
-        self.__clear_param_grads()
-
+        init_noisy = self.global_config.model.init_noisy
+        if init_noisy:
+            apply_noise_and_bias(self, mean_std=mean_std, cov_noise_std=cov_noise_std, init_logits_std=init_logits_std, self_transition_bias=self_transition_bias)
+        self.clear_param_grads()
+     
     def __init_random_separated(self, spread: float = 2.0, jitter_std: float = 0.05,) -> None:
         """Structured random initialization that separates state means.
 
@@ -607,6 +635,5 @@ class HMM(MLModel):
 
     def __str__(self):
         return f"HMM(num_states={self.num_states}, num_features={self.num_features})"
-
    
 __all__ = ["HMM"]
