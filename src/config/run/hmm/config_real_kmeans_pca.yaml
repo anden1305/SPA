@@ -1,0 +1,44 @@
+trainer:
+  epochs: 5
+  learning_rate: 0.0001
+  optimizer: adam
+validator:
+  nmi: True
+  cross_nmi: True
+visualizer:
+  losses: True
+  pca_tripanel: True
+  confusion_matrix: True
+  pca_top_k: 4
+dataloader:
+  batch_size: 16384
+  shuffle: True
+  normalize: True
+  transforms:
+    - type: reshape
+      params: {}
+    # - type: fft
+    #   params: {
+    #     "window_size": 512,
+    #     "feature": "band_power",
+    #     "sampling_rate": 128,
+    #     bands: [[0.5,4.0], [4.0,8.0], [8.0,12.0], [12.0,30.0], [30.0,45.0]]
+    #   }
+    - type: fft
+      params: {
+        "window_size": 512,
+        "feature": "power",
+        "sampling_rate": 128,
+      }
+dataset:
+  type: mssv
+  id: sub-077
+model:
+  type: hmm
+  init_strategy: kmeans
+verbose: true
+seed: 123
+results_dir: results/training
+run_name: feature_mssv_random
+runs: 5
+validate_data: false

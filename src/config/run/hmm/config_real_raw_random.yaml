@@ -1,0 +1,44 @@
+trainer:
+  epochs: 50
+  learning_rate: 0.0001
+  optimizer: adam
+validator:
+  nmi: True
+  cross_nmi: True
+visualizer:
+  losses: True
+  pca_tripanel: True
+  confusion_matrix: True
+  pca_top_k: 4
+dataloader:
+  batch_size: 16384
+  shuffle: True
+  normalize: True
+  transforms:
+    - type: reshape
+      params: {}
+    - type: percentile_clipping
+      params: {
+        "percentile": 5
+      }
+    - type: high_pass_filter
+      params: {
+        "low_cutoff": 0.5,
+        "high_cutoff": 45,
+        "sampling_rate": 128
+      }
+    - type: batch_raw
+      params: {
+        "window_size": 512
+      }
+dataset:
+  type: mssv
+  id: sub-050
+model:
+  type: hmm
+  init_strategy: random
+verbose: true
+seed: 123
+results_dir: results/training
+run_name: real_raw_random
+runs: 1
