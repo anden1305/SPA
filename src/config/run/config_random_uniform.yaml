@@ -1,16 +1,19 @@
 trainer:
-  epochs: 1200
+  epochs: 150
   learning_rate: 0.0005
   optimizer: adam
 validator:
   nmi: True
   cross_nmi: True
   state_distinctness: True
+  summary_statistics: True
+  accuracy: True
 visualizer:
   losses: True
   pca_tripanel: True
   confusion_matrix: True
   state_distinctness: True
+  summary_statistics: True
 dataloader:
   batch_size: 16384
   shuffle: True
@@ -33,4 +36,5 @@ verbose: true
 seed: 123
 results_dir: results/training
 run_name: feature_synthetic_uniform
-runs: 2
+runs: 1
+validate_data: False

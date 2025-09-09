@@ -1,5 +1,5 @@
 trainer:
-  epochs: 300
+  epochs: 50
   learning_rate: 0.0005
   optimizer: adam
 validator:
