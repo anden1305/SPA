@@ -4,10 +4,10 @@ trainer:
   optimizer: adam
 validator:
   nmi: True
+  accuracy: True
   cross_nmi: True
   state_distinctness: True
   summary_statistics: True
-  accuracy: True
 visualizer:
   losses: True
   pca_tripanel: True
@@ -36,7 +36,7 @@ model:
   params: {}
 verbose: true
 seed: 123
-results_dir: results/training
+results_dir: results/training/hmm
 run_name: feature_synthetic_uniform
 runs: 1
 validate_data: False

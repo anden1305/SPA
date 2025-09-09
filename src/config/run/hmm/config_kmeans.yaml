@@ -35,7 +35,7 @@ model:
   init_strategy: kmeans
 verbose: true
 seed: 123
-results_dir: results/training
+results_dir: results/training/hmm
 run_name: feature_synthetic_kmeans
 runs: 5
 validate_data: false

@@ -2,7 +2,6 @@ trainer:
   epochs: 100  # Reduced for testing
   learning_rate: 0.001
   optimizer: adam
-  grad_clip: 1.0
 validator:
   nmi: True
   accuracy: True
@@ -38,7 +37,7 @@ model:
   params:
     lags: [1, 2, 4]  # Fewer lags to reduce computation
     normalize_time: false
-    ridge: 0.001
+    ridge: 0.1
     ignore_prefix: true
     drop_prefix_from_normalization: true
 verbose: True

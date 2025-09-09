@@ -31,6 +31,6 @@ model:
   init_strategy: kmeans_pca
 verbose: true
 seed: 1234
-results_dir: results/training
+results_dir: results/training/hmm
 run_name: feature_synthetic_kmeans_pca_adversarial2
 runs: 1

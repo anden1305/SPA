@@ -39,6 +39,6 @@ model:
   init_strategy: random
 verbose: true
 seed: 123
-results_dir: results/training
+results_dir: results/training/hmm
 run_name: real_raw_random
 runs: 1
