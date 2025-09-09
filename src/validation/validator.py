@@ -34,7 +34,7 @@ class Validator:
         epoch = self.trainer.current_epoch
         self.validations[epoch] = {}
         self.model.prepare_for_inference()
-        xt, yt = self.data_loader.get_all_data(shuffle=False)
+        xt, yt = self.data_loader.get_all_data()
         y = yt.detach().cpu().numpy().flatten()
         with torch.no_grad():
             predst = self.model.predict(xt)
@@ -49,6 +49,7 @@ class Validator:
                     self.validations[epoch]["accuracy"] = acc
                 except Exception as e:
                     print(f"Error occurred while calculating accuracy: {e}")
+                    self.validations[epoch]["accuracy"] = None
             self.predictions[epoch] = preds.tolist()
         self.__print_validation()
     
@@ -68,7 +69,7 @@ class Validator:
         return validations
 
     def validate_data(self):
-        x, y = self.data_loader.get_all_data(shuffle=False)
+        x, y = self.data_loader.get_all_data()
         self.data_validations = {}
         out_path = f"{self.global_config.results_dir}/{self.global_config.run_name}/data_validations.json"
         if self.config.state_distinctness:

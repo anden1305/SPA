@@ -46,7 +46,7 @@ class Visualizer:
         path.mkdir(parents=True, exist_ok=True)
         x, y = self.data_loader.get_all_data()
         x = x.detach().cpu().numpy()
-        y = y.detach().cpu().numpy()
+        y = y.detach().cpu().numpy().flatten()
         if self.config.losses:
             self.__plot_losses(train_details)
         if self.config.pca_tripanel:
