@@ -299,10 +299,12 @@ class Visualizer:
         
         init_arr = train_details.get_initial_predictions()
         trained_arr = train_details.get_trained_predictions()
-        
-        init_arr = align_labels_hungarian(y, init_arr)
-        trained_arr = align_labels_hungarian(y, trained_arr)
 
+        try:
+            init_arr = align_labels_hungarian(y, init_arr)
+            trained_arr = align_labels_hungarian(y, trained_arr)
+        except Exception as e:
+            print(f"Warning: Could not align labels for confusion matrix due to: {e}")
         init_cm = confusion_matrix(y, init_arr, normalize='true')
         pred_cm = confusion_matrix(y, trained_arr, normalize='true')
 
@@ -341,11 +343,12 @@ class Visualizer:
         if X is None or X.ndim != 2:
             raise ValueError(f"x must be (T,D) or (B,T,D); got {x.shape}")
         
-        # init_arr, _, _ = self.__remap_predictions_to_labels(true_arr, init_arr)
-        init_arr = align_labels_hungarian(y, init_arr)
-        # trained_arr, _, _ = self.__remap_predictions_to_labels(true_arr, trained_arr)
-        trained_arr = align_labels_hungarian(y, trained_arr)
-
+        try:
+            init_arr = align_labels_hungarian(y, init_arr)
+            trained_arr = align_labels_hungarian(y, trained_arr)
+        except Exception as e:
+            print(f"Warning: Could not align labels for PCA tripanel due to: {e}")
+        
         if not (len(y) == len(init_arr) == len(trained_arr) == X.shape[0]):
             raise ValueError("Label lengths must match number of rows in x after flattening")
 

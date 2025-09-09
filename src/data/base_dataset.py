@@ -16,7 +16,6 @@ class BaseDataset(ABC):
         self.global_config = config
         self.config = self.global_config.dataset
         self.id = self.config.id
-        self.normalize = self.config.normalize
         self.config = self.load_config()
         self.data = self.load_data()
         self.labels = self.load_labels()

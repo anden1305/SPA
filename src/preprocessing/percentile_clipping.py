@@ -9,9 +9,11 @@ class PercentileClipping(BaseTransform):
 
     def __init__(self, config: TransformsConfig):
         super().__init__(config)
+        self.percentile: int = self.config.params['percentile']
 
     def validate_config(self, _: TransformsConfig):
-        self.percentile: int = self.config.params['percentile']
+        assert 'percentile' in self.config.params, "PercentileClipping transform requires 'percentile' parameter."
+        assert isinstance(self.config.params['percentile'], int) and 0 < self.config.params['percentile'] < 50, "Percentile must be an integer between 0 and 50."
     
     def __clip(self, x: np.ndarray, y: np.ndarray):
         lower_bound = np.percentile(x, self.percentile, axis=0)
@@ -26,4 +28,4 @@ class PercentileClipping(BaseTransform):
         return self.__clip(x, y)
 
     def __str__(self) -> str:
-        return f"PercentileClipping(window_size={self.window_size})"
+        return f"PercentileClipping(percentile={self.percentile})"

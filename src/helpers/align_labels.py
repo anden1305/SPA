@@ -36,7 +36,7 @@ def align_labels_hungarian(y_true, y_pred):
   pred_ids = np.unique(y_pred_np)
 
   if true_ids.size != pred_ids.size:
-    raise ValueError("Number of classes differ; 1–1 mapping requires same count.")
+    raise ValueError("Model did not predict the correct number of unique labels")
 
   K = true_ids.size
 

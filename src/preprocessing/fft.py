@@ -15,14 +15,22 @@ class FFT(BaseTransform):
     def __init__(self, config: TransformsConfig):
         super().__init__(config)
         self.window_size: int = self.config.params['window_size']
-        self.feature: str = self.config.params.get('feature', 'log_power')
+        self.feature: str = self.config.params['feature'].lower()
         self.eps: float = float(self.config.params.get('eps', 1e-12))
         self.sampling_rate = self.config.params.get('sampling_rate', 128)
         self.bands = self.config.params.get('bands', None)
-
+    
     def validate_config(self, config: TransformsConfig):
         assert 'window_size' in config.params, "Window size must be specified in params."
         assert isinstance(config.params['window_size'], int) and config.params['window_size'] > 0, "Window size must be a positive integer."
+        assert 'feature' in config.params, "Feature type must be specified in params."
+        assert config.params['feature'].lower() in ['magnitude', 'power', 'log_power', 'band_power'], "Feature must be one of 'magnitude', 'power', 'log_power', or 'band_power'."
+        if config.params['feature'].lower() == 'band_power':
+            assert 'sampling_rate' in config.params, "Sampling rate must be specified in params for band_power feature."
+            assert isinstance(config.params['sampling_rate'], (int, float))
+            assert 'brands' in config.params, "Frequency bands must be specified in params for band_power feature."
+            assert isinstance(config.params['bands'], list) and all(isinstance(band, list) and len(band) == 2 for band in config.params['bands']), "Bands must be a list of [low, high] pairs."
+        
 
     def __perform_fft(self, x: np.ndarray) -> np.ndarray:
         return np.fft.rfft(x, axis=-1)

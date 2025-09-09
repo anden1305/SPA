@@ -63,4 +63,4 @@ class MSSVDataset(BaseDataset):
         return config
         
     def __str__(self):
-        return f"SyntheticDataset(id={self.config['name']})"
+        return f"MSSV(id={self.config['name']})"
