@@ -245,7 +245,7 @@ class HMM(BaseModel):
             data = self.__validate_input(data)
 
         if strategy == "random_uniform":
-            init_random_uniform(self, mean_std=mean_std, jitter_std=jitter_std)
+            init_random_uniform(self, coeff_std=mean_std, jitter_std=jitter_std)
         elif strategy == "random_dirichlet":
             init_random_dirichlet(self, mean_std=mean_std, alpha=1.0, self_transition_bias=self_transition_bias)
         elif strategy == "random_separated":

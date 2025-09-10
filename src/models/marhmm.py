@@ -11,6 +11,7 @@ from src.config.config import GlobalConfig
 from src.data.data_loader import DataLoader
 from src.helpers.exponential_lags import exponential_lags
 from src.helpers.fit_ar_ls import fit_ar_ls
+from src.initializations.random_uniform import init_random_uniform
 
 class MARHMM(BaseModel):
 	"""Multivariate Autoregressive HMM with state-specific AR(p) emissions."""
@@ -41,7 +42,7 @@ class MARHMM(BaseModel):
 			raise ValueError("Provide at least one positive lag")
 		self.lags: list[int] = lags
 		self.max_lag: int = max(lags)
-		self.normalize_time = bool(params.get("normalize_time", False))
+		self.normalize_time = bool(params.get("normalize_time", True))
 		self.ridge = float(params.get("ridge", 0.0))  # L2 coeff penalty
 		self.var_reg = float(params.get("var_reg", 0.0))  # variance stabiliser
 		self.ignore_prefix = bool(params.get("ignore_prefix", True))
@@ -58,6 +59,13 @@ class MARHMM(BaseModel):
 		x_std = self.__validate_input(x)
 		log_pi = torch.log_softmax(self.initial_logits, dim=-1)
 		log_A = torch.log_softmax(self.transition_logits, dim=-1)
+		
+		# Add small random perturbation to avoid completely uniform distributions
+		if self.training:
+			eps = 1e-4
+			log_pi = log_pi + torch.randn_like(log_pi) * eps
+			log_A = log_A + torch.randn_like(log_A) * eps
+		
 		log_emiss = self.__emission_log_prob(x_std)
 		logp = self.__forward_algorithm(log_emiss, log_pi, log_A)
 		if self.normalize_time:
@@ -73,23 +81,33 @@ class MARHMM(BaseModel):
 		L = len(self.lags)
 		if T <= self.max_lag:
 			return x.new_zeros(B, T, S)
+		
+		# Build lagged features
 		lag_stack = x.new_zeros(B, T, D * L, dtype=x.dtype)
 		for j, lag in enumerate(self.lags):
 			if lag < T:
 				start_idx = j * D
 				end_idx = (j + 1) * D
 				lag_stack[:, lag:, start_idx:end_idx] = x[:, :-lag, :]
+		
+		# AR predictions for each state
 		coeffs = self.coeffs.transpose(-2, -1).to(dtype=lag_stack.dtype)
 		pred = torch.einsum("btf,sfd->btsd", lag_stack, coeffs)
 		resid = x.unsqueeze(2) - pred
+		
+		# Emission probabilities with better numerical stability
 		log_var = self.log_var.view(1, 1, S, D).to(dtype=x.dtype)
-		inv_var = torch.exp(-log_var)
+		# Clamp log_var to prevent extreme values
+		log_var = torch.clamp(log_var, min=-10, max=10)
+		
+		# Use more stable computation
 		log_2pi = self._log_2pi.to(dtype=x.dtype)
-		inv_var = torch.clamp(inv_var, min=1e-8, max=1e8)
-		log_var = torch.clamp(log_var, min=-15, max=15)
-		lp = -0.5 * (resid.pow(2) * inv_var + log_var + log_2pi)
+		lp = -0.5 * (resid.pow(2) * torch.exp(-log_var) + log_var + log_2pi)
 		lp = lp.sum(dim=-1)
-		lp = torch.clamp(lp, min=-200, max=50)
+		
+		# More conservative clamping to prevent numerical issues
+		lp = torch.clamp(lp, min=-100, max=10)
+		
 		if self.ignore_prefix and self.max_lag > 0:
 			lp[:, : self.max_lag, :] = 0.0
 		return lp
@@ -122,16 +140,27 @@ class MARHMM(BaseModel):
 		variances which can cause state collapse or numerical issues.
 		"""
 		reg = torch.zeros((), device=self.coeffs.device)
-		if self.ridge > 0:
-			reg = reg + self.ridge * self.coeffs.pow(2).sum()
-		if getattr(self, "var_reg", 0.0) > 0:
-			var = torch.exp(self.log_var)  # (S,D)
-			min_var = 1e-6
-			max_var = 1e2
-			small_pen = torch.clamp(min_var - var, min=0).div(min_var).pow(2)
-			large_pen = torch.clamp(var - max_var, min=0).div(max_var).pow(2)
-			reg = reg + self.var_reg * (small_pen.sum() + large_pen.sum())
 		return reg
+		# if self.ridge > 0:
+		# 	reg = reg + self.ridge * self.coeffs.pow(2).sum()
+		
+		# # Add variance regularization to prevent collapse
+		# var_reg = getattr(self, "var_reg", 0.0)
+		# if var_reg > 0:
+		# 	var = torch.exp(self.log_var)  # (S,D)
+		# 	min_var = 1e-3  # More conservative minimum variance
+		# 	max_var = 1e3   # More conservative maximum variance
+		# 	small_pen = torch.clamp(min_var - var, min=0).div(min_var).pow(2)
+		# 	large_pen = torch.clamp(var - max_var, min=0).div(max_var).pow(2)
+		# 	reg = reg + var_reg * (small_pen.sum() + large_pen.sum())
+		# else:
+		# 	# Even without explicit var_reg, add minimal variance regularization
+		# 	var = torch.exp(self.log_var)
+		# 	# Penalty for very small variances (< 1e-4) to prevent numerical issues
+		# 	small_pen = torch.clamp(1e-4 - var, min=0).pow(2)
+		# 	reg = reg + 0.01 * small_pen.sum()
+		
+		# return reg
 
 	@torch.no_grad()
 	def predict(self, x: Tensor) -> Tensor:
@@ -177,6 +206,16 @@ class MARHMM(BaseModel):
 	def reset(self):
 		self.__initialize_weights()
 
+	@torch.no_grad()
+	def __initialize_weights(self, coeff_std: float = 0.03, jitter_std: float = 0.05, var_init: float = 1.0) -> None:
+		"""Parameter initialization with support for different strategies."""
+		strategy = getattr(self.global_config.model, 'init_strategy', 'default').lower()
+		
+		if strategy == "random_uniform":
+			init_random_uniform(self, coeff_std=coeff_std, jitter_std=jitter_std, var_init=var_init)
+		else:
+			raise ValueError(f"Unknown initialization strategy: {strategy}")
+
 	def __validate_input(self, x: Tensor) -> Tensor:
 		"""Strict validator: require (B,T,D) with D==obs_dim; no reshaping."""
 		if x.dim() != 3:
@@ -190,27 +229,6 @@ class MARHMM(BaseModel):
 			f"MARHMM(states={self.num_states}, obs_dim={self.obs_dim}, lags={self.lags}, max_lag={self.max_lag}, "
 			f"normalize_time={self.normalize_time}, ignore_prefix={self.ignore_prefix}, "
 			f"drop_prefix_norm={self.drop_prefix_from_normalization}, ridge={self.ridge})"
-		)
-
-	@torch.no_grad()
-	def __initialize_weights(self) -> None:
-		"""Parameter initialisation with slight noise & self-transition bias."""
-		with torch.no_grad():
-			# Small noise so gradients flow (break symmetry)
-			self.initial_logits.data.normal_(mean=0.0, std=1e-4)
-			self.transition_logits.data.normal_(mean=0.0, std=1e-4)
-			# Encourage persistence
-			bias = 0.05
-			self.transition_logits.data += torch.eye(self.num_states, device=self.transition_logits.device) * bias
-			scale = 0.1 / math.sqrt(self.obs_dim)
-			torch.nn.init.normal_(self.coeffs, mean=0.0, std=scale)
-			self.log_var.fill_(0.0)
-
-	def extra_repr(self) -> str:  
-		return (
-			f"states={self.num_states}, obs_dim={self.obs_dim}, lags={self.lags}, max_lag={self.max_lag}, "
-			f"normalize_time={self.normalize_time}, ignore_prefix={self.ignore_prefix}, "
-			f"drop_prefix_norm={self.drop_prefix_from_normalization}, ridge={self.ridge}"
 		)
 
 __all__ = ["MARHMM", "exponential_lags", "fit_ar_ls"]

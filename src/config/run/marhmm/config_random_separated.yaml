@@ -13,7 +13,7 @@ visualizer:
   state_distinctness: True
 dataloader:
   batch_size: 16384
-  shuffle: True
+  shuffle: False
   normalize: True
   transforms:
     - type: reshape
