@@ -45,57 +45,19 @@ class Trainer:
         self.__init_training()
         for epoch in range(self.config.epochs):
             self.current_epoch = epoch
-            # for x, y in self.data_loader:
-            #     self.optimizer.zero_grad()
-            #     logp = self.model.forward(x)
-            #     loss = -logp.mean()
-
-            #     # # Add regularization loss (returns zero for models without regularization)
-            #     reg_loss = self.model.regularization_loss()
-            #     loss = loss + reg_loss
-
+            for x, _ in self.data_loader:
+                self.optimizer.zero_grad()
+                loss = self.model.forward(x)
+                # Add regularization loss (returns zero for models without regularization)
+                reg_loss = self.model.regularization_loss()
+                loss = loss + reg_loss
                 
-            #     loss.backward()
-            #     if self.config.grad_clip is not None:
-            #         torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.config.grad_clip)                        
-                
-            #     self.optimizer.step()
-            #     self.epoch_losses.append(loss.item())
-            #     self.epoch_regularization_losses.append(reg_loss.item())
-            # self.losses[epoch] = sum(self.epoch_losses) / len(self.epoch_losses)
-            # self.regularization_losses[epoch] = sum(self.epoch_regularization_losses) / len(self.epoch_regularization_losses)
-            # self.epoch_losses.clear()
-            # self.epoch_regularization_losses.clear()
-            # if self.global_config.verbose:
-            #     self.__print_epoch()
-            #     print('TRANSITION LOGITS:', self.model.transition_logits)
-            #     soft_trans = torch.softmax(self.model.transition_logits, dim=-1)
-            #     print('SOFTMAX TRANSITION LOGITS:', soft_trans)
-            
-            #
-            # Go through all batches and concatenate them
-            all_x = []
-            for i, (x, y) in enumerate(self.data_loader):
-                x = x.reshape(-1, x.shape[-1])
-                x = x.unsqueeze(0)
-                all_x.append(x)
-                if (i + 1) % 4 == 0:
-                    all_x = torch.cat(all_x, dim=0)
-                    self.optimizer.zero_grad()
-                    logp = self.model.forward(all_x)
-                    loss = -logp.mean()
-                    # # Add regularization loss (returns zero for models without regularization)
-                    reg_loss = self.model.regularization_loss()
-                    loss = loss + reg_loss
-
-                    loss.backward()
-                    if self.config.grad_clip is not None:
-                        torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.config.grad_clip)                        
-                    
-                    self.optimizer.step()
-                    self.epoch_losses.append(loss.item())
-                    self.epoch_regularization_losses.append(reg_loss.item())
-                    all_x = []
+                loss.backward()
+                if self.config.grad_clip is not None:
+                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.config.grad_clip)
+                self.optimizer.step()
+                self.epoch_losses.append(loss.item())
+                self.epoch_regularization_losses.append(reg_loss.item())
             self.losses[epoch] = sum(self.epoch_losses) / len(self.epoch_losses)
             self.regularization_losses[epoch] = sum(self.epoch_regularization_losses) / len(self.epoch_regularization_losses)
             self.epoch_losses.clear()

@@ -28,7 +28,7 @@ class TransformsConfig(BaseModel):
     params: dict[str, Any] = Field(...)
 
 class DataLoaderConfig(BaseModel):
-    batch_size: int = Field(..., ge=1)
+    batch_size: int | None = Field(..., ge=1)
     transforms: list[TransformsConfig] = Field(default_factory=list)
     shuffle: bool = Field(..., description="Whether to shuffle data each epoch.")
     normalize: bool = Field(..., description="Whether to normalize data using mean and std.")
