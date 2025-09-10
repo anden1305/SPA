@@ -28,11 +28,13 @@ def init_random_uniform(model: BaseModel, coeff_std: float = 1.0, jitter_std: fl
         # MAR-HMM: initialize log_var to represent scaled variance
         target_var = max(var_init, 1e-6)  # Avoid numerical issues
         log_var = torch.full((S, D), torch.log(torch.tensor(target_var, device=device)), device=device)
+        if jitter_std > 0:
+            log_var += jitter_std * torch.randn_like(log_var)
         model.log_var.copy_(log_var)
 
     # Uniform initial and transition probabilities
-    model.initial_logits.zero_()
-    model.transition_logits.zero_()
+    model.initial_logits.data.uniform_(-1.0, 1.0)
+    model.transition_logits.data.uniform_(-1.0, 1.0)
 
 def set_identity_covariance(model: BaseModel) -> None:
     """Set covariance to identity for any covariance type (standard HMM only)."""
