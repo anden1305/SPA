@@ -1,8 +1,8 @@
 trainer:
   epochs: 50
-  learning_rate: 0.0001
+  learning_rate: 0.01
   optimizer: adam
-  grad_clip: null
+  grad_clip: 5.0
 validator:
   accuracy: True
   nmi: True
@@ -15,9 +15,10 @@ visualizer:
   confusion_matrix: True
   state_distinctness: True
   summary_statistics: True
+  param_histories: True
 dataloader:
-  batch_size: 16384
-  shuffle: False
+  batch_size: null
+  shuffle: True
   normalize: True
   transforms:
     - type: reshape
@@ -25,7 +26,9 @@ dataloader:
     - type: fft
       params: {
         "window_size": 512,
-        "feature": "power",
+        "feature": "band_power",
+        "bands": [[0.5,4],[4,8],[8,12],[12,30],[30,70]],
+        "sampling_rate": 128
       }
 dataset:
   type: synthetic
@@ -33,12 +36,14 @@ dataset:
 model:
   type: marhmm
   init_strategy: random_uniform
-  init_noisy: false
+  init_noisy: True
   params:
     lags: [1, 2, 4, 8]  # Fewer lags to reduce computation
-    normalize_time: false
-    ridge: 0.001  # Reduced ridge regularization
-    var_reg: 0.001  # Add variance regularization
+    normalize_time: true
+    ridge: 0.1
+    var_reg: 0.05
+    sticky_coef: 0.1
+    sticky_kappa: 0.95
     ignore_prefix: true
     drop_prefix_from_normalization: false
 verbose: True

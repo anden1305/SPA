@@ -11,6 +11,7 @@ dependencies = [
     "numpy",
     "matplotlib",
     "seaborn",
+    "plotly>=5.22.0",
     "pyedflib>=0.1.42",
     "scipy",
     "pyyaml>=6.0.2",

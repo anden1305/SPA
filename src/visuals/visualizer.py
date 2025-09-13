@@ -5,6 +5,7 @@ from torch import Tensor
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 from src.config.config import GlobalConfig
 from src.data.data_loader import DataLoader
 from src.helpers.align_labels import align_labels_hungarian
@@ -53,6 +54,9 @@ class Visualizer:
             self.__plot_pca_tripanel(train_details, x=x, y=y)
         if self.config.confusion_matrix:
             self.__plot_confusion_matrix(train_details=train_details, y=y)
+        if self.config.param_histories:
+            self.__plot_param_histories(train_details)
+       
     
     def visualize_runs(self, train_details: list[TrainDetails], validations: dict[str, Any]):
         path = Path(self.global_config.results_dir) / self.global_config.run_name / "plots"
@@ -399,9 +403,111 @@ class Visualizer:
             out_path = train_details.get_path() / "plots" / f"hmm_tripanel_pc{a+1}_pc{b+1}.png"
             fig.savefig(out_path.as_posix(), dpi=160)
             plt.close(fig)
-            saved.append(out_path.as_posix())
-
+            saved.append(out_path.as_posix())   
         return saved
+            
+    def __plot_param_histories(self, train_details: TrainDetails):
+        hist = getattr(train_details, 'param_history', {}) or {}
+        if not hist:
+            return
+        base = train_details.get_path() / "plots" / "params"
+        base.mkdir(parents=True, exist_ok=True)
+        for name, series in hist.items():
+            if not series:
+                continue
+            arr = np.asarray(series, dtype=object)
+            # Each entry is the parameter tensor at an epoch; convert to ndarray
+            arr = np.array([np.asarray(s) for s in series], dtype=object)
+            # Decide plotting strategy
+            # 1) Scalars/Vectors: plot each element as a line (cap to first 16)
+            sample = np.asarray(series[0])
+            if sample.ndim == 0:
+                yvals = np.array([float(s) for s in series])
+                fig, ax = plt.subplots(figsize=(7,4))
+                ax.plot(yvals, lw=1.5)
+                ax.set_title(name)
+                ax.set_xlabel('Epoch')
+                ax.set_ylabel('Value')
+                fig.tight_layout(); fig.savefig(base / f"{name}.png", dpi=160); plt.close(fig)
+            elif sample.ndim == 1:
+                K = min(16, sample.shape[0])
+                fig, ax = plt.subplots(figsize=(8,5))
+                mat = np.stack([np.asarray(s)[:K] for s in series], axis=0)  # (E,K)
+                ax.plot(mat)
+                ax.set_title(name + " (first 16 elements)")
+                ax.set_xlabel('Epoch'); ax.set_ylabel('Value')
+                fig.tight_layout(); fig.savefig(base / f"{name}.png", dpi=160); plt.close(fig)
+            else:
+                # 2) Matrices/Tensors: plot heatmap of first slice(s)
+                # Construct a (E, dim) summary via mean and optionally diagonals
+                try:
+                    E = len(series)
+                    # Mean over last dims
+                    mean_vals = np.array([np.asarray(s).mean() for s in series])
+                    fig, ax = plt.subplots(1, 1, figsize=(7,4))
+                    ax.plot(mean_vals, lw=1.5)
+                    ax.set_title(name + " (mean over elements)")
+                    ax.set_xlabel('Epoch'); ax.set_ylabel('Mean value')
+                    fig.tight_layout(); fig.savefig(base / f"{name}_mean.png", dpi=160); plt.close(fig)
+                except Exception:
+                    pass
+                # If 2D, show a heatmap of the last epoch
+                last = np.asarray(series[-1])
+                if last.ndim == 2 and last.size > 0:
+                    fig, ax = plt.subplots(figsize=(6,5))
+                    sns.heatmap(last, ax=ax, cmap='coolwarm', center=0)
+                    ax.set_title(name + ' (last epoch)')
+                    fig.tight_layout(); fig.savefig(base / f"{name}_last.png", dpi=160); plt.close(fig)
+            
+            # Interactive slider (Plotly): show the full tensor at any epoch if <=2D
+            try:
+                sample = np.asarray(series[0])
+                if sample.ndim <= 2:
+                    frames = []
+                    for i, s in enumerate(series):
+                        arr2 = np.asarray(s)
+                        if arr2.ndim == 1:
+                            # line for vector
+                            frames.append(go.Frame(data=[go.Scatter(y=arr2, mode='lines')], name=str(i)))
+                        elif arr2.ndim == 2:
+                            frames.append(go.Frame(data=[go.Heatmap(z=arr2)], name=str(i)))
+                        else:
+                            continue
+                    if frames:
+                        if sample.ndim == 1:
+                            fig = go.Figure(
+                                data=[go.Scatter(y=np.asarray(series[0]), mode='lines')],
+                                frames=frames,
+                            )
+                        else:
+                            fig = go.Figure(
+                                data=[go.Heatmap(z=np.asarray(series[0]))],
+                                frames=frames,
+                            )
+                        fig.update_layout(
+                            title=f"{name} (epoch slider)",
+                            updatemenus=[{
+                                'type': 'buttons',
+                                'buttons': [
+                                    {'label': 'Play', 'method': 'animate', 'args': [None, {'frame': {'duration': 100, 'redraw': True}, 'fromcurrent': True}]},
+                                    {'label': 'Pause', 'method': 'animate', 'args': [[None], {'frame': {'duration': 0, 'redraw': False}}]},
+                                ],
+                            }],
+                            sliders=[{
+                                'steps': [
+                                    {'args': [[str(i)], {'frame': {'duration': 0, 'redraw': True}, 'mode': 'immediate'}], 'label': str(i), 'method': 'animate'}
+                                    for i in range(len(frames))
+                                ],
+                                'currentvalue': {'prefix': 'Epoch: '},
+                            }],
+                            width=800, height=500
+                        )
+                        # Save as HTML for interactive viewing
+                        fig.write_html(str(base / f"{name}_slider.html"))
+            except Exception as e:
+                print(f"Param slider for {name} failed: {e}")
+            # figures already saved/closed above for each case
+            
 
     def __plot_losses(self, train_details: TrainDetails) -> None:
         losses = list(train_details.losses.values())

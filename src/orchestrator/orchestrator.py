@@ -59,12 +59,14 @@ class Orchestrator:
     
     def __collect_training_details(self):
         losses = self.trainer.get_losses()
+        param_history = self.trainer.get_param_history()
         predictions = self.validator.get_predictions()
         validations = self.validator.get_validations()
         train_details = TrainDetails(
             predictions=predictions, 
             validations=validations, 
             losses=losses,
+            param_history=param_history,
             run_number=self.run_number,
             save_path=f"{self.global_config.results_dir}/{self.global_config.run_name}"
         )
