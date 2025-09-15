@@ -1,8 +1,9 @@
 trainer:
-  epochs: 50
+  epochs: 20
   learning_rate: 0.01
   optimizer: adam
   grad_clip: 5.0
+  validate_per_epoch: 5
 validator:
   accuracy: True
   nmi: True
@@ -15,7 +16,7 @@ visualizer:
   confusion_matrix: True
   state_distinctness: True
   summary_statistics: True
-  param_histories: True
+  historic_values: True
 dataloader:
   batch_size: null
   shuffle: True
@@ -47,5 +48,5 @@ verbose: True
 seed: 42
 results_dir: results/training/marhmm
 run_name: feature_synthetic_uniform
-runs: 1
+runs: 2
 validate_data: True

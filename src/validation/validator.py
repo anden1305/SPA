@@ -1,5 +1,6 @@
 import json
 import torch
+import numpy as np
 from typing import Any
 from src.config.config import GlobalConfig
 from src.data.data_loader import DataLoader
@@ -9,7 +10,6 @@ from src.helpers.nmi import calculate_nmi
 from src.helpers.summary_statistics import compute_summary_statistics
 from src.models.base_model import BaseModel
 from src.orchestrator.train_details import TrainDetails
-from src.training.trainer import Trainer
 from src.helpers.state_distinctness import compute_state_distinctness
 
 
@@ -17,21 +17,22 @@ class Validator:
     def __init__(self,
                  data_loader: DataLoader,
                  model: BaseModel,
-                 trainer: Trainer,
                  config: GlobalConfig):
         self.data_loader = data_loader
         self.model = model
-        self.trainer = trainer
         self.global_config = config
         self.config = self.global_config.validator
         self.validations: dict[int, dict] = {}
         self.predictions: dict[int, list] = {}
+        self.historic_values: dict[str, list] = {}
         self.data_validations: dict[str, Any] = {}
 
     ####### GENERAL METHODS #######
 
-    def validate(self):
-        epoch = self.trainer.current_epoch
+    def validate(self, epoch: int = 0):
+        if not self.historic_values:
+            self.historic_values = {name: [] for name, p in self.model.named_parameters() if p.requires_grad}
+
         self.validations[epoch] = {}
         self.model.prepare_for_inference()
         xt, yt = self.data_loader.get_all_data()
@@ -51,7 +52,42 @@ class Validator:
                     print(f"Error occurred while calculating accuracy: {e}")
                     self.validations[epoch]["accuracy"] = None
             self.predictions[epoch] = preds.tolist()
-        self.__print_validation()
+        self.__print_validation(epoch)
+    
+    def validate_epoch(self, epoch: int):
+        """Validate model at a specific epoch during training."""          
+        self.validations[epoch] = {}
+        self.model.prepare_for_inference()
+        xt, yt = self.data_loader.get_all_data()
+        y = yt.detach().cpu().numpy().flatten()
+        with torch.no_grad():
+            predst = self.model.predict(xt)
+            preds = predst.detach().cpu().numpy().flatten()
+            if self.config.nmi:
+                nmi = calculate_nmi(preds, y)
+                self.validations[epoch]["nmi"] = nmi
+            if self.config.accuracy:
+                try:
+                    aligned_preds = align_labels_hungarian(y, preds)
+                    acc = accuracy(aligned_preds, y)
+                    self.validations[epoch]["accuracy"] = acc
+                except Exception as e:
+                    print(f"Error occurred while calculating accuracy at epoch {epoch}: {e}")
+                    self.validations[epoch]["accuracy"] = None
+            self.predictions[epoch] = preds.tolist()
+            
+        # Save historic values for this epoch
+        for name, p in self.model.named_parameters():
+            if p.requires_grad and name in self.historic_values:
+                self.historic_values[name].append(p.detach().cpu().numpy())
+        
+        self.model.train()  # Set back to training mode
+        if self.global_config.verbose:
+            nmi_val = self.validations[epoch].get('nmi', 'N/A')
+            acc_val = self.validations[epoch].get('accuracy', 'N/A')
+            nmi_str = f"{nmi_val:.4f}" if isinstance(nmi_val, (int, float)) else str(nmi_val)
+            acc_str = f"{acc_val:.4f}" if isinstance(acc_val, (int, float)) else str(acc_val)
+            print(f"Epoch {epoch + 1} - NMI: {nmi_str}, Accuracy: {acc_str}")
     
     def validate_runs(self, train_details: list[TrainDetails]):
         validations = {}
@@ -97,8 +133,7 @@ class Validator:
     
     ####### PUBLIC HELPER METHODS #######
     
-    def __print_validation(self):
-        epoch = self.trainer.current_epoch
+    def __print_validation(self, epoch: int):
         val = self.validations[epoch]
 
         print("\n" + "=" * 60)
@@ -117,6 +152,7 @@ class Validator:
     def reset(self):
         self.validations = {}
         self.predictions = {}
+        self.historic_values = {}
 
     def get_predictions(self) -> dict[int, list]:
         assert self.predictions, "Inference has not been run yet."
@@ -126,6 +162,10 @@ class Validator:
         assert self.validations, "Validation has not been run yet."
         return self.validations
     
+    def get_historic_values(self) -> dict[str, list]:
+        assert self.historic_values, "No historic values recorded. Ensure training has been run and historic tracking is enabled in the config .yaml."
+        return self.historic_values
+
     def get_data_validations(self) -> dict[str, Any]:
         assert self.data_validations, "Data validation has not been run yet."
         return self.data_validations

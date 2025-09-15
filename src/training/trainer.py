@@ -2,6 +2,7 @@
 import json
 from src.data.data_loader import DataLoader
 from src.models.base_model import BaseModel
+from src.validation.validator import Validator
 from src.config.config import GlobalConfig, TrainerConfig
 from torch.optim import Adam, SGD, RMSprop
 import torch
@@ -11,7 +12,8 @@ class Trainer:
     def __init__(self,
                  data_loader: DataLoader,
                  model: BaseModel,
-                 config: GlobalConfig):
+                 config: GlobalConfig,
+                 validator: Validator):
         self.data_loader = data_loader
         self.model = model
         self.global_config = config
@@ -19,7 +21,7 @@ class Trainer:
         self.losses: dict[int, float] = {}
         self.regularization_losses: dict[int, float] = {}
         self.current_epoch = 0
-        self.param_history: dict[str, list] = {}
+        self.validator = validator
 
     def __init_optimizer(self):
         if self.config.optimizer == "adam":
@@ -39,7 +41,6 @@ class Trainer:
         self.regularization_losses: dict[int, float] = {}
         self.model.prepare_for_training()
         self.current_epoch = 0
-        self.param_history = {name: [] for name, p in self.model.named_parameters() if p.requires_grad}
     
     def train(self):
         if self.global_config.verbose:
@@ -62,13 +63,14 @@ class Trainer:
                 self.epoch_regularization_losses.append(reg_loss.item())
             self.losses[epoch] = sum(self.epoch_losses) / len(self.epoch_losses)
             self.regularization_losses[epoch] = sum(self.epoch_regularization_losses) / len(self.epoch_regularization_losses)
-            # Snapshot trainable parameters at epoch end
-            with torch.no_grad():
-                for name, p in self.model.named_parameters():
-                    if p.requires_grad and name in self.param_history:
-                        self.param_history[name].append(p.detach().cpu().numpy())
+            
+            if self.config.validate_per_epoch > 0 and (epoch + 1) % self.config.validate_per_epoch == 0:
+                # Call validator to save predictions and compute validations for this epoch
+                self.validator.validate_epoch(epoch)
+
             self.epoch_losses.clear()
             self.epoch_regularization_losses.clear()
+
             if self.global_config.verbose:
                 self.__print_epoch()
     
@@ -78,9 +80,6 @@ class Trainer:
     
     def reset(self):
         self.current_epoch = 0
-    
-    def get_param_history(self) -> dict[str, list]:
-        return self.param_history
 
     def __print_training_start(self):
         print("\n" + "=" * 60)

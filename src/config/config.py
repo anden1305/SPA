@@ -7,7 +7,8 @@ class TrainerConfig(BaseModel):
     epochs: int = Field(..., ge=1)
     learning_rate: float = Field(..., gt=0)
     optimizer: str = Field(..., pattern="^(adam|sgd|rmsprop)$")
-    grad_clip: float | None = Field(default=None, ge=0, description="Gradient clipping value. If None, no clipping is applied.")
+    grad_clip: float | None = Field(..., ge=0, description="Gradient clipping value. If None, no clipping is applied.")
+    validate_per_epoch: int = Field(..., ge=0, description="Frequency of validation during training in epochs. Set to 0 to disable per-epoch validation.")
 
 class ValidatorConfig(BaseModel):
     nmi: bool = Field(..., description="Whether to compute NMI.")
@@ -22,7 +23,7 @@ class VisualizerConfig(BaseModel):
     confusion_matrix: bool = Field(..., description="Whether to visualize confusion matrix.")
     state_distinctness: bool = Field(..., description="Whether to visualize state distinctness.")
     summary_statistics: bool = Field(..., description="Whether to visualize summary statistics.")
-    param_histories: bool = Field(..., description="Whether to visualize parameter histories.")
+    historic_values: bool = Field(..., description="Whether to visualize historic model values (parameters & confusion matrices).")
 
 class TransformsConfig(BaseModel):
     type: str = Field(..., description="Type of transform, e.g., 'fft'.")

@@ -40,9 +40,9 @@ class Orchestrator:
             self.run_number = i + 1
             self.model.reset()
             self.trainer.reset()
-            self.validator.validate()
+            self.validator.validate(epoch=0)  
             self.trainer.train()
-            self.validator.validate()
+            self.validator.validate(epoch=self.trainer.current_epoch)
             train_details = self.__collect_training_details()
             self.__save_info(train_details=train_details)
             self.visualizer.visualize(train_details=train_details)
@@ -58,14 +58,14 @@ class Orchestrator:
     
     def __collect_training_details(self):
         losses = self.trainer.get_losses()
-        param_history = self.trainer.get_param_history()
+        historic_values = self.validator.get_historic_values()
         predictions = self.validator.get_predictions()
         validations = self.validator.get_validations()
         train_details = TrainDetails(
             predictions=predictions, 
             validations=validations, 
             losses=losses,
-            param_history=param_history,
+            historic_values=historic_values,
             run_number=self.run_number,
             save_path=f"{self.global_config.results_dir}/{self.global_config.run_name}"
         )
@@ -83,8 +83,8 @@ class Orchestrator:
         self.dataset = self.__get_dataset()
         self.data_loader = DataLoader(dataset=self.dataset, config=self.global_config, device=self.device)
         self.model = self.__get_model(self.device)
-        self.trainer = Trainer(data_loader=self.data_loader, model=self.model, config=self.global_config)
-        self.validator = Validator(data_loader=self.data_loader, model=self.model, trainer=self.trainer, config=self.global_config)
+        self.validator = Validator(data_loader=self.data_loader, model=self.model, config=self.global_config)
+        self.trainer = Trainer(data_loader=self.data_loader, model=self.model, config=self.global_config, validator=self.validator)
         self.visualizer = Visualizer(data_loader=self.data_loader, config=self.global_config, validator=self.validator)
 
     def __prepare(self):
