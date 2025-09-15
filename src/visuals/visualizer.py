@@ -691,7 +691,7 @@ class Visualizer:
             print(f"   📈 Evolution across {len(epochs)} epochs of training")
 
     def __plot_metrics_over_epochs(self, train_details: TrainDetails):
-        """Create a line plot showing NMI and Accuracy over training epochs."""
+        """Create a beautiful line plot showing NMI and Accuracy over training epochs using seaborn styling."""
         if not train_details.validations:
             return  # No validation data available
         
@@ -711,45 +711,90 @@ class Visualizer:
             nmi_values.append(nmi_val if isinstance(nmi_val, (int, float)) else None)
             acc_values.append(acc_val if isinstance(acc_val, (int, float)) else None)
         
-        # Create matplotlib figure
-        fig, ax = plt.subplots(figsize=(8, 5))
+        # Set seaborn style for beautiful plots
+        sns.set_style("whitegrid")
+        sns.set_palette("husl")
+        
+        # Create matplotlib figure with seaborn styling
+        fig, ax = plt.subplots(figsize=(10, 6))
         
         # Convert to 1-based epochs for display
         epoch_display = [e + 1 for e in epochs]
         
-        # Plot NMI
+        # Define beautiful colors
+        nmi_color = '#2E86AB'  # Beautiful blue
+        acc_color = '#A23B72'  # Beautiful magenta/purple
+        
+        # Plot NMI with enhanced styling
         if any(v is not None for v in nmi_values):
             # Filter out None values for plotting
             valid_nmi = [(x, y) for x, y in zip(epoch_display, nmi_values) if y is not None]
             if valid_nmi:
                 x_nmi, y_nmi = zip(*valid_nmi)
-                ax.plot(x_nmi, y_nmi, 'o-', color='blue', linewidth=2, markersize=6, label='NMI')
+                ax.plot(x_nmi, y_nmi, 'o-', color=nmi_color, linewidth=2.5, markersize=8, 
+                       markerfacecolor=nmi_color, markeredgecolor='white', markeredgewidth=1.5,
+                       label='NMI (Normalized Mutual Information)', alpha=0.9)
         
-        # Plot Accuracy
+        # Plot Accuracy with enhanced styling
         if any(v is not None for v in acc_values):
             # Filter out None values for plotting
             valid_acc = [(x, y) for x, y in zip(epoch_display, acc_values) if y is not None]
             if valid_acc:
                 x_acc, y_acc = zip(*valid_acc)
-                ax.plot(x_acc, y_acc, 's-', color='red', linewidth=2, markersize=6, label='Accuracy')
+                ax.plot(x_acc, y_acc, 's-', color=acc_color, linewidth=2.5, markersize=8,
+                       markerfacecolor=acc_color, markeredgecolor='white', markeredgewidth=1.5,
+                       label='Accuracy', alpha=0.9)
         
-        # Customize plot
-        ax.set_xlabel('Epoch', fontsize=12)
-        ax.set_ylabel('Metric Value', fontsize=12)
-        ax.set_title(f'Training Metrics Over Epochs - Run {train_details.run_number}', fontsize=14)
-        ax.set_ylim(0, 1)  # Metrics are typically 0-1
-        ax.grid(True, alpha=0.3)
-        ax.legend(fontsize=11)
+        # Enhanced customization
+        ax.set_xlabel('Training Epoch', fontsize=14, fontweight='medium')
+        ax.set_ylabel('Metric Value', fontsize=14, fontweight='medium')
+        ax.set_title(f'Training Performance Metrics - Run {train_details.run_number}', 
+                    fontsize=16, fontweight='bold', pad=20)
         
-        # Save as PNG
+        # Set limits and ticks
+        ax.set_ylim(-0.05, 1.05)  # Slightly expanded for visual breathing room
+        ax.set_xlim(min(epoch_display) - 0.5, max(epoch_display) + 0.5)
+        
+        # Enhanced grid
+        ax.grid(True, alpha=0.3, linestyle='-', linewidth=0.8)
+        ax.set_axisbelow(True)  # Grid behind the lines
+        
+        # Beautiful legend
+        legend = ax.legend(fontsize=12, frameon=True, fancybox=True, shadow=True, 
+                          loc='best', borderpad=1, columnspacing=1.5)
+        legend.get_frame().set_facecolor('white')
+        legend.get_frame().set_alpha(0.9)
+        legend.get_frame().set_edgecolor('lightgray')
+        
+        # Add subtle background
+        ax.set_facecolor('#FAFAFA')
+        
+        # Enhance tick parameters
+        ax.tick_params(axis='both', which='major', labelsize=11, 
+                      colors='#333333', width=1, length=6)
+        ax.tick_params(axis='both', which='minor', width=0.5, length=3)
+        
+        # Add minor ticks for better granularity
+        ax.minorticks_on()
+        
+        # Spines styling
+        for spine in ax.spines.values():
+            spine.set_color('#CCCCCC')
+            spine.set_linewidth(1)
+        
+        # Save as PNG with high quality
         png_path = out_dir / 'metrics_over_epochs.png'
-        fig.tight_layout()
-        fig.savefig(png_path, dpi=170, bbox_inches='tight')
+        fig.tight_layout(pad=2.0)
+        fig.savefig(png_path, dpi=300, bbox_inches='tight', facecolor='white', edgecolor='none')
         plt.close(fig)
         
+        # Reset seaborn style to not affect other plots
+        sns.reset_defaults()
+        
         if self.global_config.verbose:
-            print(f"📈 Metrics plot saved: {png_path}")
+            print(f"📈 Enhanced metrics plot saved: {png_path}")
             print(f"   📊 Shows NMI and Accuracy evolution over {len(epochs)} epochs")
+            print(f"   🎨 Styled with seaborn for publication-quality appearance")
 
     def __plot_pca_tripanel(self, train_details: TrainDetails, x: Tensor, y: Tensor):
         """Save tri-panel PCA plots comparing HMM-init, HMM-trained, and True labels."""
