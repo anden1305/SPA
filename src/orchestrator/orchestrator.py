@@ -8,7 +8,6 @@ import torch
 from src.config.config import GlobalConfig
 from src.data.base_dataset import BaseDataset
 from src.data.data_loader import DataLoader
-from src.data.data_loader_new import DataLoaderNew
 from src.data.mssv_dataset import MSSVDataset
 from src.data.synthetic_dataset import SyntheticDataset
 from src.models.base_model import BaseModel
@@ -82,7 +81,7 @@ class Orchestrator:
     
     def __prepare_run(self):
         self.dataset = self.__get_dataset()
-        self.data_loader = DataLoaderNew(dataset=self.dataset, config=self.global_config, device=self.device)
+        self.data_loader = DataLoader(dataset=self.dataset, config=self.global_config, device=self.device)
         self.model = self.__get_model(self.device)
         self.trainer = Trainer(data_loader=self.data_loader, model=self.model, config=self.global_config)
         self.validator = Validator(data_loader=self.data_loader, model=self.model, trainer=self.trainer, config=self.global_config)

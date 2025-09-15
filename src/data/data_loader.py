@@ -33,9 +33,36 @@ class DataLoader(Iterator):
         self.device = device
         self.verbose = self.global_config.verbose
         self._epoch = 0
-        if self.normalize:
-            self.statistics = self.__get_data_statistics()
+        self.__process_data()
     
+    def __process_data(self):
+        # get data
+        x, y = self.dataset[:]
+        x, y = self.__apply_transforms(x, y)
+        # normalize data
+        if self.normalize:
+            x = (x - x.mean(axis=(0,1))) / x.std(axis=(0,1))
+        # set batch size
+        if self.batch_size is None:
+            batch_size = x.shape[0]
+        else:
+            batch_size = self.batch_size
+        num_full_batches = x.shape[0] // batch_size
+        if num_full_batches == 0:
+            raise ValueError(f"Dataset size {x.shape[0]} is smaller than batch size {batch_size}.")
+        # trim data to have full batches only
+        x = x[:num_full_batches * batch_size]
+        y = y[:num_full_batches * batch_size * x.shape[1]]
+        # reshape data so that each batch is a continuous segment of the original data
+        x = x.reshape((num_full_batches, batch_size*x.shape[1], x.shape[2]))
+        y = y.reshape((num_full_batches, y.shape[0] // num_full_batches))
+        # make data contiguous in memory
+        x = np.ascontiguousarray(x)
+        y = np.ascontiguousarray(y)
+        # store data
+        self.data = (x, y)
+        self.__print_data_info()
+
     def __init_transforms(self, transform_configs: list[TransformsConfig]):
         self.transforms: list[BaseTransform] = []
         for config in transform_configs:
@@ -53,18 +80,9 @@ class DataLoader(Iterator):
                 case _:
                     raise ValueError(f"Unknown transform: {config.type}.")
     
-    def __get_data_statistics(self):
-        self.normalize = False
-        x, _ = self.get_all_data(shuffle=False)
-        self.normalize = True
-        return {
-            "mean": x.mean(dim=(0,1)).detach().cpu().numpy(),
-            "std": x.std(dim=(0,1)).detach().cpu().numpy(),
-        }
-
     def __len__(self) -> int:
         """Number of batches per epoch."""
-        return len(self.dataset) // self.batch_size
+        return self.data[0].shape[0]
     
     def __apply_transforms(self, x: np.ndarray, y: np.ndarray):
         """Apply all transforms in order to a single sample."""
@@ -74,13 +92,13 @@ class DataLoader(Iterator):
     
     def __iter__(self) -> "DataLoader":
         """Handles every start of new epoch logic (shuffle etc.)."""
-        self._size = len(self.dataset)
-        self._num_batches = self._size // self.batch_size
-        batch_starts = [i * self.batch_size for i in range(self._num_batches)]
+        self._size = self.data[0].shape[0]
+        self._num_batches = self._size
+        batch_order = [i for i in range(self._num_batches)]
         if self.shuffle:
             rs = np.random.RandomState(self.seed + self._epoch)
-            batch_starts = rs.permutation(batch_starts).tolist()
-        self._batch_starts = batch_starts
+            batch_order = rs.permutation(batch_order).tolist()
+        self._batch_order = batch_order
         self._batch_cursor = 0
         self._epoch += 1
         return self
@@ -89,36 +107,43 @@ class DataLoader(Iterator):
         """Loads, transforms and returns the next batch of data."""
         if self._batch_cursor >= getattr(self, "_num_batches", 0):
             raise StopIteration
-        start = self._batch_starts[self._batch_cursor]
-        end = start + self.batch_size
-        batch_idx = list(range(start, end))
-        x, y = self.dataset[batch_idx]
-        if self.transforms:
-            x, y = self.__apply_transforms(x, y)
+        x = self.data[0][self._batch_order[self._batch_cursor]]
+        y = self.data[1][self._batch_order[self._batch_cursor]]
+        x = np.expand_dims(x, axis=0)
         self._batch_cursor += 1
-        if self.normalize:
-            x = (x - self.statistics["mean"]) / self.statistics["std"]
-        x = np.ascontiguousarray(x)
-        y = np.ascontiguousarray(y)
         return torch.from_numpy(x).to(self.device), torch.from_numpy(y).to(self.device)
-    
+
     def get_feature_dim(self) -> int:
-        x, y = self.dataset[:self.batch_size]
-        if self.transforms:
-            x, y = self.__apply_transforms(x, y)
-        return x.shape[-1]
+        return self.data[0].shape[2]
     
-    def get_all_data(self, shuffle: bool = False) -> tuple[torch.Tensor, torch.Tensor]:
-        __shuffle = self.shuffle
-        self.shuffle = shuffle
-        xs, ys = [], []
-        for xb, yb in self:
-            xs.append(xb)
-            ys.append(yb)
-        x = torch.concat(xs, dim=0)
-        y = torch.concat(ys, dim=0)
-        self.shuffle = __shuffle
-        return x,y
+    def get_all_data(self) -> tuple[torch.Tensor, torch.Tensor]:
+        x, y = self.data
+        y = y.reshape(-1)
+        x = x.reshape(-1, x.shape[2])
+        x = np.expand_dims(x, axis=0)
+        y = np.expand_dims(y, axis=0)
+        return torch.from_numpy(x).to(self.device), torch.from_numpy(y).to(self.device)
+
+    def __print_data_info(self):
+        print("\n" + "=" * 60)
+        print("📊 Data Info".center(60, "="))
+        print("=" * 60)
+        print(f"Dataset: {self.dataset}")
+        print(f"Number of samples: {self.data[0].shape[0] * self.data[0].shape[1]}")
+        print(f"Number of batches per epoch: {self.__len__()}")
+        print(f"Batch size: {self.batch_size}")
+        print(f"Feature dimension: {self.get_feature_dim()}")
+        print(f"Shuffle each epoch: {self.shuffle}")
+        print(f"Normalize data: {self.normalize}")
+        print(f"Device: {self.device}")
+        print(f"Final data shape: {self.data[0].shape}")
+        if self.transforms:
+            print("Transforms:")
+            for t in self.transforms:
+                print(f" - {t}")
+        else:
+            print("No transforms applied.")
+        print("=" * 60 + "\n")
 
     def __str__(self) -> str:
         return f"DataLoader(transform={self.transforms})"

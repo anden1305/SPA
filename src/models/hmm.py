@@ -14,7 +14,7 @@ import torch
 from torch import Tensor
 import torch.nn as nn
 from src.config.config import GlobalConfig
-from src.data.data_loader_new import DataLoaderNew
+from src.data.data_loader import DataLoader
 from .base_model import BaseModel
 from src.initializations.random_uniform import init_random_uniform
 from src.initializations.random_dirichlet import init_random_dirichlet
@@ -25,7 +25,7 @@ from src.initializations.apply_noise import apply_noise_and_bias
 
 class HMM(BaseModel):
     def __init__(self,
-                 data_loader: DataLoaderNew,
+                 data_loader: DataLoader,
                  config: GlobalConfig,
                  device: torch.device) -> None:
         super().__init__(data_loader, config, device)
