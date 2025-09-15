@@ -15,7 +15,7 @@ def compute_summary_statistics(x: torch.Tensor, y: torch.Tensor, dataset: BaseDa
     x_shape = x.shape
     x_mean = x.mean().item()
     x_std = x.std().item()
-
+    
     return {
         "input_shape": x_shape,
         "input_mean": x_mean,
