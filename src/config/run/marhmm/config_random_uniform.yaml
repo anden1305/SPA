@@ -1,9 +1,9 @@
 trainer:
-  epochs: 20
+  epochs: 1500
   learning_rate: 0.01
   optimizer: adam
   grad_clip: 5.0
-  validate_per_epoch: 5
+  validate_per_epoch: 10
 validator:
   accuracy: True
   nmi: True
@@ -39,14 +39,14 @@ model:
   init_strategy: random_uniform
   init_noisy: True
   params:
-    lags: [1, 2, 4, 8]  # Fewer lags to reduce computation
+    lags: [1, 2, 4, 8]
     ridge: 0.1
     var_reg: 0.05
     sticky_coef: 0.1
-    sticky_kappa: 0.95
+    sticky_kappa: 0.9
 verbose: True
 seed: 42
 results_dir: results/training/marhmm
 run_name: feature_synthetic_uniform
-runs: 2
+runs: 3
 validate_data: True

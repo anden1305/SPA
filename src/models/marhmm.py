@@ -62,12 +62,6 @@ class MARHMM(BaseModel):
 		log_pi = torch.log_softmax(self.initial_logits, dim=-1)
 		log_A = torch.log_softmax(self.transition_logits, dim=-1)
 		
-		# Add small random perturbation to avoid completely uniform distributions
-		if self.training:
-			eps = 1e-4
-			log_pi = log_pi + torch.randn_like(log_pi) * eps
-			log_A = log_A + torch.randn_like(log_A) * eps
-		
 		log_emiss = self.__emission_log_prob(x_std)
 		logp = self.__forward_algorithm(log_emiss, log_pi, log_A)
 		return self.negative_log_likelihood(x_std, logp)

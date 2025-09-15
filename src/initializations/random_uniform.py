@@ -35,12 +35,14 @@ def init_random_uniform(model: BaseModel, coeff_std: float = 1.0, jitter_std: fl
         # if jitter_std > 0:
         #     log_var += jitter_std * torch.randn_like(log_var)
         model.log_var.copy_(log_var)
-    model.initial_logits.data.zero_()
-    model.transition_logits.data.zero_()
+    # Initialize initial and transition probabilities with small random values
+    # This breaks symmetry and allows the model to learn different transition patterns
+    model.initial_logits.data.uniform_(-0.5, 0.5)
+    model.transition_logits.data.uniform_(-0.5, 0.5)
 
-    # Uniform initial and transition probabilities (commented out for now)
-    # model.initial_logits.data.uniform_(-0.5, 0.5)  # Small random values around uniform
-    # model.transition_logits.data.uniform_(-0.5, 0.5)  # Small random values around uniform
+    # Uniform initial and transition probabilities
+    # model.initial_logits.data.uniform_(-1.0, 1.0)
+    # model.transition_logits.data.uniform_(-1.0, 1.0)
 
 def set_identity_covariance(model: BaseModel) -> None:
     """Set covariance to identity for any covariance type (standard HMM only)."""
