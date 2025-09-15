@@ -1,8 +1,8 @@
 trainer:
   epochs: 50
-  learning_rate: 0.01
+  learning_rate: 0.0001
   optimizer: adam
-  grad_clip: 5.0
+  grad_clip: null
 validator:
   accuracy: True
   nmi: True
@@ -15,20 +15,26 @@ visualizer:
   confusion_matrix: True
   state_distinctness: True
   summary_statistics: True
-  param_histories: True
 dataloader:
-  batch_size: null
+  batch_size: 4096
   shuffle: True
   normalize: True
   transforms:
     - type: reshape
       params: {}
-    - type: fft
+    - type: percentile_clipping
       params: {
-        "window_size": 512,
-        "feature": "band_power",
-        "bands": [[0.5,4],[4,8],[8,12],[12,30],[30,70]],
+        "percentile": 5
+      }
+    - type: high_pass_filter
+      params: {
+        "low_cutoff": 0.5,
+        "high_cutoff": 45,
         "sampling_rate": 128
+      }
+    - type: batch_raw
+      params: {
+        "window_size": 512
       }
 dataset:
   type: synthetic
@@ -36,16 +42,14 @@ dataset:
 model:
   type: marhmm
   init_strategy: random_uniform
-  init_noisy: True
+  init_noisy: false
   params:
-    lags: [1, 2, 4, 8]  # Fewer lags to reduce computation
-    ridge: 0.1
-    var_reg: 0.05
-    sticky_coef: 0.1
-    sticky_kappa: 0.95
-verbose: True
-seed: 42
+    lags: [1, 2, 4]  # Fewer lags to reduce computation
+    ridge: 0.001  # Reduced ridge regularization
+    var_reg: 0.001  # Add variance regularization
+verbose: true
+seed: 123
 results_dir: results/training/marhmm
-run_name: feature_synthetic_uniform
+run_name: raw_synthetic_uniform
 runs: 1
-validate_data: True
+validate_data: False

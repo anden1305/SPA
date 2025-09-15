@@ -11,6 +11,7 @@ class TrainDetails:
     losses: dict[int, float]
     run_number: int
     save_path: str
+    param_history: dict[str, list] = field(default_factory=dict)
     
     def save_info(self):
         path = self.get_path()
@@ -21,6 +22,9 @@ class TrainDetails:
             json.dump(self.validations, f)
         with open(f"{path}/predictions.json", "w") as f:
             json.dump(self.predictions, f)
+        with open(f"{path}/param_history.json", "w") as f:
+            json.dump({k: [np.asarray(v).tolist() for v in vals] if isinstance(vals, list) else []
+                           for k, vals in self.param_history.items()}, f)
 
     def get_path(self):
         return Path(f"{self.save_path}/{self.run_number}")

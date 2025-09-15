@@ -13,7 +13,7 @@ visualizer:
   state_distinctness: True
 dataloader:
   batch_size: 16384
-  shuffle: True
+  shuffle: False
   normalize: True
   transforms:
     - type: reshape
@@ -32,10 +32,7 @@ model:
   init_noisy: false
   params:
     lags: [1, 2, 4, 8]
-    normalize_time: false
     ridge: 0.01
-    ignore_prefix: true
-    drop_prefix_from_normalization: true
 verbose: true
 seed: 123
 results_dir: results/training/marhmm

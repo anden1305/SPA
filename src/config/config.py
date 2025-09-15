@@ -22,13 +22,14 @@ class VisualizerConfig(BaseModel):
     confusion_matrix: bool = Field(..., description="Whether to visualize confusion matrix.")
     state_distinctness: bool = Field(..., description="Whether to visualize state distinctness.")
     summary_statistics: bool = Field(..., description="Whether to visualize summary statistics.")
+    param_histories: bool = Field(..., description="Whether to visualize parameter histories.")
 
 class TransformsConfig(BaseModel):
     type: str = Field(..., description="Type of transform, e.g., 'fft'.")
     params: dict[str, Any] = Field(...)
 
 class DataLoaderConfig(BaseModel):
-    batch_size: int | None = Field(..., ge=1)
+    batch_size: int | None = Field(..., ge=1, description="Number of windows. If None, use full dataset.")
     transforms: list[TransformsConfig] = Field(default_factory=list)
     shuffle: bool = Field(..., description="Whether to shuffle data each epoch.")
     normalize: bool = Field(..., description="Whether to normalize data using mean and std.")

@@ -14,7 +14,7 @@ import torch
 from torch import Tensor
 import torch.nn as nn
 from src.config.config import GlobalConfig
-from src.data.data_loader import DataLoader
+from src.data.data_loader_new import DataLoaderNew
 from .base_model import BaseModel
 from src.initializations.random_uniform import init_random_uniform
 from src.initializations.random_dirichlet import init_random_dirichlet
@@ -25,7 +25,7 @@ from src.initializations.apply_noise import apply_noise_and_bias
 
 class HMM(BaseModel):
     def __init__(self,
-                 data_loader: DataLoader,
+                 data_loader: DataLoaderNew,
                  config: GlobalConfig,
                  device: torch.device) -> None:
         super().__init__(data_loader, config, device)
@@ -196,7 +196,23 @@ class HMM(BaseModel):
 
     def regularization_loss(self) -> torch.Tensor:
         """Regularize emission variances to avoid too small or too large values."""
+        
+        max_var_threshold = 10.0
+        min_variance_threshold = 1
+        factor = 10
+        
         reg_loss = torch.zeros((), device=self.device)
+        # if self.covariance_type == "diag":
+        #     variance = torch.exp(self.emission_logvar)
+        #     min_var_penalty = torch.clamp(min_variance_threshold - variance, min=0.0).pow(2)
+        #     max_var_penalty = torch.clamp(variance - max_var_threshold, min=0.0).pow(2)
+        #     reg_loss = (min_var_penalty.sum() + max_var_penalty.sum()) * factor
+        # elif self.covariance_type == "full":
+        #     L = self.__full_cov_cholesky()
+        #     diag = torch.diagonal(L, dim1=1, dim2=2)
+        #     min_diag_penalty = torch.clamp(min_variance_threshold - diag, min=0.0).pow(2)
+        #     max_diag_penalty = torch.clamp(diag - max_var_threshold, min=0.0).pow(2)
+        #     reg_loss = (min_diag_penalty.sum() + max_diag_penalty.sum()) * factor
         return reg_loss
 
     def __validate_input(self, x: Tensor) -> Tensor:
@@ -245,7 +261,7 @@ class HMM(BaseModel):
             data = self.__validate_input(data)
 
         if strategy == "random_uniform":
-            init_random_uniform(self, mean_std=mean_std, jitter_std=jitter_std)
+            init_random_uniform(self, coeff_std=mean_std, jitter_std=jitter_std)
         elif strategy == "random_dirichlet":
             init_random_dirichlet(self, mean_std=mean_std, alpha=1.0, self_transition_bias=self_transition_bias)
         elif strategy == "random_separated":
