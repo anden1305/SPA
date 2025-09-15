@@ -5,6 +5,7 @@ from src.config.config import GlobalConfig
 from src.data.data_loader import DataLoader
 from src.helpers.accuracy import accuracy
 from src.helpers.align_labels import align_labels_hungarian
+from src.helpers.frequency_statistics import compute_frequency_statistics
 from src.helpers.nmi import calculate_nmi
 from src.helpers.summary_statistics import compute_summary_statistics
 from src.models.base_model import BaseModel
@@ -77,6 +78,7 @@ class Validator:
             self.data_validations.update(distinctness)
         if self.config.summary_statistics:
             self.data_validations.update(compute_summary_statistics(x, y, self.data_loader.dataset))
+            self.data_validations.update(compute_frequency_statistics(x, y, self.data_loader))
         with open(out_path, "w") as f:
             json.dump(self.data_validations, f, indent=2)
 

@@ -41,6 +41,7 @@ class Visualizer:
             self.__plot_state_distinctness(path=path)
         if self.global_config.visualizer.summary_statistics and self.global_config.validator.summary_statistics:
             self.__plot_summary_statistics(path=path)
+            self.__plot_frequency_statistics(path=path)
     
     def visualize(self, train_details: TrainDetails):
         path = train_details.get_path() / "plots"
@@ -75,6 +76,109 @@ class Visualizer:
 
     
     ####### HELPER METHODS #######
+    
+    
+    def __plot_frequency_statistics(self, path: Path):
+        # load from validator
+        dv = self.validator.get_data_validations()
+        freq_stats = dv.get("frequency_statistics", {})
+        if not freq_stats:
+            return
+
+        # freq_stats: dict[state_str->array_like (F,)]
+        # Collect states sorted by key (attempt numeric order when possible)
+        def key_fn(k):
+            try:
+                return int(k)
+            except Exception:
+                return k
+
+        states = sorted(list(freq_stats.keys()), key=key_fn)
+
+        # Convert all to numpy arrays and determine frequency length
+        arrays = {}
+        maxF = 0
+        for s in states:
+            v = freq_stats[s]
+            if hasattr(v, 'detach'):
+                # torch tensor
+                try:
+                    arr = v.detach().cpu().numpy().reshape(-1)
+                except Exception:
+                    arr = np.asarray(v).reshape(-1)
+            else:
+                arr = np.asarray(v).reshape(-1)
+            arrays[s] = arr
+            if arr.size > maxF:
+                maxF = arr.size
+
+        if maxF == 0:
+            return
+
+        freq_axis = np.arange(maxF)
+
+        # Combined line plot: all states on a single, publication-ready figure
+        sns.set_style('whitegrid')
+        n_states = len(states)
+        # choose a qualitative palette sized to number of states
+        palette_name = 'tab10' if n_states <= 10 else 'tab20' if n_states <= 20 else 'hsv'
+        try:
+            colors = sns.color_palette(palette_name, n_states)
+        except Exception:
+            colors = sns.color_palette('tab10', n_states)
+
+        fig, ax = plt.subplots(figsize=(12, 6))
+        for i, s in enumerate(states):
+            arr = arrays[s]
+            if arr.size != maxF:
+                padded = np.full(maxF, np.nan)
+                padded[:arr.size] = arr
+                arr = padded
+            # prefer human-readable state names when available
+            label = s
+            try:
+                if s.isdigit():
+                    names = self.data_loader.dataset.get_state_names() or []
+                    if len(names) > int(s):
+                        label = names[int(s)]
+            except Exception:
+                pass
+            ax.plot(freq_axis, arr, label=label, color=colors[i % len(colors)], linewidth=1.8, alpha=0.9)
+
+        ax.set_xlabel('Frequency bin', fontsize=12)
+        ax.set_ylabel('Average power (a.u.)', fontsize=12)
+        ax.set_title('Per-state average power across frequency bins', fontsize=14)
+        ax.tick_params(axis='both', which='major', labelsize=10)
+        ax.grid(True, which='both', linestyle='--', linewidth=0.4, alpha=0.6)
+
+        # Place legend to the right of the plot for clarity (publication style)
+        leg = ax.legend(loc='center left', bbox_to_anchor=(1.02, 0.5), fontsize='small', frameon=False)
+
+        fig.tight_layout(rect=(0, 0, 0.85, 1.0))
+        fig.savefig(path / 'frequency_mean_per_state.png', dpi=300, bbox_inches='tight')
+        plt.close(fig)
+
+        # Heatmap: states x frequency
+        mat = np.vstack([arrays[s] if arrays[s].size == maxF else np.pad(arrays[s], (0, maxF - arrays[s].size), constant_values=np.nan) for s in states])
+        fig2, ax2 = plt.subplots(figsize=(12, max(2, len(states) * 0.5)))
+        sns.heatmap(mat, ax=ax2, cmap='viridis', cbar_kws={'label': 'Average power'}, xticklabels=10)
+        # yticklabels: use state names when available
+        state_names = self.data_loader.dataset.get_state_names() or []
+        ylabels = []
+        for s in states:
+            if s.isdigit() and len(state_names) > int(s):
+                ylabels.append(state_names[int(s)])
+            else:
+                ylabels.append(s)
+        ax2.set_yticks(np.arange(len(states)) + 0.5)
+        ax2.set_yticklabels(ylabels, rotation=0)
+        ax2.set_xlabel('Frequency bin')
+        ax2.set_title('Frequency heatmap (states x frequency)')
+        fig2.tight_layout()
+        fig2.savefig(path / 'frequency_heatmap.png', dpi=200)
+        plt.close(fig2)
+
+        # Individual per-state plots removed — combined figure and heatmap kept
     
     def __plot_summary_statistics(self, path: Path):
         # load from validator
