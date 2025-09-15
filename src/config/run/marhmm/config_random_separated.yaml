@@ -32,10 +32,7 @@ model:
   init_noisy: false
   params:
     lags: [1, 2, 4]
-    normalize_time: true
     ridge: 0.0
-    ignore_prefix: true
-    drop_prefix_from_normalization: true
 verbose: true
 seed: 123
 results_dir: results/training/marhmm

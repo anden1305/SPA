@@ -45,11 +45,8 @@ model:
   init_noisy: false
   params:
     lags: [1, 2, 4]  # Fewer lags to reduce computation
-    normalize_time: false
     ridge: 0.001  # Reduced ridge regularization
     var_reg: 0.001  # Add variance regularization
-    ignore_prefix: true
-    drop_prefix_from_normalization: false
 verbose: true
 seed: 123
 results_dir: results/training/marhmm

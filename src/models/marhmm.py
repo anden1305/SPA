@@ -42,14 +42,11 @@ class MARHMM(BaseModel):
 			raise ValueError("Provide at least one positive lag")
 		self.lags: list[int] = lags
 		self.max_lag: int = max(lags)
-		self.normalize_time = bool(params.get("normalize_time", True))
 		self.ridge = float(params.get("ridge", 0.0))  # L2 coeff penalty
 		self.var_reg = float(params.get("var_reg", 0.0))  # variance stabiliser
 		# Optional sticky transition prior
 		self.sticky_coef = float(params.get("sticky_coef", 0.0))
 		self.sticky_kappa = float(params.get("sticky_kappa", 0.9))
-		self.ignore_prefix = bool(params.get("ignore_prefix", True))
-		self.drop_prefix_from_normalization = bool(params.get("drop_prefix_from_normalization", True))
 		# Parameters
 		default_dtype = torch.get_default_dtype()
 		self.coeffs = nn.Parameter(torch.zeros(self.num_states, self.obs_dim, self.obs_dim * len(lags), dtype=default_dtype))
@@ -78,19 +75,14 @@ class MARHMM(BaseModel):
 	def negative_log_likelihood(self, x: Tensor, logp: Tensor) -> Tensor:
 		"""Return a scalar NLL suitable for minimization by gradient descent.
 
-		- Normalizes by effective time steps (optionally excluding prefix)
+		- Normalizes by effective time steps 
 		  and by feature dimension to keep magnitudes comparable across configs.
 		- Returns the mean across the batch.
 		"""
 		T = x.shape[1]
 		F = x.shape[2]
-		if self.normalize_time:
-			denom_t = T
-			if self.ignore_prefix and self.drop_prefix_from_normalization:
-				denom_t = max(1, T - self.max_lag)
-			logp = logp / denom_t
-		# Also normalize by feature dimension as in the plain HMM for stability
-		logp = logp / max(1, F)
+		logp = logp / T
+		logp = logp / F
 		nll = -logp
 		return nll.mean()
 
@@ -129,7 +121,7 @@ class MARHMM(BaseModel):
 		# More conservative clamping to prevent numerical issues
 		lp = torch.clamp(lp, min=-100, max=10)
 		
-		if self.ignore_prefix and self.max_lag > 0:
+		if self.max_lag > 0:
 			lp[:, : self.max_lag, :] = 0.0
 		return lp
 
@@ -256,8 +248,7 @@ class MARHMM(BaseModel):
 	def __str__(self) -> str:
 		return (
 			f"MARHMM(states={self.num_states}, obs_dim={self.obs_dim}, lags={self.lags}, max_lag={self.max_lag}, "
-			f"normalize_time={self.normalize_time}, ignore_prefix={self.ignore_prefix}, "
-			f"drop_prefix_norm={self.drop_prefix_from_normalization}, ridge={self.ridge}, "
+			f"ridge={self.ridge}, "
 			f"sticky_coef={self.sticky_coef}, sticky_kappa={self.sticky_kappa})"
 		)
 
