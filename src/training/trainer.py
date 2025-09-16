@@ -1,9 +1,9 @@
-
 import json
 from src.data.data_loader import DataLoader
 from src.models.base_model import BaseModel
 from src.validation.validator import Validator
 from src.config.config import GlobalConfig, TrainerConfig
+from src.training.early_stopping import create_early_stopper
 from torch.optim import Adam, SGD, RMSprop
 import torch
 
@@ -22,6 +22,7 @@ class Trainer:
         self.regularization_losses: dict[int, float] = {}
         self.current_epoch = 0
         self.validator = validator
+        self.early_stopping = create_early_stopper(self.config, self.global_config.verbose)
 
     def __init_optimizer(self):
         if self.config.optimizer == "adam":
@@ -51,10 +52,8 @@ class Trainer:
             for x, _ in self.data_loader:
                 self.optimizer.zero_grad()
                 loss = self.model.forward(x)
-                # Add regularization loss (returns zero for models without regularization)
                 reg_loss = self.model.regularization_loss()
                 loss = loss + reg_loss
-                
                 loss.backward()
                 if self.config.grad_clip is not None:
                     torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.config.grad_clip)
@@ -63,10 +62,22 @@ class Trainer:
                 self.epoch_regularization_losses.append(reg_loss.item())
             self.losses[epoch] = sum(self.epoch_losses) / len(self.epoch_losses)
             self.regularization_losses[epoch] = sum(self.epoch_regularization_losses) / len(self.epoch_regularization_losses)
-            
+
             if self.config.validate_per_epoch > 0 and (epoch + 1) % self.config.validate_per_epoch == 0:
-                # Call validator to save predictions and compute validations for this epoch
                 self.validator.validate_epoch(epoch)
+                validations = self.validator.validations.get(epoch, {})
+            else:
+                validations = {}
+
+            # Early stopping check on its own schedule
+            if self.early_stopping is not None and (epoch + 1) % self.config.early_stopping_frequency == 0:
+                if not validations and self.global_config.verbose:
+                    print(f"[early-stopping] Epoch {epoch + 1}: no validation metrics; using unsupervised criterion.")
+                should_stop = self.early_stopping(validations, self.model, epoch)
+                if should_stop:
+                    if self.global_config.verbose:
+                        print(f"🛑 Early stopping at epoch {epoch + 1}")
+                    break
 
             self.epoch_losses.clear()
             self.epoch_regularization_losses.clear()
@@ -80,6 +91,10 @@ class Trainer:
     
     def reset(self):
         self.current_epoch = 0
+        if self.config.early_stopping:
+            self.early_stopping = create_early_stopper(self.config, self.global_config.verbose) 
+        else:
+            self.early_stopping = None
 
     def __print_training_start(self):
         print("\n" + "=" * 60)

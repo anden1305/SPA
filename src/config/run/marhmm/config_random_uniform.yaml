@@ -4,6 +4,9 @@ trainer:
   optimizer: adam
   grad_clip: 5.0
   validate_per_epoch: 10
+  early_stopping: true    # Auto-detects supervised vs unsupervised
+  patience: 50           # Wait 50 epochs without improvement
+  min_delta: 0.001       # Minimum improvement threshold
 validator:
   accuracy: True
   nmi: True
