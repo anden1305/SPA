@@ -8,7 +8,10 @@ class TrainerConfig(BaseModel):
     learning_rate: float = Field(..., gt=0)
     optimizer: str = Field(..., pattern="^(adam|sgd|rmsprop)$")
     grad_clip: float | None = Field(..., ge=0, description="Gradient clipping value. If None, no clipping is applied.")
-    validate_per_epoch: int = Field(..., ge=0, description="Frequency of validation during training in epochs. Set to 0 to disable per-epoch validation.")
+    validate_per_epoch: int = Field(..., ge=0, le=50, description="Frequency of validation during training in epochs. Set to 0 to disable per-epoch validation. Maximum value is 50.")
+    early_stopping: bool = Field(..., description="Enable adaptive early stopping.")
+    patience: int = Field(..., ge=1, le=100, description="Epochs to wait without improvement.")
+    min_delta: float = Field(..., ge=0, description="Minimum improvement threshold.")
 
 class ValidatorConfig(BaseModel):
     nmi: bool = Field(..., description="Whether to compute NMI.")
