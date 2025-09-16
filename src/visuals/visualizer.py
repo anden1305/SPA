@@ -51,6 +51,8 @@ class Visualizer:
             self.__plot_metrics_over_epochs(train_details=train_details)
         if self.config.historic_values:
             self.__plot_historic_values(train_details)
+        if self.config.learning_rate:
+            self.__plot_learning_rate(train_details)
     
     def visualize_runs(self, train_details: list[TrainDetails], validations: dict[str, Any]):
         path = Path(self.global_config.results_dir) / self.global_config.run_name / "plots"
@@ -864,7 +866,25 @@ class Visualizer:
             plt.close(fig)
             saved.append(out_path.as_posix())   
         return saved
-            
+    
+    def __plot_learning_rate(self, train_details: TrainDetails):
+        """Visualize the learning rate over epochs."""
+        vd = train_details.get_validations()
+        lr_history = []
+        for epoch in sorted(vd.keys()):
+            lr = vd[epoch].get('learning_rate', None)
+            if lr is not None:
+                lr_history.append(lr)
+        fig, ax = plt.subplots(figsize=(7, 4))
+        ax.plot(lr_history, label='Learning Rate', color='tab:blue')
+        ax.set_title('Learning Rate Over Epochs')
+        ax.set_xlabel('Epoch')
+        ax.set_ylabel('Learning Rate')
+        ax.legend()
+        out_path = train_details.get_path() / "plots" / "learning_rate.png"
+        fig.savefig(out_path.as_posix(), dpi=160)
+        plt.close(fig)
+
     def __plot_historic_values(self, train_details: TrainDetails):
         """Enhanced parameter-history visualization with specialized diagnostics.
 

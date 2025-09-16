@@ -55,7 +55,7 @@ class Validator:
             self.predictions[epoch] = preds.tolist()
         self.__print_validation(epoch)
     
-    def validate_epoch(self, epoch: int):
+    def validate_epoch(self, epoch: int, optimizer: torch.optim.Optimizer):
         """Validate model at a specific epoch during training."""          
         self.validations[epoch] = {}
         self.model.prepare_for_inference()
@@ -75,6 +75,8 @@ class Validator:
                 except Exception as e:
                     print(f"Error occurred while calculating accuracy at epoch {epoch}: {e}")
                     self.validations[epoch]["accuracy"] = None
+            if self.config.learning_rate:
+                self.validations[epoch]["learning_rate"] = optimizer.param_groups[0]['lr']
             self.predictions[epoch] = preds.tolist()
             
         # Save historic values for this epoch

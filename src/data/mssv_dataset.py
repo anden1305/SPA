@@ -44,8 +44,8 @@ class MSSVDataset(BaseDataset):
         config['n_timesteps'] = metadata['samples']
         config['sampling_rate'] = metadata['fs']
         config['epoch_length'] = 4
-        config['n_stages'] = 4 if config['lab'] != 'lab_2' else 3
-        config['stage_names'] = ['Awake', 'NREM', 'REM', 'Artifact'] if config['lab'] != 'lab_2' else ['Awake', 'NREM', 'REM']
+        config['n_stages'] = 4 if not config['lab'] in ('lab_2', 'lab_4') else 3
+        config['stage_names'] = ['Awake', 'NREM', 'REM', 'Artifact'] if not config['lab'] in ('lab_2', 'lab_4') else ['Awake', 'NREM', 'REM']
         signals = []
         if metadata['EEG1']:
             signals.append('EEG1')

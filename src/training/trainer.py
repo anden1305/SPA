@@ -25,7 +25,7 @@ class Trainer:
         self.validator = validator
         self.early_stopping = create_early_stopper(self.config, self.global_config.verbose)
         self.validation_controller = ValidationController(validator=self.validator, early_stopper=self.early_stopping, config_trainer=self.config, global_verbose=self.global_config.verbose,)
-
+    
     def __init_optimizer(self):
         if self.config.optimizer == "adam":
             self.optimizer = Adam(self.model.parameters(), lr=self.config.learning_rate)
@@ -33,11 +33,25 @@ class Trainer:
             self.optimizer = SGD(self.model.parameters(), lr=self.config.learning_rate)
         elif self.config.optimizer == "rmsprop":
             self.optimizer = RMSprop(self.model.parameters(), lr=self.config.learning_rate)
+        elif self.config.optimizer == "adamw":
+            self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.config.learning_rate)
         else:
             raise ValueError(f"Unsupported optimizer: {self.config.optimizer}")
-
+    
+    def __init_scheduler(self):
+        if not self.config.scheduler.enabled:
+            self.scheduler = None
+            return
+        elif self.config.scheduler.type == "step":
+            self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.config.scheduler.step_size, gamma=self.config.scheduler.gamma)
+        elif self.config.scheduler.type == "exponential":
+            self.scheduler = torch.optim.lr_scheduler.ExponentialLR(self.optimizer, gamma=self.config.scheduler.gamma)
+        else:
+            raise ValueError(f"Unsupported scheduler: {self.config.scheduler}")
+    
     def __init_training(self):
         self.__init_optimizer()
+        self.__init_scheduler()
         self.epoch_losses: list[float] = []
         self.epoch_regularization_losses: list[float] = []
         self.losses: dict[int, float] = {}
@@ -62,6 +76,8 @@ class Trainer:
                 self.optimizer.step()
                 self.epoch_losses.append(loss.item())
                 self.epoch_regularization_losses.append(reg_loss.item())
+            if self.scheduler:
+                    self.scheduler.step()
             self.losses[epoch] = sum(self.epoch_losses) / len(self.epoch_losses)
             self.regularization_losses[epoch] = sum(self.epoch_regularization_losses) / len(self.epoch_regularization_losses)
             # Validation + early stopping via controller (prints internally if stopping)

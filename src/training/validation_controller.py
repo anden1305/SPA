@@ -2,6 +2,10 @@ from __future__ import annotations
 from typing import Dict, Optional
 import torch
 
+from src.config.config import TrainerConfig
+from src.training.early_stopping import EarlyStopping
+from src.validation.validator import Validator
+
 class ValidationController:
     """Encapsulates validation scheduling and early stopping decisions.
 
@@ -12,7 +16,7 @@ class ValidationController:
     - Return a tuple (ran_validation, should_stop).
     """
 
-    def __init__(self, *, validator, early_stopper, config_trainer, global_verbose: bool):
+    def __init__(self, *, validator: Validator, early_stopper: EarlyStopping, config_trainer: TrainerConfig, global_verbose: bool):
         self.validator = validator
         self.early_stopper = early_stopper
         self.config_trainer = config_trainer
@@ -32,7 +36,7 @@ class ValidationController:
 
         # Decide if we validate this epoch
         if self.config_trainer.validate_per_epoch > 0 and (epoch + 1) % self.config_trainer.validate_per_epoch == 0:
-            self.validator.validate_epoch(epoch)
+            self.validator.validate_epoch(epoch, optimizer)
             ran_validation = True
             validations = self.validator.validations.get(epoch, {})
 
