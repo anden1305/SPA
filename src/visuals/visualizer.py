@@ -700,16 +700,19 @@ class Visualizer:
         
         # Extract epochs and metrics
         epochs = sorted(train_details.validations.keys())
-        nmi_values = []
-        acc_values = []
-        
+        nmi_values: list[float | None] = []
+        acc_values: list[float | None] = []
+
         for epoch in epochs:
             validation_data = train_details.validations[epoch]
-            nmi_val = validation_data.get('nmi', None)
-            acc_val = validation_data.get('accuracy', None)
-            
+            nmi_val = validation_data.get('nmi')
+            acc_val = validation_data.get('accuracy')
             nmi_values.append(nmi_val if isinstance(nmi_val, (int, float)) else None)
             acc_values.append(acc_val if isinstance(acc_val, (int, float)) else None)
+
+        # Losses (may have different epoch coverage)
+        loss_epochs = sorted(train_details.losses.keys()) if getattr(train_details, 'losses', None) else []
+        loss_values: list[float] = [train_details.losses[e] for e in loss_epochs]
         
         # Set seaborn style for beautiful plots
         sns.set_style("whitegrid")
@@ -720,30 +723,78 @@ class Visualizer:
         
         # Convert to 1-based epochs for display
         epoch_display = [e + 1 for e in epochs]
+        loss_epoch_display = [e + 1 for e in loss_epochs]
+
+        # Union for axis limits (fall back to metrics if no losses)
+        all_epoch_display = epoch_display if not loss_epoch_display else sorted(set(epoch_display) | set(loss_epoch_display))
         
         # Define beautiful colors
         nmi_color = '#2E86AB'  # Beautiful blue
         acc_color = '#A23B72'  # Beautiful magenta/purple
+        loss_color = '#555555'  # Neutral gray for loss
         
-        # Plot NMI with enhanced styling
+        # Plot NMI as a plain line; annotate earliest max
         if any(v is not None for v in nmi_values):
-            # Filter out None values for plotting
             valid_nmi = [(x, y) for x, y in zip(epoch_display, nmi_values) if y is not None]
             if valid_nmi:
                 x_nmi, y_nmi = zip(*valid_nmi)
-                ax.plot(x_nmi, y_nmi, 'o-', color=nmi_color, linewidth=2.5, markersize=8, 
-                       markerfacecolor=nmi_color, markeredgecolor='white', markeredgewidth=1.5,
-                       label='NMI (Normalized Mutual Information)', alpha=0.9)
+                ax.plot(x_nmi, y_nmi, '-', color=nmi_color, linewidth=2.5,
+                        label='NMI (Normalized Mutual Information)', alpha=0.9)
+                max_nmi = max(y_nmi)
+                # earliest occurrence
+                for idx, v in enumerate(y_nmi):
+                    if v == max_nmi:
+                        max_nmi_idx = idx
+                        break
+                max_nmi_epoch = x_nmi[max_nmi_idx]
+                ax.annotate(f"Peak NMI {max_nmi:.3f} (E{max_nmi_epoch})",
+                            xy=(max_nmi_epoch, max_nmi),
+                            xytext=(10, 6), textcoords='offset points',
+                            fontsize=9, fontweight='bold', color=nmi_color,
+                            bbox=dict(boxstyle='round,pad=0.25', fc='white', ec=nmi_color, lw=0.8, alpha=0.85),
+                            arrowprops=dict(arrowstyle='->', color=nmi_color, lw=0.8))
         
-        # Plot Accuracy with enhanced styling
+        # Plot Accuracy (if still present in validations) as a plain line; earliest max
         if any(v is not None for v in acc_values):
-            # Filter out None values for plotting
             valid_acc = [(x, y) for x, y in zip(epoch_display, acc_values) if y is not None]
             if valid_acc:
                 x_acc, y_acc = zip(*valid_acc)
-                ax.plot(x_acc, y_acc, 's-', color=acc_color, linewidth=2.5, markersize=8,
-                       markerfacecolor=acc_color, markeredgecolor='white', markeredgewidth=1.5,
-                       label='Accuracy', alpha=0.9)
+                ax.plot(x_acc, y_acc, '-', color=acc_color, linewidth=2.5,
+                        label='Accuracy', alpha=0.75)
+                max_acc = max(y_acc)
+                for idx, v in enumerate(y_acc):
+                    if v == max_acc:
+                        max_acc_idx = idx
+                        break
+                max_acc_epoch = x_acc[max_acc_idx]
+                ax.annotate(f"Peak Acc {max_acc:.3f} (E{max_acc_epoch})",
+                            xy=(max_acc_epoch, max_acc),
+                            xytext=(8, -18), textcoords='offset points',
+                            fontsize=8, fontweight='bold', color=acc_color,
+                            bbox=dict(boxstyle='round,pad=0.2', fc='white', ec=acc_color, lw=0.6, alpha=0.85),
+                            arrowprops=dict(arrowstyle='->', color=acc_color, lw=0.6))
+
+        # Secondary axis for Loss
+        ax2 = None
+        if loss_values:
+            ax2 = ax.twinx()
+            ax2.plot(loss_epoch_display, loss_values, '-', color=loss_color, linewidth=2.0,
+                     label='Loss', alpha=0.9)
+            ax2.set_ylabel('Loss', fontsize=14, fontweight='medium', color=loss_color)
+            ax2.tick_params(axis='y', labelcolor=loss_color)
+            # Annotate earliest min loss
+            min_loss = min(loss_values)
+            for idx, v in enumerate(loss_values):
+                if v == min_loss:
+                    min_loss_idx = idx
+                    break
+            min_loss_epoch = loss_epoch_display[min_loss_idx]
+            ax2.annotate(f"Min Loss {min_loss:.4g} (E{min_loss_epoch})",
+                         xy=(min_loss_epoch, min_loss),
+                         xytext=(10, -20), textcoords='offset points',
+                         fontsize=9, fontweight='bold', color=loss_color,
+                         bbox=dict(boxstyle='round,pad=0.25', fc='white', ec=loss_color, lw=0.8, alpha=0.85),
+                         arrowprops=dict(arrowstyle='->', color=loss_color, lw=0.7))
         
         # Enhanced customization
         ax.set_xlabel('Training Epoch', fontsize=14, fontweight='medium')
@@ -752,27 +803,38 @@ class Visualizer:
                     fontsize=16, fontweight='bold', pad=20)
         
         # Set limits and ticks
-        ax.set_ylim(-0.05, 1.05)  # Slightly expanded for visual breathing room
-        ax.set_xlim(min(epoch_display) - 0.5, max(epoch_display) + 0.5)
+        ax.set_ylim(-0.05, 1.05)  # Slightly expanded for visual breathing room for metrics
+        ax.set_xlim(min(all_epoch_display) - 0.5, max(all_epoch_display) + 0.5)
         
         # Enhanced grid
         ax.grid(True, alpha=0.3, linestyle='-', linewidth=0.8)
         ax.set_axisbelow(True)  # Grid behind the lines
         
         # Beautiful legend
-        legend = ax.legend(fontsize=12, frameon=True, fancybox=True, shadow=True, 
-                          loc='best', borderpad=1, columnspacing=1.5)
+        # Combine legends from both axes if loss present
+        if ax2 is not None:
+            lines1, labels1 = ax.get_legend_handles_labels()
+            lines2, labels2 = ax2.get_legend_handles_labels()
+            legend = ax.legend(lines1 + lines2, labels1 + labels2, fontsize=12, frameon=True, fancybox=True, shadow=True,
+                               loc='best', borderpad=1, columnspacing=1.5)
+        else:
+            legend = ax.legend(fontsize=12, frameon=True, fancybox=True, shadow=True, 
+                               loc='best', borderpad=1, columnspacing=1.5)
         legend.get_frame().set_facecolor('white')
         legend.get_frame().set_alpha(0.9)
         legend.get_frame().set_edgecolor('lightgray')
         
         # Add subtle background
         ax.set_facecolor('#FAFAFA')
+        if ax2 is not None:
+            ax2.set_facecolor('#FAFAFA')
         
         # Enhance tick parameters
         ax.tick_params(axis='both', which='major', labelsize=11, 
                       colors='#333333', width=1, length=6)
         ax.tick_params(axis='both', which='minor', width=0.5, length=3)
+        if ax2 is not None:
+            ax2.tick_params(axis='y', which='major', labelsize=11, width=1, length=6)
         
         # Add minor ticks for better granularity
         ax.minorticks_on()
@@ -781,6 +843,10 @@ class Visualizer:
         for spine in ax.spines.values():
             spine.set_color('#CCCCCC')
             spine.set_linewidth(1)
+        if ax2 is not None:
+            for spine in ax2.spines.values():
+                spine.set_color('#BBBBBB')
+                spine.set_linewidth(1)
         
         # Save as PNG with high quality
         png_path = out_dir / 'metrics_over_epochs.png'
@@ -793,7 +859,13 @@ class Visualizer:
         
         if self.global_config.verbose:
             print(f"📈 Enhanced metrics plot saved: {png_path}")
-            print(f"   📊 Shows NMI and Accuracy evolution over {len(epochs)} epochs")
+            print(f"   📊 Shows NMI, Accuracy and Loss evolution (epochs: {len(all_epoch_display)})")
+            if any(v is not None for v in nmi_values):
+                print(f"   ⭐ Max NMI at epoch {max_nmi_epoch}: {max_nmi:.4f}")
+            if any(v is not None for v in acc_values):
+                print(f"   ⭐ Max Accuracy at epoch {max_acc_epoch}: {max_acc:.4f}")
+            if loss_values:
+                print(f"   🔻 Min Loss at epoch {min_loss_epoch}: {min_loss:.6g}")
             print(f"   🎨 Styled with seaborn for publication-quality appearance")
 
     def __plot_pca_tripanel(self, train_details: TrainDetails, x: Tensor, y: Tensor):

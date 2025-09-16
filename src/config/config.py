@@ -3,15 +3,21 @@ from pathlib import Path
 from typing import Any
 import yaml
 
+class EarlyStoppingConfig(BaseModel):
+    enabled: bool = Field(True, description="Enable adaptive early stopping.")
+    patience: int = Field(..., ge=1, le=100, description="Epochs without relative improvement before action.")
+    min_delta: float = Field(..., ge=0, le=0.5, description="Minimum relative improvement fraction required (e.g. 0.01 = 1%). Always relative.")
+
 class TrainerConfig(BaseModel):
     epochs: int = Field(..., ge=1)
     learning_rate: float = Field(..., gt=0)
     optimizer: str = Field(..., pattern="^(adam|sgd|rmsprop)$")
     grad_clip: float | None = Field(..., ge=0, description="Gradient clipping value. If None, no clipping is applied.")
-    validate_per_epoch: int = Field(..., ge=0, le=50, description="Frequency of validation during training in epochs. Set to 0 to disable per-epoch validation. Maximum value is 50.")
-    early_stopping: bool = Field(..., description="Enable adaptive early stopping.")
-    patience: int = Field(..., ge=1, le=100, description="Epochs to wait without improvement.")
-    min_delta: float = Field(..., ge=0, description="Minimum improvement threshold.")
+    validate_per_epoch: int = Field(..., ge=0, le=50, description=("Frequency (in epochs) to run full validation & supervised metrics. "
+            "Set to 0 to skip metric validation entirely; unsupervised early stopping "
+            "(parameter-drift) still runs each epoch if early stopping is enabled. "
+            "Maximum value is 50."))
+    early_stopping: EarlyStoppingConfig | None = Field(default_factory=EarlyStoppingConfig, description="Early stopping settings. Set enabled=False to disable.")
 
 class ValidatorConfig(BaseModel):
     nmi: bool = Field(..., description="Whether to compute NMI.")
@@ -19,7 +25,6 @@ class ValidatorConfig(BaseModel):
     cross_nmi: bool = Field(..., description="Whether to compute cross NMI.")
     state_distinctness: bool = Field(..., description="Whether to compute state distinctness.")
     summary_statistics: bool = Field(..., description="Whether to compute summary statistics.")
-
 class VisualizerConfig(BaseModel):
     losses: bool = Field(..., description="Whether to visualize losses.")
     pca_tripanel: bool = Field(..., description="Whether to visualize PCA tripanel.")

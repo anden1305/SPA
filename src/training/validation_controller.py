@@ -21,6 +21,15 @@ class ValidationController:
     def step(self, epoch: int, model: torch.nn.Module, optimizer: torch.optim.Optimizer) -> bool:
         """Run scheduled validation + early stopping.
 
+        Behaviour when validate_per_epoch == 0:
+        --------------------------------------
+        We still allow early stopping to function in *unsupervised* mode by invoking the
+        early stopper every epoch with an empty validation dict. This triggers the
+        parameter-drift proxy inside `EarlyStopping` (since no 'nmi' key is present).
+
+        This lets users disable potentially expensive validation metrics while still
+        benefiting from adaptive stopping based on model parameter convergence.
+
         Returns
         -------
         bool
@@ -30,17 +39,26 @@ class ValidationController:
         should_stop = False
         validations: Dict = {}
 
-        # Decide if we validate this epoch
+        # Decide if we validate this epoch (supervised / metric-based)
         if self.config_trainer.validate_per_epoch > 0 and (epoch + 1) % self.config_trainer.validate_per_epoch == 0:
             self.validator.validate_epoch(epoch)
             ran_validation = True
             validations = self.validator.validations.get(epoch, {})
 
-        # Early stopping only after validation
-        if self.early_stopper is not None and ran_validation:
-            if not validations and self.verbose:
-                print(f"[early-stopping] Epoch {epoch + 1}: no validation metrics; using unsupervised criterion.")
-            should_stop = self.early_stopper(validations, model, epoch, optimizer=optimizer)
+        # Early stopping logic
+        if self.early_stopper is not None:
+            if ran_validation:
+                # Standard path: we have (possibly supervised) metrics
+                if not validations and self.verbose:
+                    print(f"[early-stopping] Epoch {epoch + 1}: no validation metrics; using unsupervised criterion.")
+                should_stop = self.early_stopper(validations, model, epoch, optimizer=optimizer)
+            else:
+                # Fallback path: validation disabled -> unsupervised stopping each epoch
+                if self.config_trainer.validate_per_epoch == 0:
+                    if epoch == 0 and self.verbose:
+                        print("[early-stopping] Per-epoch validation disabled (validate_per_epoch=0); running unsupervised early stopping every epoch.")
+                    should_stop = self.early_stopper({}, model, epoch, optimizer=optimizer)
+
             if should_stop and self.verbose:
                 print(f"🛑 Early stopping at epoch {epoch + 1}")
 

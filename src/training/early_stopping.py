@@ -9,16 +9,16 @@ from typing import Dict, Optional
 
 
 class EarlyStopping:
-    """Adaptive early stopping with metric auto-selection, EMA smoothing and LR-on-plateau.
+    """Adaptive early stopping with metric auto-selection, Exponential Moving Average (EMA) smoothing and LR-on-plateau.
 
     Modes:
-      - supervised: prefer NMI, fallback to accuracy
-      - unsupervised: parameter convergence proxy
+        - supervised: uses NMI when provided
+        - unsupervised: parameter convergence proxy (inverse relative parameter drift)
     Features:
-      - EMA smoothing of score
-      - Warmup window (no stopping during first N validations)
-      - Relative or absolute improvement threshold (min_delta < 1 => relative)
-      - Single learning rate reduction on first plateau, stop on second
+        - Exponential Moving Average smoothing (alpha=0.3) to reduce noise
+        - Warmup window (first few validations never trigger stopping)
+        - Relative-only improvement threshold (min_delta interpreted as fractional gain)
+        - Single learning rate reduction on first plateau, hard stop on second
     """
 
     _EMA_ALPHA = 0.3
@@ -26,10 +26,10 @@ class EarlyStopping:
     _MIN_LR = 1e-5
     _LR_FACTOR = 0.5
 
-    def __init__(self, patience: int = 20, min_delta: float = 0.001, restore_best: bool = True):
-        self.patience = patience
-        self.min_delta = min_delta
-        self.restore_best = restore_best
+    def __init__(self, patience: int = 20, min_delta: float = 0.001):
+        self.patience = patience              # epochs without sufficient relative improvement
+        self.min_delta = min_delta            # required relative improvement (e.g. 0.001 = +0.1%)
+        self.restore_best = True              # always restore best
 
         # Internal state
         self._mode: Optional[str] = None
@@ -84,7 +84,7 @@ class EarlyStopping:
 
     # ---- Metric Selection & Scoring -------------------------------------------------
     def _infer_mode(self, validations: Dict) -> str:
-        if any(m in validations for m in ("nmi", "accuracy")):
+        if 'nmi' in validations:
             return "supervised"
         return "unsupervised"
 
@@ -92,10 +92,10 @@ class EarlyStopping:
         return self._score_supervised(validations) if self._mode == "supervised" else self._score_unsupervised(model)
 
     def _score_supervised(self, validations: Dict) -> Optional[float]:
-        for metric in ("nmi", "accuracy"):
-            val = validations.get(metric)
-            if isinstance(val, (int, float)):
-                return float(val)
+        val = validations.get('nmi')
+        if isinstance(val, (int, float)):
+            return float(val)
+        # If we are in supervised mode but nmi missing, treat as no score (caller may raise elsewhere)
         return None
 
     def _score_unsupervised(self, model: torch.nn.Module) -> float:
@@ -123,18 +123,16 @@ class EarlyStopping:
     def _is_improvement(self, score: float) -> bool:
         if self._best_score is None:
             return True
-        if self.min_delta < 1.0:
-            rel = (score - self._best_score) / (abs(self._best_score) + 1e-8)
-            return rel > self.min_delta
-        return score > self._best_score + self.min_delta
+        rel = (score - self._best_score) / (abs(self._best_score) + 1e-8)
+        return rel > self.min_delta
 
     def _update_best(self, score: float, model: torch.nn.Module) -> None:
         if self._best_score is None or score > self._best_score:
             self._best_score = score
-            if self.restore_best:
-                self._best_weights = {k: v.clone() for k, v in model.named_parameters()}
+            self._best_weights = {k: v.clone() for k, v in model.named_parameters()}
 
     def _update_ema(self, score: float) -> float:
+        """ Update and return the Exponential Moving Average (EMA) of the score. """
         self._ema = score if self._ema is None else (self._EMA_ALPHA * score + (1 - self._EMA_ALPHA) * self._ema)
         return self._ema
 
@@ -153,7 +151,7 @@ class EarlyStopping:
 
     # ---- Restoring & Logging --------------------------------------------------------
     def _restore_best(self, model: torch.nn.Module) -> None:
-        if not (self.restore_best and self._best_weights):
+        if not self._best_weights:
             return
         for name, param in model.named_parameters():
             if name in self._best_weights:
@@ -175,20 +173,14 @@ class EarlyStopping:
 
 # Factory ---------------------------------------------------------------------
 def create_early_stopper(config_trainer, verbose: bool = True) -> Optional[EarlyStopping]:
-    """Factory returning an EarlyStopping instance or None.
-
-    Expects config_trainer to expose:
-      - early_stopping (bool)
-      - patience (int)
-      - min_delta (float)
-      - restore_best (optional, default True if missing)
-    """
-    if not getattr(config_trainer, 'early_stopping', False):
+    es_cfg = getattr(config_trainer, 'early_stopping', None)
+    if es_cfg is None:
         return None
-    patience = getattr(config_trainer, 'patience', 20)
-    min_delta = getattr(config_trainer, 'min_delta', 0.001)
-    restore_best = getattr(config_trainer, 'restore_best', True)
-    stopper = EarlyStopping(patience=patience, min_delta=min_delta, restore_best=restore_best)
+    if hasattr(es_cfg, 'enabled') and not es_cfg.enabled:
+        return None
+    patience = getattr(es_cfg, 'patience', 20)
+    min_delta = getattr(es_cfg, 'min_delta', 0.002)
+    stopper = EarlyStopping(patience=patience, min_delta=min_delta)
     if verbose:
-        print(f"[EarlyStopping] Enabled (patience={patience}, min_delta={min_delta}, restore_best={restore_best})")
+        print(f"[EarlyStopping] Enabled (patience={patience} epochs, rel_min_delta={min_delta})")
     return stopper
