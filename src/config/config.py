@@ -12,7 +12,6 @@ class TrainerConfig(BaseModel):
     early_stopping: bool = Field(..., description="Enable adaptive early stopping.")
     patience: int = Field(..., ge=1, le=100, description="Epochs to wait without improvement.")
     min_delta: float = Field(..., ge=0, description="Minimum improvement threshold.")
-    early_stopping_frequency: int = Field(..., ge=1, le=50, description="Frequency of early stopping checks in validation steps. Maximum value is 50.")
 
 class ValidatorConfig(BaseModel):
     nmi: bool = Field(..., description="Whether to compute NMI.")

@@ -32,9 +32,31 @@ class EarlyStopping:
         # For unsupervised mode
         self.prev_params = None
         self.validation_count = 0  # Track how many validations we've done
+        # EMA tracking
+        self.ema_score = None
+        self.ema_alpha = 0.3  # Fixed smoothing factor (not exposed in config)
+        self.warmup_validations = 2  # Number of validation points before early stopping decisions
+
+        # LR scheduling state
+        self.lr_reduced = False  # Whether we've already reduced LR once
+        self.stop_after_lr = False  # Trigger stop after second plateau
+        self.min_lr = 1e-5
+        self.lr_factor = 0.5
         
-    def __call__(self, validations: Dict, model: torch.nn.Module, epoch: int) -> bool:
-        """Check if training should stop. Returns True to stop."""
+    def __call__(self, validations: Dict, model: torch.nn.Module, epoch: int, optimizer: Optional[torch.optim.Optimizer] = None) -> bool:
+        """Check if training should stop. Returns True to stop.
+
+        Parameters
+        ----------
+        validations : Dict
+            Validation metrics for this epoch (may be empty for unsupervised fallback).
+        model : torch.nn.Module
+            Model being trained.
+        epoch : int
+            Current epoch index.
+        optimizer : torch.optim.Optimizer, optional
+            Optimizer for potential LR scheduling.
+        """
         
         self.validation_count += 1
         
@@ -48,8 +70,18 @@ class EarlyStopping:
         if score is None:
             return False
         
-        # Check for improvement
-        if self._is_improvement(score):
+        # Update EMA score
+        score_for_eval = self._update_ema(score)
+
+        # During warmup just collect statistics
+        if self.validation_count <= self.warmup_validations:
+            self.best_score = score_for_eval if self.best_score is None else max(self.best_score, score_for_eval)
+            if self.restore_best:
+                self.best_weights = {k: v.clone() for k, v in model.named_parameters()}
+            return False
+
+        # Check for improvement using EMA-adjusted score
+        if self._is_improvement(score_for_eval):
             self.best_score = score
             self.patience_counter = 0
             if self.restore_best:
@@ -57,14 +89,20 @@ class EarlyStopping:
         else:
             self.patience_counter += 1
         
-        # Check if we should stop (patience is in terms of validation steps, not epochs)
+        # Plateau handling
         if self.patience_counter >= self.patience:
-            self.should_stop = True
-            if self.restore_best and self.best_weights:
-                for name, param in model.named_parameters():
-                    if name in self.best_weights:
-                        param.data.copy_(self.best_weights[name])
-                print(f"🔄 Restored best weights")
+            # First plateau: try reducing LR if possible
+            if optimizer is not None and not self.lr_reduced and self._maybe_reduce_lr(optimizer):
+                self.lr_reduced = True
+                self.patience_counter = 0
+                print("⚙️  EarlyStopping: Plateau detected. Reduced learning rate and reset patience.")
+            else:
+                self.should_stop = True
+                if self.restore_best and self.best_weights:
+                    for name, param in model.named_parameters():
+                        if name in self.best_weights:
+                            param.data.copy_(self.best_weights[name])
+                    print(f"🔄 Restored best weights")
         
         return self.should_stop
     
@@ -131,7 +169,35 @@ class EarlyStopping:
         """Check if current score is better than best."""
         if self.best_score is None:
             return True
-        return score > self.best_score + self.min_delta
+        # Relative threshold if min_delta < 1, absolute otherwise
+        if self.min_delta < 1.0:
+            rel_improvement = (score - self.best_score) / (abs(self.best_score) + 1e-8)
+            return rel_improvement > self.min_delta
+        else:
+            return score > self.best_score + self.min_delta
+
+    def _update_ema(self, score: float) -> float:
+        if self.ema_score is None:
+            self.ema_score = score
+        else:
+            self.ema_score = self.ema_alpha * score + (1 - self.ema_alpha) * self.ema_score
+        return self.ema_score
+
+    def _maybe_reduce_lr(self, optimizer: torch.optim.Optimizer) -> bool:
+        """Reduce learning rate if above minimum. Returns True if reduced."""
+        reduced = False
+        for param_group in optimizer.param_groups:
+            old_lr = param_group.get('lr', None)
+            if old_lr is None:
+                continue
+            if old_lr <= self.min_lr * 1.01:  # effectively at floor
+                return False
+            new_lr = max(self.min_lr, old_lr * self.lr_factor)
+            if new_lr < old_lr:
+                param_group['lr'] = new_lr
+                reduced = True
+                print(f"⚖️  Learning rate reduced from {old_lr:.6f} to {new_lr:.6f}")
+        return reduced
 
 
 def create_early_stopper(config_trainer, global_verbose: bool) -> Optional[EarlyStopping]:

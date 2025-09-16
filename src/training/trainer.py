@@ -4,6 +4,7 @@ from src.models.base_model import BaseModel
 from src.validation.validator import Validator
 from src.config.config import GlobalConfig, TrainerConfig
 from src.training.early_stopping import create_early_stopper
+from src.training.validation_controller import ValidationController
 from torch.optim import Adam, SGD, RMSprop
 import torch
 
@@ -23,6 +24,7 @@ class Trainer:
         self.current_epoch = 0
         self.validator = validator
         self.early_stopping = create_early_stopper(self.config, self.global_config.verbose)
+        self.validation_controller = ValidationController(validator=self.validator, early_stopper=self.early_stopping, config_trainer=self.config, global_verbose=self.global_config.verbose,)
 
     def __init_optimizer(self):
         if self.config.optimizer == "adam":
@@ -62,26 +64,12 @@ class Trainer:
                 self.epoch_regularization_losses.append(reg_loss.item())
             self.losses[epoch] = sum(self.epoch_losses) / len(self.epoch_losses)
             self.regularization_losses[epoch] = sum(self.epoch_regularization_losses) / len(self.epoch_regularization_losses)
-
-            if self.config.validate_per_epoch > 0 and (epoch + 1) % self.config.validate_per_epoch == 0:
-                self.validator.validate_epoch(epoch)
-                validations = self.validator.validations.get(epoch, {})
-            else:
-                validations = {}
-
-            # Early stopping check on its own schedule
-            if self.early_stopping is not None and (epoch + 1) % self.config.early_stopping_frequency == 0:
-                if not validations and self.global_config.verbose:
-                    print(f"[early-stopping] Epoch {epoch + 1}: no validation metrics; using unsupervised criterion.")
-                should_stop = self.early_stopping(validations, self.model, epoch)
-                if should_stop:
-                    if self.global_config.verbose:
-                        print(f"🛑 Early stopping at epoch {epoch + 1}")
-                    break
-
+            # Validation + early stopping via controller (prints internally if stopping)
+            should_stop = self.validation_controller.step(epoch, self.model, self.optimizer)
+            if should_stop:
+                break
             self.epoch_losses.clear()
             self.epoch_regularization_losses.clear()
-
             if self.global_config.verbose:
                 self.__print_epoch()
     
@@ -92,10 +80,11 @@ class Trainer:
     def reset(self):
         self.current_epoch = 0
         if self.config.early_stopping:
-            self.early_stopping = create_early_stopper(self.config, self.global_config.verbose) 
+            self.early_stopping = create_early_stopper(self.config, self.global_config.verbose)
         else:
             self.early_stopping = None
-
+        self.validation_controller = ValidationController(validator=self.validator, early_stopper=self.early_stopping, config_trainer=self.config, global_verbose=self.global_config.verbose)
+            
     def __print_training_start(self):
         print("\n" + "=" * 60)
         print(f"🚀 Starting Training ({self.config.epochs} Epochs)".center(60, "="))
