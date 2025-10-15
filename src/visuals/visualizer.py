@@ -8,6 +8,7 @@ import torch
 import plotly.graph_objects as go
 from src.config.config import GlobalConfig
 from src.data.data_loader import DataLoader
+from src.data.data_loader_collection import DataLoaderCollection
 from src.helpers.align_labels import align_labels_hungarian
 from src.orchestrator.train_details import TrainDetails
 from src.validation.validator import Validator
@@ -16,7 +17,7 @@ from itertools import combinations
 
 class Visualizer:
     def __init__(self,
-                 data_loader: DataLoader,
+                 data_loader: DataLoaderCollection,
                  config: GlobalConfig,
                  validator: Validator):
         self.data_loader = data_loader
@@ -133,7 +134,7 @@ class Visualizer:
             label = s
             try:
                 if s.isdigit():
-                    names = self.data_loader.dataset.get_state_names() or []
+                    names = self.data_loader.get_state_names() or []
                     if len(names) > int(s):
                         label = names[int(s)]
             except Exception:
@@ -158,7 +159,7 @@ class Visualizer:
         fig2, ax2 = plt.subplots(figsize=(12, max(2, len(states) * 0.5)))
         sns.heatmap(mat, ax=ax2, cmap='viridis', cbar_kws={'label': 'Average power'}, xticklabels=10)
         # yticklabels: use state names when available
-        state_names = self.data_loader.dataset.get_state_names() or []
+        state_names = self.data_loader.get_state_names() or []
         ylabels = []
         for s in states:
             if s.isdigit() and len(state_names) > int(s):
@@ -184,7 +185,7 @@ class Visualizer:
         target_counts = dv.get("target_counts", None) # dict[int, float]
         target_means = dv.get("target_means", None) # dict[int, float]
         target_stds = dv.get("target_stds", None) # dict[int, float]
-        state_names = self.data_loader.dataset.get_state_names()
+        state_names = self.data_loader.get_state_names()
 
         counts = np.array([float(target_counts.get(c, 0.0)) if target_counts is not None else 0.0 for c in (target_classes or [])])
         means = np.array([float(target_means.get(c, np.nan)) if target_means is not None else np.nan for c in (target_classes or [])])
@@ -305,7 +306,7 @@ class Visualizer:
         # load from validator
         dv = self.validator.get_data_validations()
         # human-readable state names (may be None)
-        state_names = self.data_loader.dataset.get_state_names()
+        state_names = self.data_loader.get_state_names()
 
         ed_mat = np.asarray(dv.get("pairwise_energy", []), dtype=float)
         if ed_mat.size == 0:
@@ -412,7 +413,7 @@ class Visualizer:
         pred_cm = confusion_matrix(y, trained_arr, normalize='true')
 
         # Determine human-readable labels if available
-        state_names = self.data_loader.dataset.get_state_names()
+        state_names = self.data_loader.get_state_names()
         labels = None
         # Try to infer labels length from confusion matrix shape
         cm_size = init_cm.shape[0]
@@ -448,7 +449,7 @@ class Visualizer:
             return  # No predictions available
         
         y_true = y.flatten() if y.ndim > 1 else y
-        labels = self.data_loader.dataset.get_state_names()
+        labels = self.data_loader.get_state_names()
         if labels is None or len(labels) != len(np.unique(y_true)):
             labels = [str(i) for i in range(len(np.unique(y_true)))]
         
@@ -834,7 +835,7 @@ class Visualizer:
         arrays = [init_arr, trained_arr, y]
 
         # human-readable state names (if available)
-        state_names = self.data_loader.dataset.get_state_names()
+        state_names = self.data_loader.get_state_names()
 
         saved: list[str] = []
         for a, b in combinations(range(proj.shape[1]), 2):

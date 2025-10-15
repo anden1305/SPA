@@ -1,0 +1,103 @@
+trainer:
+  epochs: 1500
+  learning_rate: 0.005
+  optimizer: adamw
+  grad_clip: null
+  validate_per_epoch: 10
+  early_stopping: false
+  patience: 10
+  min_delta: 0.001
+  scheduler:
+    enabled: true
+    type: exponential
+    step_size: null
+    gamma: 0.9975
+validator:
+  nmi: True
+  accuracy: True
+  learning_rate: True
+  cross_nmi: True
+  state_distinctness: True
+  summary_statistics: True
+visualizer:
+  losses: True
+  learning_rate: True
+  pca_tripanel: True
+  confusion_matrix: True
+  state_distinctness: True
+  summary_statistics: True
+  historic_values: True
+dataloader:
+  batch_size: 32
+  shuffle: True
+  normalize: True
+  transforms:
+    - type: reshape
+      params: {}
+    # - type: fft
+    #   params: {
+    #     "window_size": 512,
+    #     "feature": "band_power",
+    #     "bands": [[0.5,4],[4,8],[8,12],[12,30],[30,100]],
+    #     "sampling_rate": 128
+    #   }
+    - type: fft
+      params: {
+        "window_size": 512,
+        "feature": "power",
+      }
+train_datasets:
+  - type: mssv
+    id: sub-015
+    run: 1
+  - type: mssv
+    id: sub-015
+    run: 3
+  - type: mssv
+    id: sub-015
+    run: 4
+  - type: mssv
+    id: sub-017
+    run: 1
+  - type: mssv
+    id: sub-017
+    run: 2
+  - type: mssv
+    id: sub-027
+    run: 1
+  - type: mssv
+    id: sub-027
+    run: 2
+val_datasets:
+  - type: mssv
+    id: sub-015
+    run: 1
+  - type: mssv
+    id: sub-015
+    run: 3
+  - type: mssv
+    id: sub-015
+    run: 4
+  - type: mssv
+    id: sub-017
+    run: 1
+  - type: mssv
+    id: sub-017
+    run: 2
+  - type: mssv
+    id: sub-027
+    run: 1
+  - type: mssv
+    id: sub-027
+    run: 2
+model:
+  type: hmm
+  init_strategy: random_uniform
+  init_noisy: false
+  params: {}
+verbose: true
+seed: 123
+results_dir: results/training/hmm
+run_name: real_test
+runs: 1
+validate_data: True

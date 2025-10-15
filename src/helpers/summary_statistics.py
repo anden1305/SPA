@@ -2,8 +2,9 @@
 from pyparsing import Any
 import torch
 from src.data.base_dataset import BaseDataset
+from src.data.data_loader_collection import DataLoaderCollection
 
-def compute_summary_statistics(x: torch.Tensor, y: torch.Tensor, dataset: BaseDataset) -> dict[str, Any]:
+def compute_summary_statistics(x: torch.Tensor, y: torch.Tensor, data_loader: DataLoaderCollection) -> dict[str, Any]:
     
     # target statistics
     classes = [_y.item() for _y in y.unique()]
@@ -24,5 +25,5 @@ def compute_summary_statistics(x: torch.Tensor, y: torch.Tensor, dataset: BaseDa
         "target_counts": class_counts,
         "target_means": x_means,
         "target_stds": x_stds,
-        "target_labels": dataset.get_state_names(),
+        "target_labels": data_loader.get_state_names(),
     }

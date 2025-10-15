@@ -1,5 +1,6 @@
 import json
 from src.data.data_loader import DataLoader
+from src.data.data_loader_collection import DataLoaderCollection
 from src.models.base_model import BaseModel
 from src.validation.validator import Validator
 from src.config.config import GlobalConfig, TrainerConfig
@@ -11,7 +12,7 @@ import torch
 class Trainer:
     
     def __init__(self,
-                 data_loader: DataLoader,
+                 data_loader: DataLoaderCollection,
                  model: BaseModel,
                  config: GlobalConfig,
                  validator: Validator):

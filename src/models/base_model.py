@@ -9,6 +9,7 @@ from torch import Tensor
 from src.config.config import GlobalConfig
 from src.data.base_dataset import BaseDataset
 from src.data.data_loader import DataLoader
+from src.data.data_loader_collection import DataLoaderCollection
 from src.orchestrator.train_details import TrainDetails
 
 
@@ -19,17 +20,16 @@ class BaseModel(nn.Module, ABC):
     A concrete `__init__` is provided so calling `super().__init__()` is safe.
     """
 
-    def __init__(self, data_loader: DataLoader, config: GlobalConfig, device: torch.device):
+    def __init__(self, data_loader: DataLoaderCollection, config: GlobalConfig, device: torch.device):
         self.global_config = config
         self.config = self.global_config.model
-        self.dataset = data_loader.dataset
         self.data_loader = data_loader
         self.device = device
         self.__extract_model_parameters()
         super().__init__()
     
     def __extract_model_parameters(self):
-        self.num_states = self.dataset.get_num_states()
+        self.num_states = self.data_loader.get_num_states()
         self.num_features = self.data_loader.get_feature_dim()
 
     ### TRAINING ###

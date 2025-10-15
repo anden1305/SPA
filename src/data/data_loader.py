@@ -144,6 +144,6 @@ class DataLoader(Iterator):
         else:
             print("No transforms applied.")
         print("=" * 60 + "\n")
-
+    
     def __str__(self) -> str:
-        return f"DataLoader(transform={self.transforms})"
+        return f"DataLoader(transform={self.transforms}, dataset={self.dataset})"

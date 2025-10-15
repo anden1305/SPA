@@ -8,6 +8,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy import stats
+from scipy import signal
 from pathlib import Path
 import warnings
 warnings.filterwarnings('ignore')
@@ -25,10 +26,11 @@ SLEEP_STAGE_MAPPING = {
 }
 
 SLEEP_STAGE_COLORS = {
-    'Awake': '#FF6B6B',
-    'NREM': '#4ECDC4',
-    'REM': '#45B7D1',
-    'Artifact': '#FF8C00'  # Orange color for better contrast
+    # Project-wide palette (user-specified)
+    'Awake': '#79C780',
+    'NREM': '#6C9BD9',
+    'REM': '#D1779A',
+    'Artifact': '#FFC675'
 }
 
 # Define consistent stage order
@@ -68,7 +70,50 @@ def load_participant_data(participant_id, run_id, data_dir="data/ds006366_proces
     emg_path = base_path / 'EMG.npy'
     if emg_path.exists():
         data['EMG'] = np.load(emg_path)
-    
+
+
+    # --- Bandpass filter and normalization ---
+    # Apply a 0.5-30 Hz bandpass to EEG channels and EMG to remove >30 Hz content,
+    # then normalize each signal per-run to zero-mean and unit-variance.
+    fs = 128.0
+    nyq = fs / 2.0
+    low = 0.5 / nyq
+    high = 30.0 / nyq
+    try:
+        b, a = signal.butter(4, [low, high], btype='band')
+    except Exception:
+        b = a = None
+
+    for ch in ['EEG1', 'EEG2', 'EEG3', 'EEG4']:
+        if ch in data:
+            arr = np.asarray(data[ch], dtype=float)
+            # attempt filtering; filtfilt can fail for very short signals
+            if b is not None:
+                try:
+                    arr = signal.filtfilt(b, a, arr)
+                except Exception:
+                    # fallback to unfiltered arr
+                    arr = np.asarray(data[ch], dtype=float)
+            # normalization
+            mu = np.mean(arr)
+            sigma = np.std(arr)
+            if sigma == 0 or np.isnan(sigma):
+                sigma = 1.0
+            data[ch] = (arr - mu) / sigma
+
+    if 'EMG' in data:
+        arr = np.asarray(data['EMG'], dtype=float)
+        if b is not None:
+            try:
+                arr = signal.filtfilt(b, a, arr)
+            except Exception:
+                arr = np.asarray(data['EMG'], dtype=float)
+        mu = np.mean(arr)
+        sigma = np.std(arr)
+        if sigma == 0 or np.isnan(sigma):
+            sigma = 1.0
+        data['EMG'] = (arr - mu) / sigma
+
     return data
 
 def calculate_confidence_interval(data, confidence=0.95):

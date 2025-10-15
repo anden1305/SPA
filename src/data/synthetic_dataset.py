@@ -1,5 +1,5 @@
 
-from src.config.config import GlobalConfig
+from src.config.config import DatasetConfig, GlobalConfig
 from src.data.base_dataset import BaseDataset
 import yaml
 import numpy as np
@@ -12,8 +12,8 @@ class SyntheticDataset(BaseDataset):
     
     BASE_PATH = 'data/synthetic_data'
     
-    def __init__(self, config: GlobalConfig):
-        self.data_path = f'{self.BASE_PATH}/{config.dataset.id}'
+    def __init__(self, config: DatasetConfig):
+        self.data_path = f'{self.BASE_PATH}/{config.id}'
         super().__init__(config=config)
 
     def load_data(self):

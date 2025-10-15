@@ -1,5 +1,5 @@
 
-from src.config.config import GlobalConfig
+from src.config.config import DatasetConfig, GlobalConfig
 from src.data.base_dataset import BaseDataset
 import yaml
 import numpy as np
@@ -14,9 +14,9 @@ class MSSVDataset(BaseDataset):
     BASE_PATH = 'data/ds006366_processed'
 
     def __init__(self, 
-                 config: GlobalConfig):
-        self.run = config.dataset.run if 'run' in config.dataset else 1
-        self.data_path = f'{self.BASE_PATH}/{config.dataset.id}/{self.run}'
+                 config: DatasetConfig):
+        self.run = config.run if config.run is not None else 1
+        self.data_path = f'{self.BASE_PATH}/{config.id}/{self.run}'
         super().__init__(config=config)
     
     def load_data(self):
@@ -63,4 +63,4 @@ class MSSVDataset(BaseDataset):
         return config
         
     def __str__(self):
-        return f"MSSV(id={self.config['name']})"
+        return f"MSSV(id={self.config['name']}, run={self.run})"

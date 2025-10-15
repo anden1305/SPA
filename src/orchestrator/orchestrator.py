@@ -8,6 +8,7 @@ import torch
 from src.config.config import GlobalConfig
 from src.data.base_dataset import BaseDataset
 from src.data.data_loader import DataLoader
+from src.data.data_loader_collection import DataLoaderCollection
 from src.data.mssv_dataset import MSSVDataset
 from src.data.synthetic_dataset import SyntheticDataset
 from src.models.base_model import BaseModel
@@ -25,7 +26,7 @@ class Orchestrator:
         self.config_path = config_path
         self.__set_config()
         self.__prepare()
-
+    
     ### public methods ###
     
     def run(self):
@@ -80,12 +81,21 @@ class Orchestrator:
         self.global_config = GlobalConfig.from_yaml(self.config_path)
     
     def __prepare_run(self):
-        self.dataset = self.__get_dataset()
-        self.data_loader = DataLoader(dataset=self.dataset, config=self.global_config, device=self.device)
+        self.train_datasets = self.get_train_datasets()
+        self.val_datasets = self.get_val_datasets()
+        self.train_loader = DataLoaderCollection(datasets=self.train_datasets, config=self.global_config, device=self.device)
+        self.val_loader = DataLoaderCollection(datasets=self.val_datasets, config=self.global_config, device=self.device)
         self.model = self.__get_model(self.device)
-        self.validator = Validator(data_loader=self.data_loader, model=self.model, config=self.global_config)
-        self.trainer = Trainer(data_loader=self.data_loader, model=self.model, config=self.global_config, validator=self.validator)
-        self.visualizer = Visualizer(data_loader=self.data_loader, config=self.global_config, validator=self.validator)
+        self.validator = Validator(data_loader=self.val_loader, model=self.model, config=self.global_config)
+        self.trainer = Trainer(data_loader=self.train_loader, model=self.model, config=self.global_config, validator=self.validator)
+        self.visualizer = Visualizer(data_loader=self.val_loader, config=self.global_config, validator=self.validator)
+
+        # self.dataset = self.__get_dataset()
+        # self.data_loader = DataLoader(dataset=self.dataset, config=self.global_config, device=self.device)
+        # self.model = self.__get_model(self.device)
+        # self.validator = Validator(data_loader=self.data_loader, model=self.model, config=self.global_config)
+        # self.trainer = Trainer(data_loader=self.data_loader, model=self.model, config=self.global_config, validator=self.validator)
+        # self.visualizer = Visualizer(data_loader=self.data_loader, config=self.global_config, validator=self.validator)
 
     def __prepare(self):
         time_str = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -114,13 +124,37 @@ class Orchestrator:
                 return MSSVDataset(config=self.global_config)
             case _:
                 raise ValueError(f"Unknown dataset type: {self.global_config.dataset.type}")
+    
+    def get_train_datasets(self):
+        datasets = []
+        for config in self.global_config.train_datasets:
+            match config.type:
+                case "synthetic":
+                    datasets.append(SyntheticDataset(config=config))
+                case "mssv":
+                    datasets.append(MSSVDataset(config=config))
+                case _:
+                    raise ValueError(f"Unknown dataset type: {config.type}")
+        return datasets
+    
+    def get_val_datasets(self):
+        datasets = []
+        for config in self.global_config.val_datasets:
+            match config.type:
+                case "synthetic":
+                    datasets.append(SyntheticDataset(config=config))
+                case "mssv":
+                    datasets.append(MSSVDataset(config=config))
+                case _:
+                    raise ValueError(f"Unknown dataset type: {config.type}")
+        return datasets
 
     def __get_model(self, device: torch.device):
         match self.global_config.model.type:
             case "hmm":
-                return HMM(data_loader=self.data_loader, config=self.global_config, device=device)
+                return HMM(data_loader=self.train_loader, config=self.global_config, device=device)
             case "marhmm":
-                return MARHMM(data_loader=self.data_loader, config=self.global_config, device=device)
+                return MARHMM(data_loader=self.train_loader, config=self.global_config, device=device)
             case _:
                 raise ValueError(f"Unknown model type: {self.global_config.model.type}")
     
@@ -129,8 +163,10 @@ class Orchestrator:
         print(f"🚀 Starting: {self.global_config.run_name}")
         print("=" * 60)
         print(f"🖥️  Device:      {self.device}")
-        print(f"📚 Dataset:     {self.dataset}")
-        print(f"🔄 DataLoader:  {self.data_loader}")
+        print(f"📚 Train Dataset:     {[str(ds) for ds in self.train_datasets]}")
+        print(f"📚 Val Dataset:       {[str(ds) for ds in self.val_datasets]}")
+        print(f"🔄 Train Dataloader:  {self.train_loader}")
+        print(f"🔄 Val Dataloader:    {self.val_loader}")
         print(f"🧠 Model:       {self.model}")
         print(f"🏋️ Trainer:      {self.trainer}")
         print("=" * 60)
@@ -149,7 +185,9 @@ class Orchestrator:
 
     def __str__(self):
         return (f"Orchestrator(config_path={self.config_path}, "
-                f"dataset={self.dataset}, "
-                f"data_loader={self.data_loader}, "
+                f"train_datasets={self.train_datasets}, "
+                f"train_dataloader={self.train_loader}, "
+                f"val_datasets={self.val_datasets}, "
+                f"val_dataloader={self.val_loader}, "
                 f"model={self.model}, "
                 f"trainer={self.trainer})")
