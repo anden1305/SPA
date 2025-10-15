@@ -13,10 +13,8 @@ class TrainerConfig(BaseModel):
     learning_rate: float = Field(..., gt=0)
     optimizer: str = Field(..., pattern="^(adam|sgd|rmsprop)$")
     grad_clip: float | None = Field(..., ge=0, description="Gradient clipping value. If None, no clipping is applied.")
-    validate_per_epoch: int = Field(..., ge=0, le=50, description=("Frequency (in epochs) to run full validation & supervised metrics. "
-            "Set to 0 to skip metric validation entirely; unsupervised early stopping "
-            "(parameter-drift) still runs each epoch if early stopping is enabled. "
-            "Maximum value is 50."))
+    validate_per_epoch: int = Field(..., ge=0, le=50, description=("Frequency (in epochs) to run validation & supervised metrics." 
+        "Set to None to disable per-epoch validation. Maximum value is 50."))
     early_stopping: EarlyStoppingConfig | None = Field(default_factory=EarlyStoppingConfig, description="Early stopping settings. Set enabled=False to disable.")
 
 class ValidatorConfig(BaseModel):
@@ -53,6 +51,7 @@ class ModelConfig(BaseModel):
     init_strategy: str = Field(..., pattern="^(random_uniform|random_dirichlet|random_separated|kmeans|kmeans_pca)$", description="Initialization strategy for the model.")
     init_noisy: bool = Field(...)
     params: dict[str, Any] = Field(..., description="Model-specific parameters.")
+    #TODO self.covariance_type = "diag" or "full"
 
 class GlobalConfig(BaseModel):
     trainer: TrainerConfig = Field(default_factory=TrainerConfig)

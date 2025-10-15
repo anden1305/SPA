@@ -21,7 +21,7 @@ class ValidationController:
     def step(self, epoch: int, model: torch.nn.Module, optimizer: torch.optim.Optimizer) -> bool:
         """Run scheduled validation + early stopping.
 
-        Behaviour when validate_per_epoch == 0:
+        Behaviour when validate_per_epoch = None:
         --------------------------------------
         We still allow early stopping to function in *unsupervised* mode by invoking the
         early stopper every epoch with an empty validation dict. This triggers the
@@ -54,9 +54,9 @@ class ValidationController:
                 should_stop = self.early_stopper(validations, model, epoch, optimizer=optimizer)
             else:
                 # Fallback path: validation disabled -> unsupervised stopping each epoch
-                if self.config_trainer.validate_per_epoch == 0:
+                if self.config_trainer.validate_per_epoch is None:
                     if epoch == 0 and self.verbose:
-                        print("[early-stopping] Per-epoch validation disabled (validate_per_epoch=0); running unsupervised early stopping every epoch.")
+                        print("[early-stopping] Per-epoch validation disabled (validate_per_epoch=None); running unsupervised early stopping every epoch.")
                     should_stop = self.early_stopper({}, model, epoch, optimizer=optimizer)
 
             if should_stop and self.verbose:
