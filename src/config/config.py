@@ -50,6 +50,7 @@ class VisualizerConfig(BaseModel):
 
 class TransformsConfig(BaseModel):
     type: str = Field(..., description="Type of transform, e.g., 'fft'.")
+    channel: str = Field(..., description="Channel group the transform applies to, e.g., 'EEG'.")
     params: dict[str, Any] = Field(...)
 
 class DataLoaderConfig(BaseModel):
