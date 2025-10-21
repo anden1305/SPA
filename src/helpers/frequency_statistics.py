@@ -3,10 +3,11 @@
 from typing import Any
 import torch
 from src.data.data_loader import DataLoader
+from src.data.data_loader_collection import DataLoaderCollection
 from src.preprocessing.fft import FFT
 
 
-def compute_frequency_statistics(x: torch.Tensor, y: torch.Tensor, data_loader: DataLoader) -> dict[str, Any]:
+def compute_frequency_statistics(x: torch.Tensor, y: torch.Tensor, data_loader: DataLoaderCollection) -> dict[str, Any]:
     """Compute average power per frequency for each state in `y`.
 
     Supports `x` shapes:
@@ -23,7 +24,7 @@ def compute_frequency_statistics(x: torch.Tensor, y: torch.Tensor, data_loader: 
     empty dict.
     """
 
-    transforms = data_loader.transforms
+    transforms = data_loader.get_transforms()
     has_fft = any(isinstance(t, FFT) for t in transforms)
     if not has_fft:
         # Perform an rFFT-based conversion from time-domain to frequency-domain.

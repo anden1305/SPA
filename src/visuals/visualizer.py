@@ -8,6 +8,7 @@ import torch
 import plotly.graph_objects as go
 from src.config.config import GlobalConfig
 from src.data.data_loader import DataLoader
+from src.data.data_loader_collection import DataLoaderCollection
 from src.helpers.align_labels import align_labels_hungarian
 from src.orchestrator.train_details import TrainDetails
 from src.validation.validator import Validator
@@ -16,7 +17,7 @@ from itertools import combinations
 
 class Visualizer:
     def __init__(self,
-                 data_loader: DataLoader,
+                 data_loader: DataLoaderCollection,
                  config: GlobalConfig,
                  validator: Validator):
         self.data_loader = data_loader
@@ -51,6 +52,8 @@ class Visualizer:
             self.__plot_metrics_over_epochs(train_details=train_details)
         if self.config.historic_values:
             self.__plot_historic_values(train_details)
+        if self.config.learning_rate:
+            self.__plot_learning_rate(train_details)
     
     def visualize_runs(self, train_details: list[TrainDetails], validations: dict[str, Any]):
         path = Path(self.global_config.results_dir) / self.global_config.run_name / "plots"
@@ -131,7 +134,7 @@ class Visualizer:
             label = s
             try:
                 if s.isdigit():
-                    names = self.data_loader.dataset.get_state_names() or []
+                    names = self.data_loader.get_state_names() or []
                     if len(names) > int(s):
                         label = names[int(s)]
             except Exception:
@@ -156,7 +159,7 @@ class Visualizer:
         fig2, ax2 = plt.subplots(figsize=(12, max(2, len(states) * 0.5)))
         sns.heatmap(mat, ax=ax2, cmap='viridis', cbar_kws={'label': 'Average power'}, xticklabels=10)
         # yticklabels: use state names when available
-        state_names = self.data_loader.dataset.get_state_names() or []
+        state_names = self.data_loader.get_state_names() or []
         ylabels = []
         for s in states:
             if s.isdigit() and len(state_names) > int(s):
@@ -182,7 +185,7 @@ class Visualizer:
         target_counts = dv.get("target_counts", None) # dict[int, float]
         target_means = dv.get("target_means", None) # dict[int, float]
         target_stds = dv.get("target_stds", None) # dict[int, float]
-        state_names = self.data_loader.dataset.get_state_names()
+        state_names = self.data_loader.get_state_names()
 
         counts = np.array([float(target_counts.get(c, 0.0)) if target_counts is not None else 0.0 for c in (target_classes or [])])
         means = np.array([float(target_means.get(c, np.nan)) if target_means is not None else np.nan for c in (target_classes or [])])
@@ -303,7 +306,7 @@ class Visualizer:
         # load from validator
         dv = self.validator.get_data_validations()
         # human-readable state names (may be None)
-        state_names = self.data_loader.dataset.get_state_names()
+        state_names = self.data_loader.get_state_names()
 
         ed_mat = np.asarray(dv.get("pairwise_energy", []), dtype=float)
         if ed_mat.size == 0:
@@ -410,7 +413,7 @@ class Visualizer:
         pred_cm = confusion_matrix(y, trained_arr, normalize='true')
 
         # Determine human-readable labels if available
-        state_names = self.data_loader.dataset.get_state_names()
+        state_names = self.data_loader.get_state_names()
         labels = None
         # Try to infer labels length from confusion matrix shape
         cm_size = init_cm.shape[0]
@@ -446,7 +449,7 @@ class Visualizer:
             return  # No predictions available
         
         y_true = y.flatten() if y.ndim > 1 else y
-        labels = self.data_loader.dataset.get_state_names()
+        labels = self.data_loader.get_state_names()
         if labels is None or len(labels) != len(np.unique(y_true)):
             labels = [str(i) for i in range(len(np.unique(y_true)))]
         
@@ -904,7 +907,7 @@ class Visualizer:
         arrays = [init_arr, trained_arr, y]
 
         # human-readable state names (if available)
-        state_names = self.data_loader.dataset.get_state_names()
+        state_names = self.data_loader.get_state_names()
 
         saved: list[str] = []
         for a, b in combinations(range(proj.shape[1]), 2):
@@ -936,7 +939,25 @@ class Visualizer:
             plt.close(fig)
             saved.append(out_path.as_posix())   
         return saved
-            
+    
+    def __plot_learning_rate(self, train_details: TrainDetails):
+        """Visualize the learning rate over epochs."""
+        vd = train_details.get_validations()
+        lr_history = []
+        for epoch in sorted(vd.keys()):
+            lr = vd[epoch].get('learning_rate', None)
+            if lr is not None:
+                lr_history.append(lr)
+        fig, ax = plt.subplots(figsize=(7, 4))
+        ax.plot(lr_history, label='Learning Rate', color='tab:blue')
+        ax.set_title('Learning Rate Over Epochs')
+        ax.set_xlabel('Epoch')
+        ax.set_ylabel('Learning Rate')
+        ax.legend()
+        out_path = train_details.get_path() / "plots" / "learning_rate.png"
+        fig.savefig(out_path.as_posix(), dpi=160)
+        plt.close(fig)
+
     def __plot_historic_values(self, train_details: TrainDetails):
         """Enhanced parameter-history visualization with specialized diagnostics.
 

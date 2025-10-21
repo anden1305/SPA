@@ -3,6 +3,12 @@ from pathlib import Path
 from typing import Any
 import yaml
 
+class SchedulerConfig(BaseModel):
+    enabled: bool = Field(..., description="Whether to use a learning rate scheduler.")
+    type: str = Field(..., pattern="^(step|exponential)$", description="Type of scheduler, e.g., 'step'.")
+    step_size: int | None = Field(..., description="Step size for 'step' scheduler.")
+    gamma: float = Field(..., gt=0, lt=1, description="Decay factor for the scheduler.")
+
 class EarlyStoppingConfig(BaseModel):
     enabled: bool = Field(True, description="Enable adaptive early stopping.")
     patience: int = Field(..., ge=1, le=100, description="Epochs without relative improvement before action.")
@@ -11,20 +17,22 @@ class EarlyStoppingConfig(BaseModel):
 class TrainerConfig(BaseModel):
     epochs: int = Field(..., ge=1)
     learning_rate: float = Field(..., gt=0)
-    optimizer: str = Field(..., pattern="^(adam|sgd|rmsprop)$")
+    optimizer: str = Field(..., pattern="^(adam|sgd|rmsprop|adamw)$")
     grad_clip: float | None = Field(..., ge=0, description="Gradient clipping value. If None, no clipping is applied.")
-    validate_per_epoch: int = Field(..., ge=0, le=50, description=("Frequency (in epochs) to run validation & supervised metrics." 
-        "Set to None to disable per-epoch validation. Maximum value is 50."))
+    validate_per_epoch: int = Field(..., ge=0, le=50, description="Frequency of validation during training in epochs. Set to 0 to disable per-epoch validation. Maximum value is 50.")
     early_stopping: EarlyStoppingConfig | None = Field(default_factory=EarlyStoppingConfig, description="Early stopping settings. Set enabled=False to disable.")
+    scheduler: SchedulerConfig = Field(default_factory=SchedulerConfig)
 
 class ValidatorConfig(BaseModel):
     nmi: bool = Field(..., description="Whether to compute NMI.")
     accuracy: bool = Field(..., description="Whether to compute accuracy.")
     cross_nmi: bool = Field(..., description="Whether to compute cross NMI.")
+    learning_rate: bool = Field(..., description="Whether to compute learning rate.")
     state_distinctness: bool = Field(..., description="Whether to compute state distinctness.")
     summary_statistics: bool = Field(..., description="Whether to compute summary statistics.")
 class VisualizerConfig(BaseModel):
     losses: bool = Field(..., description="Whether to visualize losses.")
+    learning_rate: bool = Field(..., description="Whether to visualize learning rate.")
     pca_tripanel: bool = Field(..., description="Whether to visualize PCA tripanel.")
     confusion_matrix: bool = Field(..., description="Whether to visualize confusion matrix.")
     state_distinctness: bool = Field(..., description="Whether to visualize state distinctness.")
@@ -58,7 +66,8 @@ class GlobalConfig(BaseModel):
     validator: ValidatorConfig = Field(default_factory=ValidatorConfig)
     visualizer: VisualizerConfig = Field(default_factory=VisualizerConfig)
     dataloader: DataLoaderConfig = Field(default_factory=DataLoaderConfig)
-    dataset: DatasetConfig = Field(default_factory=DatasetConfig)
+    train_datasets: list[DatasetConfig] = Field(default_factory=list)
+    val_datasets: list[DatasetConfig] = Field(default_factory=list)
     model: ModelConfig = Field(default_factory=ModelConfig)
     verbose: bool = Field(..., description="Whether to print detailed logs.")
     seed: int = Field(..., ge=0, description="Random seed for reproducibility.")

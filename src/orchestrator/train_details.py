@@ -26,6 +26,9 @@ class TrainDetails:
             json.dump({k: [np.asarray(v).tolist() for v in vals] if isinstance(vals, list) else []
                            for k, vals in self.historic_values.items()}, f)
 
+    def get_validations(self):
+        return self.validations
+
     def get_path(self):
         return Path(f"{self.save_path}/{self.run_number}")
     

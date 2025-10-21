@@ -4,6 +4,7 @@ import numpy as np
 from typing import Any
 from src.config.config import GlobalConfig
 from src.data.data_loader import DataLoader
+from src.data.data_loader_collection import DataLoaderCollection
 from src.helpers.accuracy import accuracy
 from src.helpers.align_labels import align_labels_hungarian
 from src.helpers.frequency_statistics import compute_frequency_statistics
@@ -16,7 +17,7 @@ from src.helpers.state_distinctness import compute_state_distinctness
 
 class Validator:
     def __init__(self,
-                 data_loader: DataLoader,
+                 data_loader: DataLoaderCollection,
                  model: BaseModel,
                  config: GlobalConfig):
         self.data_loader = data_loader
@@ -55,7 +56,7 @@ class Validator:
             self.predictions[epoch] = preds.tolist()
         self.__print_validation(epoch)
     
-    def validate_epoch(self, epoch: int):
+    def validate_epoch(self, epoch: int, optimizer: torch.optim.Optimizer):
         """Validate model at a specific epoch during training."""          
         self.validations[epoch] = {}
         self.model.prepare_for_inference()
@@ -75,6 +76,8 @@ class Validator:
                 except Exception as e:
                     print(f"Error occurred while calculating accuracy at epoch {epoch}: {e}")
                     self.validations[epoch]["accuracy"] = None
+            if self.config.learning_rate:
+                self.validations[epoch]["learning_rate"] = optimizer.param_groups[0]['lr']
             self.predictions[epoch] = preds.tolist()
             
         # Save historic values for this epoch
@@ -113,7 +116,7 @@ class Validator:
             distinctness = compute_state_distinctness(x, y)
             self.data_validations.update(distinctness)
         if self.config.summary_statistics:
-            self.data_validations.update(compute_summary_statistics(x, y, self.data_loader.dataset))
+            self.data_validations.update(compute_summary_statistics(x, y, self.data_loader))
             self.data_validations.update(compute_frequency_statistics(x, y, self.data_loader))
         with open(out_path, "w") as f:
             json.dump(self.data_validations, f, indent=2)

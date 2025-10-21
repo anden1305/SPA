@@ -22,9 +22,9 @@ import json
 
 
 SYN_SLEEP_STAGE_COLORS = {
-    'AWAKE': '#FF6B6B',
-    'NREM': '#4ECDC4',
-    'REM': '#45B7D1',
+    'AWAKE': '#79C780',
+    'NREM': '#6C9BD9',
+    'REM': '#D1779A',
 }
 
 BASE_RESULTS = Path("results") / "synthetic_exploration"

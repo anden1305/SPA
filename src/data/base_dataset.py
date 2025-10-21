@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 import yaml
 
-from src.config.config import GlobalConfig
+from src.config.config import DatasetConfig, GlobalConfig
 
 class BaseDataset(ABC):
     """Documentation
@@ -12,9 +12,8 @@ class BaseDataset(ABC):
     """
     
     def __init__(self,
-                 config: GlobalConfig):
-        self.global_config = config
-        self.config = self.global_config.dataset
+                 config: DatasetConfig):
+        self.config = config
         self.id = self.config.id
         self.config = self.load_config()
         self.data = self.load_data()
@@ -45,7 +44,7 @@ class BaseDataset(ABC):
         assert hasattr(self, 'labels'), "Labels not found in dataset."
         assert self.labels.ndim == 1, "Labels must be a 1D array."
         assert self.labels.shape[0] == self.config['n_timesteps'], f"Labels length {self.labels.shape[0]} does not match number of timesteps {self.config['n_timesteps']}."
-        assert len(np.unique(self.labels)) == self.config['n_stages'], f"Number of unique ({np.unique(self.labels)}) labels does not match number of stages ({self.config['n_stages']})."
+        assert len(np.unique(self.labels)) == self.config['n_stages'], f"Number of unique ({np.unique(self.labels)}) labels does not match number of stages ({self.config['n_stages']}) for {self}"
     
     def get_config(self):
         return self.config

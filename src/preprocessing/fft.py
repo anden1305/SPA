@@ -58,10 +58,9 @@ class FFT(BaseTransform):
             power = mag ** 2
             return np.log(power + self.eps).astype(np.float32)
         if feat == 'band_power':
-            # compute band power for standard EEG bands per channel
             if self.sampling_rate is None:
                 raise ValueError("sampling_rate must be set in transform params for band_power feature.")
-            power = mag ** 2  # shape (..., F)
+            power = mag ** 2
             freqs = np.fft.rfftfreq(self.window_size, d=1.0 / self.sampling_rate)
             band_powers = []
             for i, (low, high) in enumerate(self.bands):
