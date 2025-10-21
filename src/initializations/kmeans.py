@@ -77,11 +77,18 @@ def set_diag_covariance_from_assignments(model: BaseModel, X: torch.Tensor, assi
     counts = torch.bincount(assign, minlength=model.num_states).clamp_min(1)
     model.emission_logvar.copy_((var / counts.view(-1, 1)).clamp_min(1e-6).log())
 
-def set_full_covariance_from_assignments(model: BaseModel, X: torch.Tensor, assign: torch.Tensor, S: int, D: int) -> None:
-    """Helper method to set full covariance parameters from cluster assignments."""
+def set_full_covariance_from_assignments(model: BaseModel, X: torch.Tensor, assign: torch.Tensor) -> None:
+    """Set Cholesky-parameterized full covariances using softplus mapping.
+
+    Writes lower-triangular raw parameters such that on reconstruction we use:
+        L = tril(raw); diag(L) = softplus(diag(raw)) + jitter
+    ensuring positive diagonals and positive-definite covariance Σ = L L^T.
+    """
+    S = model.num_states
+    D = model.num_features
     raw = torch.zeros_like(model.emission_cholesky_raw)
     I = torch.eye(D, device=model.device, dtype=X.dtype)
-    
+
     for k in range(S):
         Xk = X[assign == k]
         if Xk.size(0) <= 1:
@@ -97,7 +104,9 @@ def set_full_covariance_from_assignments(model: BaseModel, X: torch.Tensor, assi
             Lk = torch.linalg.cholesky(Ck + 1e-4 * I)
         
         raw[k] = torch.tril(Lk)
-        diag_raw = torch.log(torch.expm1((torch.diagonal(Lk) - model.jitter).clamp_min(1e-8)))
+        # Inverse softplus
+        target = (torch.diagonal(Lk) - model.jitter).clamp_min(1e-8)
+        diag_raw = torch.log(torch.expm1(target))
         raw[k].diagonal().copy_(diag_raw)
     
     model.emission_cholesky_raw.copy_(raw)

@@ -13,6 +13,12 @@ class EarlyStoppingConfig(BaseModel):
     enabled: bool = Field(True, description="Enable adaptive early stopping.")
     patience: int = Field(..., ge=1, le=100, description="Epochs without relative improvement before action.")
     min_delta: float = Field(..., ge=0, le=0.5, description="Minimum relative improvement fraction required (e.g. 0.01 = 1%). Always relative.")
+    # Hardcoded in src/training/early_stopping.py:
+    #   - _MIN_LR = 1e-5 (minimum learning rate floor)
+    #   - _LR_FACTOR = 0.5 (learning rate reduction factor)
+    #   - _EMA_ALPHA = 0.3 (exponential moving average decay)
+    #   - _WARMUP_VALIDATIONS = 5 (number of warmup validations)
+    #   - 1.01 multiplier for LR comparison threshold
 
 class TrainerConfig(BaseModel):
     epochs: int = Field(..., ge=1)
@@ -30,6 +36,8 @@ class ValidatorConfig(BaseModel):
     learning_rate: bool = Field(..., description="Whether to compute learning rate.")
     state_distinctness: bool = Field(..., description="Whether to compute state distinctness.")
     summary_statistics: bool = Field(..., description="Whether to compute summary statistics.")
+    # No hardcoded constants - all validation metrics are configurable toggles
+
 class VisualizerConfig(BaseModel):
     losses: bool = Field(..., description="Whether to visualize losses.")
     learning_rate: bool = Field(..., description="Whether to visualize learning rate.")
@@ -38,6 +46,7 @@ class VisualizerConfig(BaseModel):
     state_distinctness: bool = Field(..., description="Whether to visualize state distinctness.")
     summary_statistics: bool = Field(..., description="Whether to visualize summary statistics.")
     historic_values: bool = Field(..., description="Whether to visualize historic model values (parameters & confusion matrices).")
+    # Hardcoded in src/visuals/visualizer.py (aesthetic constants)
 
 class TransformsConfig(BaseModel):
     type: str = Field(..., description="Type of transform, e.g., 'fft'.")
@@ -48,18 +57,62 @@ class DataLoaderConfig(BaseModel):
     transforms: list[TransformsConfig] = Field(default_factory=list)
     shuffle: bool = Field(..., description="Whether to shuffle data each epoch.")
     normalize: bool = Field(..., description="Whether to normalize data using mean and std.")
+    # No hardcoded constants - all data loading behavior is configurable
 
 class DatasetConfig(BaseModel):
     type: str = Field(..., pattern="^(synthetic|mssv)$")
     id: str = Field(..., description="Dataset identifier or path.")
     run: int | None = Field(default=None, ge=1)
+    # No hardcoded constants - dataset selection is fully configurable
 
 class ModelConfig(BaseModel):
     type: str = Field(..., pattern="^(hmm|marhmm)$", description="Type of model, e.g., 'hmm'.")
+    covariance_type: str = Field(default="diag", pattern="^(diag|full|meanonly)$", description="Covariance structure: 'diag' (diagonal), 'full' (Cholesky-factorized with softplus), or 'meanonly' (identity, HMM only).")
     init_strategy: str = Field(..., pattern="^(random_uniform|random_dirichlet|random_separated|kmeans|kmeans_pca)$", description="Initialization strategy for the model.")
-    init_noisy: bool = Field(...)
+    init_noisy: bool = Field(...)  # Adds Gaussian noise to initialization; noise levels hardcoded below
     params: dict[str, Any] = Field(..., description="Model-specific parameters.")
-    #TODO self.covariance_type = "diag" or "full"
+    # MAR-HMM params (via params dict - these ARE configurable):
+    #   - ridge: L2 penalty on regression coefficients (default 0.0)
+    #   - var_reg: variance stabilization penalty (default 0.0)
+    #   - sticky_coef: sticky transition prior weight (default 0.0)
+    #   - sticky_kappa: self-transition probability in prior (default 0.9)
+    #   - max_lag: autoregressive order (required for marhmm)
+    #
+    # Hardcoded in src/models/hmm.py & marhmm.py:
+    #   - self.jitter = 1e-5 (numerical stability for covariance matrices)
+    #   - Gaussian log-likelihood constants: -0.5 factor, log(2π)
+    #
+    # Hardcoded in src/models/hmm.py (commented out regularization):
+    #   - max_var_threshold = 10.0
+    #   - min_variance_threshold = 1
+    #
+    # Hardcoded in src/models/marhmm.py (regularization):
+    #   - min_var = 1e-3 (variance floor for diag covariance)
+    #   - min_diag = 1e-3 (diagonal floor for full covariance)
+    #   - 1e-3 penalty weight for variance constraints
+    #   - 1e-4 variance threshold for penalty
+    #   - 0.0 zero-likelihood for early timesteps (lp[:, :max_lag, :] = 0.0)
+    #
+    # Hardcoded in src/initializations/kmeans.py:
+    #   - 1e-6 minimum variance clamp
+    #   - 1e-4 Cholesky stabilization jitter
+    #   - 1e-8 minimum diagonal clamp
+    #   - 1e-3 smoothing for pi_counts and trans_counts
+    #   - 1.0/S uniform initialization fallback
+    #   - alpha=1.0 for Dirichlet initialization
+    #
+    # Hardcoded in src/models/hmm.py add_noise() method (when init_noisy=True):
+    #   - mean_std: 0.05
+    #   - cov_noise_std: 0.05
+    #   - init_logits_std: 0.05
+    #   - self_transition_bias: 0.05
+    #   - spread: 0.05
+    #   - jitter_std: 0.05
+    #
+    # Hardcoded in src/models/marhmm.py __initialize_weights():
+    #   - coeff_std: 0.03
+    #   - jitter_std: 0.05
+    #   - var_init: 1.0
 
 class GlobalConfig(BaseModel):
     trainer: TrainerConfig = Field(default_factory=TrainerConfig)
@@ -75,6 +128,7 @@ class GlobalConfig(BaseModel):
     run_name: str = Field(..., description="Name of the current run.")
     runs: int = Field(..., ge=1, description="Number of runs to execute.")
     validate_data: bool = Field(..., description="Whether to perform data validation before training.")
+    # No hardcoded constants at global level - all experiment settings are configurable
 
     @classmethod
     def from_yaml(cls, file_path: str) -> "GlobalConfig":

@@ -687,11 +687,11 @@ class Visualizer:
         fig.write_html(str(html_path))
         
         if self.global_config.verbose:
-            print(f"📊 Interactive confusion matrix saved: {html_path}")
-            print(f"   📽️  Use Play/Pause controls and speed buttons (0.5x to 4x)")
-            print(f"   🎚️  Drag slider to navigate epochs manually")
-            print(f"   ⚡ Animation speed: {fps:.1f} FPS ({frame_duration}ms per frame)")
-            print(f"   📈 Evolution across {len(epochs)} epochs of training")
+            print(f"Interactive confusion matrix saved: {html_path}")
+            print(f"   Use Play/Pause controls and speed buttons (0.5x to 4x)")
+            print(f"   Drag slider to navigate epochs manually")
+            print(f"   Animation speed: {fps:.1f} FPS ({frame_duration}ms per frame)")
+            print(f"   Evolution across {len(epochs)} epochs of training")
 
     def __plot_metrics_over_epochs(self, train_details: TrainDetails):
         """Create a beautiful line plot showing NMI and Accuracy over training epochs using seaborn styling."""
@@ -861,15 +861,14 @@ class Visualizer:
         sns.reset_defaults()
         
         if self.global_config.verbose:
-            print(f"📈 Enhanced metrics plot saved: {png_path}")
-            print(f"   📊 Shows NMI, Accuracy and Loss evolution (epochs: {len(all_epoch_display)})")
+            print(f"    Enhanced metrics plot saved: {png_path}")
+            print(f"    Shows NMI, Accuracy and Loss evolution (epochs: {len(all_epoch_display)})")
             if any(v is not None for v in nmi_values):
-                print(f"   ⭐ Max NMI at epoch {max_nmi_epoch}: {max_nmi:.4f}")
+                print(f"    Max NMI at epoch {max_nmi_epoch}: {max_nmi:.4f}")
             if any(v is not None for v in acc_values):
-                print(f"   ⭐ Max Accuracy at epoch {max_acc_epoch}: {max_acc:.4f}")
+                print(f"    Max Accuracy at epoch {max_acc_epoch}: {max_acc:.4f}")
             if loss_values:
-                print(f"   🔻 Min Loss at epoch {min_loss_epoch}: {min_loss:.6g}")
-            print(f"   🎨 Styled with seaborn for publication-quality appearance")
+                print(f"    Min Loss at epoch {min_loss_epoch}: {min_loss:.6g}")
 
     def __plot_pca_tripanel(self, train_details: TrainDetails, x: Tensor, y: Tensor):
         """Save tri-panel PCA plots comparing HMM-init, HMM-trained, and True labels."""

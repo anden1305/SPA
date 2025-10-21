@@ -36,6 +36,9 @@ class MARHMM(BaseModel):
 			torch.cuda.manual_seed_all(int(self.seed))
 		# Dimensions
 		self.obs_dim = self.num_features
+		# Covariance type
+		self.covariance_type = self.global_config.model.covariance_type
+		self.jitter = float(1e-5)
 		# Config
 		params = self.global_config.model.params
 		lags = params.get("lags", [1, 2, 4, 8])
@@ -54,7 +57,15 @@ class MARHMM(BaseModel):
 		self.coeffs = nn.Parameter(torch.zeros(self.num_states, self.obs_dim, self.obs_dim * len(lags), dtype=default_dtype))
 		# State-specific intercept for each observed dimension
 		self.bias = nn.Parameter(torch.zeros(self.num_states, self.obs_dim, dtype=default_dtype))
-		self.log_var = nn.Parameter(torch.zeros(self.num_states, self.obs_dim, dtype=default_dtype))
+		# Covariance parameters
+		if self.covariance_type == "diag":
+			self.log_var = nn.Parameter(torch.zeros(self.num_states, self.obs_dim, dtype=default_dtype))
+		elif self.covariance_type == "full":
+			# Unconstrained lower-triangular raw parameters for Cholesky factors L (S,D,D)
+			# Diagonals passed through softplus for positive constraint
+			self.emission_cholesky_raw = nn.Parameter(torch.zeros(self.num_states, self.obs_dim, self.obs_dim, dtype=default_dtype))
+		else:
+			raise ValueError(f"Unsupported covariance_type for MARHMM: {self.covariance_type}. MARHMM supports 'diag' or 'full'.")
 		self.initial_logits = nn.Parameter(torch.zeros(self.num_states, dtype=default_dtype))
 		self.transition_logits = nn.Parameter(torch.zeros(self.num_states, self.num_states, dtype=default_dtype))
 		self.register_buffer("_log_2pi", torch.tensor(math.log(2 * math.pi), dtype=default_dtype))
@@ -104,18 +115,39 @@ class MARHMM(BaseModel):
 		pred = pred + self.bias.view(1, 1, S, D)
 		resid = x.unsqueeze(2) - pred
 		
-		# Emission probabilities with better numerical stability
-		log_var = self.log_var.view(1, 1, S, D).to(dtype=x.dtype)
-		# Clamp log_var to prevent extreme values
-		log_var = torch.clamp(log_var, min=-10, max=10)
-		
-		# Use more stable computation
-		log_2pi = self._log_2pi.to(dtype=x.dtype)
-		lp = -0.5 * (resid.pow(2) * torch.exp(-log_var) + log_var + log_2pi)
-		lp = lp.sum(dim=-1)
-		
-		# More conservative clamping to prevent numerical issues
-		lp = torch.clamp(lp, min=-100, max=10)
+		# Compute log probabilities based on covariance type
+		if self.covariance_type == "diag":
+			# Diagonal covariance case
+			log_var = self.log_var.view(1, 1, S, D).to(dtype=x.dtype)
+			# Clamp log_var to prevent extreme values
+			log_var = torch.clamp(log_var, min=-10, max=10)
+			
+			# Use more stable computation
+			log_2pi = self._log_2pi.to(dtype=x.dtype)
+			lp = -0.5 * (resid.pow(2) * torch.exp(-log_var) + log_var + log_2pi)
+			lp = lp.sum(dim=-1)
+			
+			# More conservative clamping to prevent numerical issues
+			lp = torch.clamp(lp, min=-100, max=10)
+		else:  # full covariance
+			# Full covariance with Cholesky factorization
+			L_chol = self.__full_cov_cholesky()  # (S,D,D)
+			# Precompute log det Σ_s = 2 * sum(log(diag(L_s)))
+			log_det = 2 * torch.log(torch.diagonal(L_chol, dim1=1, dim2=2)).sum(-1)  # (S,)
+			log_2pi = self._log_2pi.to(dtype=x.dtype)
+			
+			# Loop over states for clarity
+			log_probs = []
+			for s in range(S):
+				Ls = L_chol[s]  # (D,D)
+				# Flatten (B*T,D) for solve
+				resid_flat = resid[:, :, s, :].reshape(B * T, D).T  # (D, B*T)
+				# Solve L y = resid^T -> y
+				y = torch.linalg.solve_triangular(Ls, resid_flat, upper=False)  # (D, B*T)
+				m_dist2 = (y.pow(2).sum(0)).reshape(B, T)  # (B,T)
+				lp_s = -0.5 * (m_dist2 + log_det[s] + D * log_2pi)  # (B,T)
+				log_probs.append(lp_s.unsqueeze(-1))  # (B,T,1)
+			lp = torch.cat(log_probs, dim=-1)  # (B,T,S)
 		
 		if self.max_lag > 0:
 			lp[:, : self.max_lag, :] = 0.0
@@ -142,6 +174,19 @@ class MARHMM(BaseModel):
 			alpha = log_emiss[:, t, :] + torch.logsumexp(prev, dim=1)
 		return torch.logsumexp(alpha, dim=1)  # (B,)
 
+	def __full_cov_cholesky(self) -> Tensor:
+		"""Return lower-triangular Cholesky factors L (S,D,D) with positive diag."""
+		raw = self.emission_cholesky_raw
+		# Mask upper triangle
+		tril_mask = torch.tril(torch.ones_like(raw)).bool()
+		L = torch.zeros_like(raw)
+		L[tril_mask] = raw[tril_mask]
+		# Stabilise diagonals: softplus + jitter
+		diag_idx = torch.arange(self.obs_dim, device=L.device)
+		diag = L[:, diag_idx, diag_idx]
+		L[:, diag_idx, diag_idx] = torch.nn.functional.softplus(diag) + self.jitter
+		return L
+
 	def regularization_loss(self) -> Tensor:
 		"""Composite regularization: ridge on coeffs + variance stabilisation.
 
@@ -155,16 +200,31 @@ class MARHMM(BaseModel):
 		# Variance regularization to avoid collapse to extremely small or huge variances
 		var_reg = float(getattr(self, "var_reg", 0.0))
 		if var_reg > 0:
-			var = torch.exp(self.log_var)  # (S,D)
-			min_var = 1e-3
-			max_var = 1e3
-			small_pen = torch.clamp(min_var - var, min=0).div(min_var).pow(2)
-			large_pen = torch.clamp(var - max_var, min=0).div(max_var).pow(2)
-			reg = reg + var_reg * (small_pen.sum() + large_pen.sum())
+			if self.covariance_type == "diag":
+				var = torch.exp(self.log_var)  # (S,D)
+				min_var = 1e-3
+				max_var = 1e3
+				small_pen = torch.clamp(min_var - var, min=0).div(min_var).pow(2)
+				large_pen = torch.clamp(var - max_var, min=0).div(max_var).pow(2)
+				reg = reg + var_reg * (small_pen.sum() + large_pen.sum())
+			elif self.covariance_type == "full":
+				# Regularize Cholesky diagonal entries
+				L = self.__full_cov_cholesky()
+				diag = torch.diagonal(L, dim1=1, dim2=2)
+				min_diag = 1e-3
+				max_diag = 1e3
+				small_pen = torch.clamp(min_diag - diag, min=0).div(min_diag).pow(2)
+				large_pen = torch.clamp(diag - max_diag, min=0).div(max_diag).pow(2)
+				reg = reg + var_reg * (small_pen.sum() + large_pen.sum())
 		else:
 			# Light penalty against too-small variances by default
-			var = torch.exp(self.log_var)
-			reg = reg + 1e-3 * torch.clamp(1e-4 - var, min=0).pow(2).sum()
+			if self.covariance_type == "diag":
+				var = torch.exp(self.log_var)
+				reg = reg + 1e-3 * torch.clamp(1e-4 - var, min=0).pow(2).sum()
+			elif self.covariance_type == "full":
+				L = self.__full_cov_cholesky()
+				diag = torch.diagonal(L, dim1=1, dim2=2)
+				reg = reg + 1e-3 * torch.clamp(1e-4 - diag, min=0).pow(2).sum()
 		# Sticky transitions: encourage self-transitions via KL(A || A_prior)
 		sticky_coef = float(getattr(self, "sticky_coef", 0.0))
 		if sticky_coef > 0:

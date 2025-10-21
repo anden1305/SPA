@@ -40,7 +40,7 @@ class HMM(BaseModel):
         if torch.cuda.is_available():
             torch.cuda.manual_seed_all(int(self.seed))
             
-        self.covariance_type = "diag"
+        self.covariance_type = self.global_config.model.covariance_type
         self.jitter = float(1e-5)
 
         # Parameterization (logits for simplex params; mean/logvar for Gaussians)
