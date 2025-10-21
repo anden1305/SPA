@@ -1,21 +1,28 @@
 trainer:
-  epochs: 2000
+  epochs: 750
   learning_rate: 0.01
   optimizer: adam
   grad_clip: 5.0
   validate_per_epoch: 10
   early_stopping:
     enabled: true    # Auto-detects supervised vs unsupervised
-    patience: 100
+    patience: 25
     min_delta: 0.001
+  scheduler:
+    enabled: false
+    type: step
+    step_size: 100
+    gamma: 0.999
 validator:
   nmi: True
   accuracy: True
   cross_nmi: True
+  learning_rate: True
   state_distinctness: True
   summary_statistics: True
 visualizer:
   losses: True
+  learning_rate: True
   pca_tripanel: True
   confusion_matrix: True
   state_distinctness: True
@@ -35,11 +42,15 @@ dataloader:
         "bands": [[0.5,4],[4,8],[8,12],[12,30],[30,70]],
         "sampling_rate": 128
       }
-dataset:
-  type: synthetic
-  id: test3
+train_datasets:
+  - type: synthetic
+    id: test3
+val_datasets:
+  - type: synthetic
+    id: test3
 model:
   type: marhmm
+  covariance_type: full
   init_strategy: random_uniform
   init_noisy: True
   params:
