@@ -64,19 +64,24 @@ class DataLoader(Iterator):
         self.__print_data_info()
 
     def __init_transforms(self, transform_configs: list[TransformsConfig]):
-        self.transforms: list[BaseTransform] = []
+        # keep transforms keyed by channel name in upper case to match dataset channel labels
+        self.transforms: dict[str, list[BaseTransform]] = {"EEG": [], "EMG": []}
         for config in transform_configs:
-            match config.type.lower():
+            channel = config.channel.upper()
+            if channel not in self.transforms:
+                raise ValueError(f"Unknown channel for transform: {config.channel}. Expected one of {list(self.transforms.keys())}.")
+            ttype = config.type.lower()
+            match ttype:
                 case "fft":
-                    self.transforms.append(FFT(config=config))
+                    self.transforms[channel].append(FFT(config=config))
                 case "reshape":
-                    self.transforms.append(Reshape(config=config))
+                    self.transforms[channel].append(Reshape(config=config))
                 case "percentile_clipping":
-                    self.transforms.append(PercentileClipping(config=config))
+                    self.transforms[channel].append(PercentileClipping(config=config))
                 case "high_pass_filter":
-                    self.transforms.append(HighPassFilter(config=config))
+                    self.transforms[channel].append(HighPassFilter(config=config))
                 case "batch_raw":
-                    self.transforms.append(BatchRaw(config=config))
+                    self.transforms[channel].append(BatchRaw(config=config))
                 case _:
                     raise ValueError(f"Unknown transform: {config.type}.")
     
@@ -85,10 +90,76 @@ class DataLoader(Iterator):
         return self.data[0].shape[0]
     
     def __apply_transforms(self, x: np.ndarray, y: np.ndarray):
-        """Apply all transforms in order to a single sample."""
-        for t in self.transforms:
-            x, y = t(x, y)
-        return x, y
+        """Apply transforms per channel group and combine results.
+
+        Strategy:
+        - `x` starts as shape (C, T) (channels, time) and `y` is (T,).
+        - For each channel type (e.g. 'EEG', 'EMG') gather the indices in the dataset
+          that match that type and build a sub-array of shape (T, C_group).
+        - Apply all preprocessing transforms for that channel (in order), then all
+          postprocessing transforms (in order). Each transform receives and returns
+          (x, y) where x is typically (T, C) or (N, T, C). We normalize to a
+          3D array (N, T, C_group_processed) for later concatenation.
+        - Finally concatenate processed channel groups along the feature/channel
+          axis (last axis) and return (N, T, C_total) together with the labels.
+        """
+        
+        # initial data is (C, T)
+        channels_meta = self.dataset.get_channels()
+
+        processed_groups: list[np.ndarray] = []
+        processed_y = None
+        for ch_type, transforms in self.transforms.items():
+            
+            # find indices for this channel type (case-insensitive)
+            idxs = [i for i, ch in enumerate(channels_meta) if ch.upper() == ch_type.upper()]
+            if len(idxs) == 0:
+                # nothing to do for this channel type
+                continue
+            
+            # extract group data: result shape (n_ch, T)
+            group_x = x[idxs, :]
+            # convert to (T, C_group) which most transforms expect
+            group_x = group_x.transpose(1, 0)
+            group_y = y
+
+            # split transforms by stage
+            pre_transforms = [t for t in transforms if t.get_stage() == "preprocessing"]
+            post_transforms = [t for t in transforms if t.get_stage() == "postprocessing"]
+
+            # apply preprocessing
+            for t in pre_transforms:
+                group_x, group_y = t(group_x, group_y)
+
+            # apply postprocessing
+            for t in post_transforms:
+                group_x, group_y = t(group_x, group_y)
+
+            # store labels, ensuring consistency across channel groups
+            if processed_y is None:
+                processed_y = group_y
+            else:
+                if not np.array_equal(processed_y, group_y):
+                    raise ValueError("Labels produced by transforms are inconsistent across channel groups.")
+
+            processed_groups.append(group_x)
+
+        # if no transforms were defined/applied, convert raw data to (1, T, C)
+        if len(processed_groups) == 0:
+            x_out = x.transpose(1, 0)
+            x_out = np.expand_dims(x_out, axis=0)
+            return x_out, y
+
+        # ensure all processed groups have matching sample/time dims (N, T)
+        Ns = [g.shape[0] for g in processed_groups]
+        Ts = [g.shape[1] for g in processed_groups]
+        if len(set(Ns)) > 1 or len(set(Ts)) > 1:
+            raise ValueError(f"Transformed channel groups have mismatched shapes: Ns={Ns}, Ts={Ts}.")
+
+        # concatenate along last axis (features / channels)
+        x_out = np.concatenate(processed_groups, axis=2)
+        return x_out, processed_y
+    
     
     def __iter__(self) -> "DataLoader":
         """Handles every start of new epoch logic (shuffle etc.)."""
@@ -136,11 +207,12 @@ class DataLoader(Iterator):
         print(f"Shuffle each epoch: {self.shuffle}")
         print(f"Normalize data: {self.normalize}")
         print(f"Device: {self.device}")
-        print(f"Final data shape: {self.data[0].shape}")
+        print(f"Final X shape: {self.data[0].shape}")
+        print(f"Final Y shape: {self.data[1].shape}")
         if self.transforms:
             print("Transforms:")
-            for t in self.transforms:
-                print(f" - {t}")
+            for channel in self.transforms:
+                print(f" - {channel}: {self.transforms[channel]}")
         else:
             print("No transforms applied.")
         print("=" * 60 + "\n")

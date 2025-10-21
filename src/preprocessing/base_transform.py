@@ -1,9 +1,13 @@
 
 from abc import ABC, abstractmethod
+from enum import Enum
 import numpy as np
 
 from src.config.config import TransformsConfig
 
+class PreprocessingStage(Enum):
+    PREPROCESSING = "preprocessing"
+    POSTPROCESSING = "postprocessing"
 
 class BaseTransform(ABC):
     """Documentation
@@ -11,8 +15,9 @@ class BaseTransform(ABC):
     Abstract class for all preprocessing methods that is needed for this codebase.
     """
     
-    def __init__(self, config: TransformsConfig):
+    def __init__(self, config: TransformsConfig, stage: str):
         self.config = config
+        self.stage: PreprocessingStage = PreprocessingStage[stage.upper()]
         self.validate_config(self.config)
     
     @abstractmethod
@@ -30,6 +35,9 @@ class BaseTransform(ABC):
     @abstractmethod
     def __str__(self) -> str:
         raise NotImplementedError('This method has to be implemented.')
-    
+
+    def get_stage(self) -> str:
+        return self.stage.value
+
     def __repr__(self):
         return self.__str__()

@@ -9,7 +9,7 @@ from src.preprocessing.base_transform import BaseTransform
 class HighPassFilter(BaseTransform):
 
     def __init__(self, config: TransformsConfig):
-        super().__init__(config)
+        super().__init__(config, stage="preprocessing")
         nyquist = 0.5 * self.config.params['sampling_rate']
         self.low = self.config.params['low_cutoff'] / nyquist
         self.high = self.config.params['high_cutoff'] / nyquist

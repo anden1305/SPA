@@ -13,8 +13,8 @@ class BaseDataset(ABC):
     
     def __init__(self,
                  config: DatasetConfig):
-        self.config = config
-        self.id = self.config.id
+        self.dataset_config = config
+        self.id = self.dataset_config.id
         self.config = self.load_config()
         self.data = self.load_data()
         self.labels = self.load_labels()
@@ -34,11 +34,14 @@ class BaseDataset(ABC):
         assert 'epoch_length' in self.config, "Epoch length not found in config."
         assert 'n_stages' in self.config, "Number of stages not found in config."
         assert 'stage_names' in self.config, "Stage names not found in config."
+        assert 'channels' in self.config, "Channels not found in config."
     
     def validate_data(self):
         assert self.data.ndim == 2, f"Data must be a 2D array with shape (C, T), but got shape {self.data.ndim}."
         assert self.data.shape[0] == self.config['n_channels'], "Data channels do not match config."
         assert self.data.shape[1] == self.config['n_timesteps'], "Data timesteps do not match config."
+        assert self.config['n_channels'] == len(self.config['channels']), "Number of channels does not match length of channel names list."
+        assert all([channel in ['EEG', 'EMG'] for channel in self.config['channels']]), "Invalid channel names found in config."
     
     def validate_labels(self):
         assert hasattr(self, 'labels'), "Labels not found in dataset."
@@ -67,6 +70,9 @@ class BaseDataset(ABC):
     
     def get_num_states(self):
         return self.config['n_stages']
+    
+    def get_channels(self):
+        return self.config['channels']
 
     ###### ABSTRACT METHODS ######
 

@@ -1,37 +1,68 @@
 trainer:
-  epochs: 100
-  learning_rate: 0.05
+  epochs: 1000
+  learning_rate: 0.025
   optimizer: adam
   grad_clip: null
+  validate_per_epoch: 10
+  early_stopping:
+    enabled: false
+    patience: 25
+    min_delta: 0.001
+  scheduler:
+    enabled: false
+    type: step
+    step_size: 100
+    gamma: 0.999
 validator:
   accuracy: True
   nmi: True
   cross_nmi: True
   state_distinctness: True
   summary_statistics: True
+  learning_rate: True
 visualizer:
   losses: True
   pca_tripanel: True
   confusion_matrix: True
   state_distinctness: True
   summary_statistics: True
+  learning_rate: True
+  historic_values: True
 dataloader:
   batch_size: null
   shuffle: True
   normalize: True
   transforms:
-    - type: reshape
-      params: {}
     - type: fft
+      channel: EEG
       params: {
         "window_size": 512,
         "feature": "band_power",
         "bands": [[0.5,4],[4,8],[8,12],[12,30],[30,70]],
         "sampling_rate": 128
       }
-dataset:
-  type: synthetic
-  id: test3
+    - type: fft
+      channel: EMG
+      params: {
+        "window_size": 512,
+        "feature": "band_power",
+        "bands": [[0.5,12],[12,70]],
+        "sampling_rate": 128
+      }
+train_datasets:
+  - type: mssv
+    id: sub-017
+    run: 1
+  - type: mssv
+    id: sub-017
+    run: 2
+val_datasets:
+  - type: mssv
+    id: sub-017
+    run: 1
+  - type: mssv
+    id: sub-017
+    run: 2
 model:
   type: hmm
   init_strategy: random_uniform

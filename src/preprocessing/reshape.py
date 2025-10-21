@@ -8,7 +8,7 @@ from src.preprocessing.base_transform import BaseTransform
 class Reshape(BaseTransform):
 
     def __init__(self, config: TransformsConfig):
-        super().__init__(config)
+        super().__init__(config, stage="preprocessing")
 
     def validate_config(self, _: TransformsConfig):
         pass

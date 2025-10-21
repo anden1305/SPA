@@ -60,6 +60,7 @@ class MSSVDataset(BaseDataset):
         config['n_channels'] = len(signals)
         config['signals'] = signals
         config['run'] = self.run
+        config['channels'] = [signal[:3] for signal in signals]
         return config
         
     def __str__(self):

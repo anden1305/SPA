@@ -25,7 +25,7 @@ def compute_frequency_statistics(x: torch.Tensor, y: torch.Tensor, data_loader: 
     """
 
     transforms = data_loader.get_transforms()
-    has_fft = any(isinstance(t, FFT) for t in transforms)
+    has_fft = any(isinstance(t, FFT) for t in transforms.get('EEG', []))
     if not has_fft:
         # Perform an rFFT-based conversion from time-domain to frequency-domain.
         # Supported time-domain shapes:
@@ -49,7 +49,7 @@ def compute_frequency_statistics(x: torch.Tensor, y: torch.Tensor, data_loader: 
 
     if not isinstance(x, torch.Tensor) or not isinstance(y, torch.Tensor):
         raise TypeError("x and y must be torch.Tensor instances")
-
+    
     # Normalize inputs to sample-level pairs (N, F) and (N,)
     if x.dim() == 2:
         # (B, F)
@@ -57,7 +57,7 @@ def compute_frequency_statistics(x: torch.Tensor, y: torch.Tensor, data_loader: 
         if y.dim() == 1:
             y_flat = y
         else:
-            raise ValueError("y has time dimension but x does not")
+            raise ValueError(f"y has time dimension but x does not with shapes X: {x.shape} and Y: {y.shape}")
     elif x.dim() == 3:
         # (B, T, F)
         B, T, F = x.shape

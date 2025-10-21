@@ -8,7 +8,7 @@ from src.preprocessing.base_transform import BaseTransform
 class PercentileClipping(BaseTransform):
 
     def __init__(self, config: TransformsConfig):
-        super().__init__(config)
+        super().__init__(config, stage="preprocessing")
         self.percentile: int = self.config.params['percentile']
 
     def validate_config(self, _: TransformsConfig):

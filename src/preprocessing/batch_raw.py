@@ -8,7 +8,7 @@ from src.preprocessing.base_transform import BaseTransform
 class BatchRaw(BaseTransform):
 
     def __init__(self, config: TransformsConfig):
-        super().__init__(config)
+        super().__init__(config, stage="postprocessing")
         self.window_size: int = self.config.params['window_size']
 
     def validate_config(self, config: TransformsConfig):

@@ -13,7 +13,7 @@ class FFT(BaseTransform):
     """
 
     def __init__(self, config: TransformsConfig):
-        super().__init__(config)
+        super().__init__(config, stage="postprocessing")
         self.window_size: int = self.config.params['window_size']
         self.feature: str = self.config.params['feature'].lower()
         self.eps: float = float(self.config.params.get('eps', 1e-12))
