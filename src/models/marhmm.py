@@ -74,9 +74,9 @@ class MARHMM(BaseModel):
 		- Returns the mean across the batch.
 		"""
 		T = x.shape[1]
-		F = x.shape[2]
+		D = x.shape[2]
 		logp = logp / T
-		logp = logp / F
+		logp = logp / D
 		nll = -logp
 		return nll.mean()
 
