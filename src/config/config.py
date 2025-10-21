@@ -26,7 +26,7 @@ class TrainerConfig(BaseModel):
     optimizer: str = Field(..., pattern="^(adam|sgd|rmsprop|adamw)$")
     grad_clip: float | None = Field(..., ge=0, description="Gradient clipping value. If None, no clipping is applied.")
     validate_per_epoch: int = Field(..., ge=0, le=50, description="Frequency of validation during training in epochs. Set to 0 to disable per-epoch validation. Maximum value is 50.")
-    early_stopping: EarlyStoppingConfig | None = Field(default_factory=EarlyStoppingConfig, description="Early stopping settings. Set enabled=False to disable.")
+    early_stopping: EarlyStoppingConfig = Field(default_factory=EarlyStoppingConfig, description="Early stopping settings. Set enabled=False to disable.")
     scheduler: SchedulerConfig = Field(default_factory=SchedulerConfig)
 
 class ValidatorConfig(BaseModel):
@@ -68,7 +68,7 @@ class DatasetConfig(BaseModel):
 
 class ModelConfig(BaseModel):
     type: str = Field(..., pattern="^(hmm|marhmm)$", description="Type of model, e.g., 'hmm'.")
-    covariance_type: str = Field(default="diag", pattern="^(diag|full|meanonly)$", description="Covariance structure: 'diag' (diagonal), 'full' (Cholesky-factorized with softplus), or 'meanonly' (identity, HMM only).")
+    covariance_type: str = Field(..., pattern="^(diag|full|meanonly)$", description="Covariance structure: 'diag' (diagonal), 'full' (Cholesky-factorized with softplus), or 'meanonly' (identity, HMM only).")
     init_strategy: str = Field(..., pattern="^(random_uniform|random_dirichlet|random_separated|kmeans|kmeans_pca)$", description="Initialization strategy for the model.")
     init_noisy: bool = Field(...)  # Adds Gaussian noise to initialization; noise levels hardcoded below
     params: dict[str, Any] = Field(..., description="Model-specific parameters.")
