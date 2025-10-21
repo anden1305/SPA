@@ -55,6 +55,8 @@ class TransformsConfig(BaseModel):
 
 class DataLoaderConfig(BaseModel):
     batch_size: int | None = Field(..., ge=1, description="Number of windows. If None, use full dataset.")
+    window_size: int | None = Field(..., ge=1, description="Size of each data window in timesteps.")
+    stride: int | None = Field(..., ge=1, description="Stride between windows in timesteps.")
     transforms: list[TransformsConfig] = Field(default_factory=list)
     shuffle: bool = Field(..., description="Whether to shuffle data each epoch.")
     normalize: bool = Field(..., description="Whether to normalize data using mean and std.")

@@ -57,6 +57,7 @@ class DataLoaderCollection:
             ys.append(y)
         x_all = torch.cat(xs, dim=1)
         y_all = torch.cat(ys, dim=1)
+        
         return x_all, y_all
     
     def __iter__(self) -> "DataLoaderCollection":
