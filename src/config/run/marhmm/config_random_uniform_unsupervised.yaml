@@ -3,14 +3,14 @@ trainer:
   learning_rate: 0.01
   optimizer: adam
   grad_clip: 5.0
-  validate_per_epoch: 10
+  validate_per_epoch: 0   
   early_stopping:
-    enabled: true    # Auto-detects supervised vs unsupervised
-    patience: 100
-    min_delta: 0.001
+    enabled: true    
+    patience: 40
+    min_delta: 0.1
 validator:
-  nmi: True
-  accuracy: True
+  nmi: False
+  accuracy: False
   cross_nmi: True
   state_distinctness: True
   summary_statistics: True
@@ -51,6 +51,6 @@ model:
 verbose: True
 seed: 42
 results_dir: results/training/marhmm
-run_name: feature_synthetic_uniform
+run_name: feature_synthetic_uniform_unsupervised
 runs: 3
 validate_data: True
