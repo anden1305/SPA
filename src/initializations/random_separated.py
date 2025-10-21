@@ -21,5 +21,8 @@ def init_random_separated(model: BaseModel, spread: float = 2.0, jitter_std: flo
     
     # Identity covariance and uniform transitions
     set_identity_covariance(model)
-    model.initial_logits.zero_()
-    model.transition_logits.zero_()
+    # model.initial_logits.zero_() 
+    # model.transition_logits.zero_()
+
+    model.initial_logits.data.uniform_(-0.2, 0.2)
+    model.transition_logits.data.uniform_(-0.2, 0.2)
