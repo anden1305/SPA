@@ -1,0 +1,18 @@
+method: bayes
+metric:
+  name: val/nmi
+  goal: maximize
+parameters:
+  trainer.learning_rate:
+    distribution: log_uniform
+    min: 1e-4
+    max: 5e-3
+  model.init_strategy:
+    values: [random_uniform, random_dirichlet, random_separated, kmeans, kmeans_pca]
+  model.init_noisy:
+    values: [false, true]
+early_terminate:
+  type: hyperband
+  min_iter: 3
+base_config: src/config/run/hmm/config_random_uniform.yaml
+count: 40

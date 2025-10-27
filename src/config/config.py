@@ -3,6 +3,11 @@ from pathlib import Path
 from typing import Any
 import yaml
 
+class WandbConfig(BaseModel):
+    enabled: bool = Field(True, description="Enable Weights & Biases logging.")
+    group: str | None = Field(default=None, description="Optional W&B group for runs. Only used if specified.")
+    tags: list[str] | None = Field(default=None, description="Optional tags for the run. Only used if specified.")
+
 class SchedulerConfig(BaseModel):
     enabled: bool = Field(..., description="Whether to use a learning rate scheduler.")
     type: str = Field(..., pattern="^(step|exponential)$", description="Type of scheduler, e.g., 'step'.")
@@ -129,6 +134,7 @@ class GlobalConfig(BaseModel):
     run_name: str = Field(..., description="Name of the current run.")
     runs: int = Field(..., ge=1, description="Number of runs to execute.")
     validate_data: bool = Field(..., description="Whether to perform data validation before training.")
+    wandb: WandbConfig | None = Field(default_factory=WandbConfig, description="Weights & Biases settings.")
     # No hardcoded constants at global level - all experiment settings are configurable
 
     @classmethod

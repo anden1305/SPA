@@ -16,6 +16,12 @@ dependencies = [
     "scipy",
     "pyyaml>=6.0.2",
     "pydantic>=2.11.7",
+    "wandb>=0.17.0",
+    "scikit-learn>=1.7.2",
+    "line-profiler>=5.0.0",
+    "snakeviz>=2.2.2",
+    "numba>=0.62.1",
+    "pyinstrument>=5.1.1",
 ]
 
 [tool.uv.sources]

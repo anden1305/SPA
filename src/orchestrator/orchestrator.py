@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import datetime
 import uuid
+import cProfile
 import torch
 from src.config.config import GlobalConfig
 from src.data.base_dataset import BaseDataset
@@ -17,13 +18,15 @@ from src.models.marhmm import MARHMM
 from src.orchestrator.train_details import TrainDetails
 from src.training.trainer import Trainer
 from src.validation.validator import Validator
+from src.helpers.profiling import write_cprofile_outputs
 from src.visuals.visualizer import Visualizer
 
 
 class Orchestrator:
     
-    def __init__(self, config_path: str):
+    def __init__(self, config_path: str, profile: bool = False):
         self.config_path = config_path
+        self.profile = profile
         self.__set_config()
         self.__prepare()
     
@@ -42,7 +45,11 @@ class Orchestrator:
             self.model.reset()
             self.trainer.reset()
             self.validator.validate(epoch=0)  
-            self.trainer.train()
+            run_dir = Path(self.global_config.results_dir) / self.global_config.run_name / str(self.run_number)
+            if self.profile:
+                self.trainer.train_profiled(run_dir, basename="train", sort="cumulative")
+            else:
+                self.trainer.train()
             self.validator.validate(epoch=self.trainer.current_epoch)
             train_details = self.__collect_training_details()
             self.__save_info(train_details=train_details)
