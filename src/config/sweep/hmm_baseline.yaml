@@ -1,0 +1,11 @@
+method: bayes
+metric:
+  name: train/total_loss
+  goal: minimize
+parameters:
+  trainer.learning_rate:
+    distribution: log_uniform_values
+    min: 1e-5
+    max: 1e-2
+base_config: src/config/run/hmm/config_random_uniform.yaml
+count: 7

@@ -1,4 +1,3 @@
-import json
 from src.data.data_loader import DataLoader
 from src.data.data_loader_collection import DataLoaderCollection
 from src.models.base_model import BaseModel
@@ -6,6 +5,10 @@ from src.validation.validator import Validator
 from src.config.config import GlobalConfig, TrainerConfig
 from src.training.early_stopping import create_early_stopper
 from src.training.validation_controller import ValidationController
+from src.training.experiment_logger import create_logger
+from src.helpers.profiling import write_cprofile_outputs
+import cProfile
+from pathlib import Path
 from torch.optim import Adam, SGD, RMSprop
 import torch
 
@@ -63,6 +66,11 @@ class Trainer:
     def train(self):
         if self.global_config.verbose:
             self.__print_training_start()
+        logger = create_logger(self.global_config)
+        logger.start(
+            run_name=self.global_config.run_name,
+            config=self.global_config.model_dump(),
+        )
         self.__init_training()
         for epoch in range(self.config.epochs):
             self.current_epoch = epoch
@@ -81,14 +89,34 @@ class Trainer:
                     self.scheduler.step()
             self.losses[epoch] = sum(self.epoch_losses) / len(self.epoch_losses)
             self.regularization_losses[epoch] = sum(self.epoch_regularization_losses) / len(self.epoch_regularization_losses)
-            # Validation + early stopping via controller (prints internally if stopping)
             should_stop = self.validation_controller.step(epoch, self.model, self.optimizer)
+            lr = self.optimizer.param_groups[0].get('lr')
+            val = self.validator.validations.get(epoch, {})
+            logger.log_epoch(
+                step=epoch,
+                train_total_loss=self.losses[epoch],
+                train_reg_loss=self.regularization_losses[epoch],
+                lr=lr,
+                val_metrics=val,
+                epoch=epoch + 1,
+                run_seed=int(self.global_config.seed),
+            )
             if should_stop:
                 break
             self.epoch_losses.clear()
             self.epoch_regularization_losses.clear()
             if self.global_config.verbose:
                 self.__print_epoch()
+        logger.finish()
+    
+    def train_profiled(self, out_dir: str | Path, *, basename: str = "train", sort: str = "cumulative") -> None:
+        prof = cProfile.Profile()
+        prof.enable()
+        try:
+            self.train()
+        finally:
+            prof.disable()
+            write_cprofile_outputs(prof, out_dir, basename=basename, sort=sort)
     
     def get_losses(self) -> dict[int, float]:
         assert self.losses, "Training has not been run yet."

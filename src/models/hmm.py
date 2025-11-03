@@ -23,6 +23,9 @@ from src.initializations.random_separated import init_random_separated
 from src.initializations.kmeans import init_kmeans
 from src.initializations.kmeans_pca import init_kmeans_pca
 from src.initializations.apply_noise import apply_noise_and_bias
+from line_profiler import profile
+
+ 
 
 class HMM(BaseModel):
     def __init__(self,
@@ -79,6 +82,7 @@ class HMM(BaseModel):
         nll = -logp
         return nll.mean()
     
+    @profile
     def __emission_log_prob(self, x: Tensor) -> Tensor:
         """Return log p(x_t | z_t) for all states.
 
@@ -106,35 +110,36 @@ class HMM(BaseModel):
             const = D * self._log_2pi
             return -0.5 * (quad + const)
         else:  # full
+            # Batched triangular solves across states to avoid Python loop over S
+            # Shapes: L (S,D,D), diff (B,T,S,D)
             L = self.__full_cov_cholesky()  # (S,D,D)
-            # Precompute log det Σ_s = 2 * sum(log(diag(L_s)))
-            log_det = 2 * torch.log(torch.diagonal(L, dim1=1, dim2=2)).sum(-1)  # (S,)
-            # We'll loop over states (S typically small) for clarity
-            log_probs = []
-            for s in range(S):
-                Ls = L[s]  # (D,D)
-                # Flatten (B*T,D) for solve
-                d_flat = diff[:, :, s, :].reshape(B * T, D).T  # (D, B*T)
-                # Solve L y = diff^T -> y
-                y = torch.linalg.solve_triangular(Ls, d_flat, upper=False)  # (D, B*T)
-                m_dist2 = (y.pow(2).sum(0)).reshape(B, T)  # (B,T)
-                lp = -0.5 * (m_dist2 + log_det[s] + D * self._log_2pi)  # (B,T)
-                log_probs.append(lp.unsqueeze(-1))  # (B,T,1)
-            return torch.cat(log_probs, dim=-1)  # (B,T,S)
+            # log det Σ_s = 2 * sum(log(diag(L_s))) -> (S,)
+            log_det = 2 * torch.log(torch.diagonal(L, dim1=1, dim2=2)).sum(-1)
+
+            # Reorder/flatten diff to match batched solve: (S,D,B*T)
+            d_s_btd = diff.permute(2, 0, 1, 3).reshape(S, B * T, D).transpose(1, 2)  # (S,D,B*T)
+            # Solve L_s * y_s = d_s^T for all s in batch
+            y = torch.linalg.solve_triangular(L, d_s_btd, upper=False)  # (S,D,B*T)
+            # Mahalanobis distance per state and time: sum over D, then reshape to (S,B,T)
+            m_dist2 = y.pow(2).sum(dim=1).reshape(S, B, T)  # (S,B,T)
+            # Broadcast constants to (S,B,T), then permute back to (B,T,S)
+            const = (D * self._log_2pi).expand_as(m_dist2)
+            lp_sbt = -0.5 * (m_dist2 + log_det[:, None, None] + const)  # (S,B,T)
+            return lp_sbt.permute(1, 2, 0)  # (B,T,S)
 
     def __full_cov_cholesky(self) -> Tensor:
         """Return lower‑triangular Cholesky factors L (S,D,D) with positive diag."""
         raw = self.emission_cholesky_raw
-        # Mask upper triangle
-        tril_mask = torch.tril(torch.ones_like(raw)).bool()
-        L = torch.zeros_like(raw)
-        L[tril_mask] = raw[tril_mask]
-        # Stabilise diagonals: softplus + jitter
-        diag_idx = torch.arange(self.num_features, device=L.device)
-        diag = L[:, diag_idx, diag_idx]
-        L[:, diag_idx, diag_idx] = torch.nn.functional.softplus(diag) + self.jitter
+        # Keep lower triangle only (functional form)
+        L = torch.tril(raw)
+        # Stabilise diagonals without in-place mutation on views (avoids autograd aliasing issues)
+        diag_raw = torch.diagonal(L, dim1=1, dim2=2)
+        diag_pos = torch.nn.functional.softplus(diag_raw) + self.jitter
+        # Replace diagonal via diag_embed add: L_new = L + diag_embed(diag_pos - current_diag)
+        L = L + torch.diag_embed(diag_pos - diag_raw)
         return L
 
+    @profile
     def __forward_algorithm(self, log_emiss: Tensor, log_pi: Tensor, log_A: Tensor) -> Tensor:
         """Run forward algorithm.
 
@@ -147,13 +152,17 @@ class HMM(BaseModel):
         -------
         log_likelihood : (B,)
         """
-        B, T, S = log_emiss.shape
+        _, T, _ = log_emiss.shape
+        # Numerically-stable probability-space matmul, autograd-friendly (no out= / in-place on graph tensors)
+        A_prob = torch.exp(log_A)  # (S,S)
+        eps = torch.finfo(log_emiss.dtype).tiny
         # alpha_0
         alpha = log_pi.unsqueeze(0) + log_emiss[:, 0, :]  # (B,S)
         for t in range(1, T):
-            # (B,S,S): previous alpha_j + log_A_{j->i}
-            prev = alpha.unsqueeze(2) + log_A.unsqueeze(0)
-            alpha = log_emiss[:, t, :] + torch.logsumexp(prev, dim=1)
+            m = alpha.max(dim=1, keepdim=True).values                 # (B,1)
+            v = torch.exp(alpha - m)                                   # (B,S)
+            u = v @ A_prob                                             # (B,S)
+            alpha = log_emiss[:, t, :] + m.squeeze(1) + torch.log(u.clamp_min(eps))
         return torch.logsumexp(alpha, dim=1)  # (B,)
 
     @torch.no_grad()
@@ -162,6 +171,7 @@ class HMM(BaseModel):
         return self.__decode_viterbi(x)
 
     @torch.no_grad()
+    @profile
     def __decode_viterbi(self, x: Tensor) -> Tensor:
         """Most likely state sequence (Viterbi path).
 
@@ -173,18 +183,72 @@ class HMM(BaseModel):
         log_A = torch.log_softmax(self.transition_logits, dim=-1)
         log_emiss = self.__emission_log_prob(x)  # (B,T,S)
         backptr = x.new_zeros((B, T, self.num_states), dtype=torch.long)
+        # Use transposed transition to reduce over last dim
+        log_A_T = log_A.transpose(0, 1).contiguous()  # (S,S)
         delta = log_pi.unsqueeze(0) + log_emiss[:, 0, :]  # (B,S)
         for t in range(1, T):
-            scores = delta.unsqueeze(2) + log_A.unsqueeze(0)  # (B,S,S)
-            delta, idx = torch.max(scores, dim=1)            # (B,S)
+            scores = delta.unsqueeze(1) + log_A_T  # (B,S,S)
+            delta, idx = torch.max(scores, dim=2)            # (B,S)
             delta = delta + log_emiss[:, t, :]
             backptr[:, t, :] = idx
         last = torch.argmax(delta, dim=1)  # (B,)
-        path = x.new_zeros((B, T), dtype=torch.long)
+        return self.__backtrace(backptr, last)
+
+    def __backtrace(self, backptr: Tensor, last: Tensor) -> Tensor:
+        """Backtrace Viterbi path given backpointers and last-state indices using PyTorch only."""
+        B, T, _ = backptr.shape
+        device = backptr.device
+        path = backptr.new_zeros((B, T))
         path[:, -1] = last
+        arange_B = torch.arange(B, device=device)
         for t in range(T - 2, -1, -1):
-            path[:, t] = backptr[torch.arange(B), t + 1, path[:, t + 1]]
+            path[:, t] = backptr[arange_B, t + 1, path[:, t + 1]]
         return path
+
+    @torch.no_grad()
+    def benchmark_backtrace(self, x: Tensor, reps: int = 3) -> dict:
+        """Benchmark backtrace only (not DP), comparing PyTorch vs Numba (if available).
+
+        Returns a dict with average milliseconds per backtrace and speedup factor.
+        """
+        import time
+        x = self.__validate_input(x)
+        B, T, D = x.shape
+        log_pi = torch.log_softmax(self.initial_logits, dim=-1)
+        log_A = torch.log_softmax(self.transition_logits, dim=-1)
+        log_emiss = self.__emission_log_prob(x)
+        # Build backptr and last via DP (same as __decode_viterbi up to backtrace)
+        backptr = x.new_zeros((B, T, self.num_states), dtype=torch.long)
+        log_A_T = log_A.transpose(0, 1).contiguous()
+        delta = log_pi.unsqueeze(0) + log_emiss[:, 0, :]
+        for t in range(1, T):
+            scores = delta.unsqueeze(1) + log_A_T
+            delta, idx = torch.max(scores, dim=2)
+            delta = delta + log_emiss[:, t, :]
+            backptr[:, t, :] = idx
+        last = torch.argmax(delta, dim=1)
+
+        def _sync():
+            if x.is_cuda:
+                torch.cuda.synchronize()
+
+        # Torch loop timing
+        t0 = 0.0
+        for _ in range(reps):
+            _sync()
+            s = time.perf_counter()
+            _ = self.__backtrace(backptr, last, use_numba=False)
+            _sync()
+            t0 += (time.perf_counter() - s)
+
+        ms_torch = (t0 / reps) * 1e3
+        # No Numba path; return torch timing only and NaNs for compatibility
+        result = {
+            'torch_backtrace_ms': ms_torch,
+            'numba_backtrace_ms': float('nan'),
+            'speedup_x': float('nan'),
+        }
+        return result
     
     def prepare_for_training(self):
         self.train()
@@ -231,9 +295,6 @@ class HMM(BaseModel):
     def __str__(self):
         return f"HMM(num_states={self.num_states}, num_features={self.num_features})"
 
-    def reset(self):
-        self.__initialize_weights()
-
     @torch.no_grad()
     def __initialize_weights(
         self,
@@ -279,19 +340,6 @@ class HMM(BaseModel):
             apply_noise_and_bias(self, mean_std=mean_std, cov_noise_std=cov_noise_std, init_logits_std=init_logits_std, self_transition_bias=self_transition_bias)
         self.clear_param_grads()
      
-    def __validate_input(self, x: Tensor) -> Tensor:
-        """Validate that x has shape (B,T,D) with D == self.num_features.
-        Returns the tensor moved to the model device.
-        """
-        if x.dim() != 3:
-            raise ValueError(f"Expected input of rank 3 (B,T,D); got shape {tuple(x.shape)}")
-        if x.shape[2] != self.num_features:
-            raise ValueError(
-                f"Feature dimension mismatch: got D={x.shape[2]}, expected {self.num_features} (obs_dim)."
-            )
-        return x.to(self.device) 
-
-    def __str__(self):
-        return f"HMM(num_states={self.num_states}, num_features={self.num_features})"
+    
    
 __all__ = ["HMM"]

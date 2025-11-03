@@ -2,10 +2,10 @@ trainer:
   epochs: 500
   learning_rate: 0.05
   optimizer: adam
-  grad_clip: null
+  grad_clip: 5.0
   validate_per_epoch: 10
   early_stopping:
-    enabled: false
+    enabled: true   
     patience: 25
     min_delta: 0.001
   scheduler:
@@ -70,15 +70,14 @@ dataloader:
         bands: [[0.5, 45]],
       }
 train_datasets:
-  - type: mssv
-    id: sub-017
-    run: 1
+  - type: synthetic
+    id: test3
 val_datasets:
-  - type: mssv
-    id: sub-017
-    run: 1
+  - type: synthetic
+    id: test3
 model:
   type: hmm
+  covariance_type: full
   init_strategy: random_uniform
   init_noisy: True
   covariance_type: full
@@ -86,6 +85,6 @@ model:
 verbose: true
 seed: 123
 results_dir: results/training/hmm
-run_name: feature_synthetic_uniform
-runs: 2
+run_name: feature_synthetic_uniform_kernprof
+runs: 1
 validate_data: True

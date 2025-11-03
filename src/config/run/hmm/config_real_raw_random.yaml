@@ -31,11 +31,23 @@ dataloader:
       params: {
         "window_size": 512
       }
-dataset:
-  type: mssv
-  id: sub-050
+train_datasets:
+  - type: mssv
+    id: sub-017
+    run: 1
+  - type: mssv
+    id: sub-017
+    run: 2
+val_datasets:
+  - type: mssv
+    id: sub-017
+    run: 1
+  - type: mssv
+    id: sub-017
+    run: 2
 model:
   type: hmm
+  covariance_type: full
   init_strategy: random
 verbose: true
 seed: 123
