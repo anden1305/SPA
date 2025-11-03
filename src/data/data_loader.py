@@ -6,11 +6,13 @@ from src.data.base_dataset import BaseDataset
 from src.config.config import GlobalConfig, TransformsConfig
 from src.preprocessing.base_transform import BaseTransform
 import torch
-from src.preprocessing.batch_raw import BatchRaw
-from src.preprocessing.fft import FFT
+from src.preprocessing.LEGACY_batch_raw import BatchRaw
+from src.preprocessing.fft_band_power import FFTBandPower
+from src.preprocessing.fft_log_power import FFTLogPower
+from src.preprocessing.fft_power import FFTPower
 from src.preprocessing.high_pass_filter import HighPassFilter
 from src.preprocessing.percentile_clipping import PercentileClipping
-from src.preprocessing.reshape import Reshape
+from src.preprocessing.LEGACY_reshape import Reshape
 
 class DataLoader(Iterator):
     """Documentation
@@ -72,16 +74,37 @@ class DataLoader(Iterator):
                 raise ValueError(f"Unknown channel for transform: {config.channel}. Expected one of {list(self.transforms.keys())}.")
             ttype = config.type.lower()
             match ttype:
-                case "fft":
-                    self.transforms[channel].append(FFT(config=config))
-                case "reshape":
-                    self.transforms[channel].append(Reshape(config=config))
+                case "fft_power":
+                    self.transforms[channel].append(
+                        FFTPower(
+                            config=config, 
+                            window_size=self.config.window_size, 
+                            stride=self.config.stride, 
+                            sampling_rate=self.dataset.get_sampling_rate()
+                        )
+                    )
+                case "fft_log_power":
+                    self.transforms[channel].append(
+                        FFTLogPower(
+                            config=config,
+                            window_size=self.config.window_size,
+                            stride=self.config.stride,
+                            sampling_rate=self.dataset.get_sampling_rate()
+                        )
+                    )
+                case "fft_band_power":
+                    self.transforms[channel].append(
+                        FFTBandPower(
+                            config=config,
+                            window_size=self.config.window_size,
+                            stride=self.config.stride,
+                            sampling_rate=self.dataset.get_sampling_rate()
+                        )
+                    )
                 case "percentile_clipping":
                     self.transforms[channel].append(PercentileClipping(config=config))
                 case "high_pass_filter":
-                    self.transforms[channel].append(HighPassFilter(config=config))
-                case "batch_raw":
-                    self.transforms[channel].append(BatchRaw(config=config))
+                    self.transforms[channel].append(HighPassFilter(config=config, sampling_rate=self.dataset.get_sampling_rate()))
                 case _:
                     raise ValueError(f"Unknown transform: {config.type}.")
     
@@ -134,6 +157,9 @@ class DataLoader(Iterator):
             # apply postprocessing
             for t in post_transforms:
                 group_x, group_y = t(group_x, group_y)
+            
+            if group_x.ndim == 2:
+                group_x = np.expand_dims(group_x, axis=0)
 
             # store labels, ensuring consistency across channel groups
             if processed_y is None:

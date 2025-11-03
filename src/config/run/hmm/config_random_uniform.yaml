@@ -1,6 +1,6 @@
 trainer:
-  epochs: 100
-  learning_rate: 0.01
+  epochs: 500
+  learning_rate: 0.05
   optimizer: adam
   grad_clip: 5.0
   validate_per_epoch: 10
@@ -18,36 +18,56 @@ validator:
   nmi: True
   cross_nmi: True
   state_distinctness: True
-  summary_statistics: True
+  summary_statistics: False
   learning_rate: True
 visualizer:
   losses: True
   pca_tripanel: True
   confusion_matrix: True
   state_distinctness: True
-  summary_statistics: True
+  summary_statistics: False
   learning_rate: True
   historic_values: True
 dataloader:
   batch_size: null
+  window_size: 512
+  stride: 512
   shuffle: True
   normalize: True
   transforms:
-    - type: fft
+    # EEG channel transforms
+    - type: high_pass_filter
       channel: EEG
       params: {
-        "window_size": 512,
-        "feature": "band_power",
-        "bands": [[0.5,4],[4,8],[8,12],[12,30],[30,70]],
-        "sampling_rate": 128
+        "low_cutoff": 0.5,
+        "high_cutoff": 45,
       }
-    - type: fft
+    - type: percentile_clipping
+      channel: EEG
+      params: {
+        "percentile": 5
+      }
+    - type: fft_band_power
+      channel: EEG
+      params: {
+        bands: [[0.5, 4], [4, 8], [8, 12], [12, 30], [30, 45]],
+      }
+    # EMG channel transforms
+    - type: high_pass_filter
       channel: EMG
       params: {
-        "window_size": 512,
-        "feature": "band_power",
-        "bands": [[0.5,12],[12,70]],
-        "sampling_rate": 128
+        "low_cutoff": 0.5,
+        "high_cutoff": 45,
+      }
+    - type: percentile_clipping
+      channel: EMG
+      params: {
+        "percentile": 1
+      }
+    - type: fft_band_power
+      channel: EMG
+      params: {
+        bands: [[0.5, 45]],
       }
 train_datasets:
   - type: synthetic
@@ -60,6 +80,7 @@ model:
   covariance_type: full
   init_strategy: random_uniform
   init_noisy: True
+  covariance_type: full
   params: {}
 verbose: true
 seed: 123

@@ -73,6 +73,9 @@ class BaseDataset(ABC):
     
     def get_channels(self):
         return self.config['channels']
+    
+    def get_sampling_rate(self):
+        return int(self.config['sampling_rate'])
 
     ###### ABSTRACT METHODS ######
 
