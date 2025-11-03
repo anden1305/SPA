@@ -1,0 +1,70 @@
+python: 3.12.12 (main, Oct 14 2025, 21:25:31) [Clang 20.1.4 ]
+torch: 2.8.0+cu128
+torch.version.cuda: 12.8
+torch.cuda.is_available(): True
+torch.cuda.device_count(): 1
+CUDA_VISIBLE_DEVICES: 0
+current_device: 0
+device_name: Tesla V100-PCIE-16GB
+device count: 1
+current device: 0 (Tesla V100-PCIE-16GB)
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@hpc.dtu.dk>
+Subject: Job 26703990: <optimised_test> in cluster <dcc> Done
+
+Job <optimised_test> was submitted from host <n-62-30-1> by user <s204070> in cluster <dcc> at Wed Oct 29 13:13:31 2025
+Job was executed on host(s) <4*n-62-20-3>, in queue <gpuv100>, as user <s204070> in cluster <dcc> at Wed Oct 29 13:13:31 2025
+</zhome/2e/5/156001> was used as the home directory.
+</zhome/2e/5/156001/SPA> was used as the working directory.
+Started at Wed Oct 29 13:13:31 2025
+Terminated at Wed Oct 29 13:13:45 2025
+Results reported at Wed Oct 29 13:13:45 2025
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+#!/bin/bash
+#BSUB -J optimised_test                             
+#BSUB -q gpuv100                
+#BSUB -W 00:10  
+#BSUB -n 4
+#BSUB -R "span[hosts=1]"                      
+#BSUB -R "rusage[mem=1GB]"
+#BSUB -o output/optimised_%J.out          
+#BSUB -e output/optimised_%J.err     
+#BSUB -gpu "num=1:mode=exclusive_process"  
+
+# module purge
+module load cuda/12.8.1
+source .venv/bin/activate
+mkdir -p output
+mkdir -p results
+python3 cuda.py
+
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   2.68 sec.
+    Max Memory :                                 293 MB
+    Average Memory :                             293.00 MB
+    Total Requested Memory :                     4096.00 MB
+    Delta Memory :                               3803.00 MB
+    Max Swap :                                   -
+    Max Processes :                              4
+    Max Threads :                                6
+    Run time :                                   51 sec.
+    Turnaround time :                            14 sec.
+
+The output (if any) is above this job summary.
+
+
+
+PS:
+
+Read file <output/optimised_26703990.err> for stderr output of this job.
+
