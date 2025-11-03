@@ -33,13 +33,20 @@ dataloader:
   shuffle: True
   normalize: True
   transforms:
-    - type: reshape
-      params: {}
     - type: fft
+      channel: EEG
       params: {
         "window_size": 512,
         "feature": "band_power",
         "bands": [[0.5,4],[4,8],[8,12],[12,30],[30,70]],
+        "sampling_rate": 128
+      }
+    - type: fft
+      channel: EMG
+      params: {
+        "window_size": 512,
+        "feature": "band_power",
+        "bands": [[0.5,12],[12,70]],
         "sampling_rate": 128
       }
 train_datasets:
