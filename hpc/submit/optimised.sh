@@ -5,8 +5,8 @@
 #BSUB -n 4
 #BSUB -R "span[hosts=1]"                      
 #BSUB -R "rusage[mem=1GB]"
-#BSUB -o output/optimised_%J.out          
-#BSUB -e output/optimised_%J.err     
+#BSUB -o hpc/output/optimised_%J.out          
+#BSUB -e hpc/output/optimised_%J.err     
 #BSUB -gpu "num=1:mode=exclusive_process"  
 
 # module purge

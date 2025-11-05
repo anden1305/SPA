@@ -55,7 +55,7 @@ fi
 SWEEP_ID=$(python3 src/training/wandb_sweep_runner.py "$ABS_SWEEP_YAML" --create-only)
 echo "Created sweep: $SWEEP_ID"
 
-OUTPUT_DIR=$(pwd)/output
+OUTPUT_DIR=$(pwd)/hpc/output
 mkdir -p "$OUTPUT_DIR"
 
 echo "Submitting $NUM_AGENTS agent jobs as an LSF array (each agent runs $TRIALS_PER_AGENT trials)..."
@@ -70,4 +70,4 @@ bsub -J "wandb_sweep_agent[1-${NUM_AGENTS}]" \
   -gpu "num=1:mode=exclusive_process" \
   "bash -lc \"module load cuda/12.8.1; source .venv/bin/activate; python3 src/training/wandb_sweep_runner.py '$ABS_SWEEP_YAML' --agent-only --sweep-id '$SWEEP_ID' --trials-per-agent $TRIALS_PER_AGENT\""
 
-echo "Submitted array job. Monitor with bjobs and check output/ for logs."
+echo "Submitted array job. Monitor with bjobs and check hpc/output/ for logs."
