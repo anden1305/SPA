@@ -7,4 +7,4 @@ parameters:
     values: [1e-4, 1e-3, 1e-2, 5e-2, 1e-1]
   model.init_strategy:
     values: [random_uniform, random_dirichlet, kmeans, kmeans_pca]
-base_config: src/config/run/marhmm/experiment_mssv_raw.yaml
+base_config: src/config/run/marhmm/experiments/experiment_mssv_raw.yaml
