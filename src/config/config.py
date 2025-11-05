@@ -19,10 +19,9 @@ class EarlyStoppingConfig(BaseModel):
     patience: int = Field(..., ge=1, le=100, description="Epochs without relative improvement before action.")
     min_delta: float = Field(..., ge=0, le=0.5, description="Minimum relative improvement fraction required (e.g. 0.01 = 1%). Always relative.")
     # Hardcoded in src/training/early_stopping.py:
-    #   - _MIN_LR = 1e-5 (minimum learning rate floor)
-    #   - _LR_FACTOR = 0.5 (learning rate reduction factor)
-    #   - _EMA_ALPHA = 0.3 (exponential moving average decay)
-    #   - _WARMUP_VALIDATIONS = 5 (number of warmup validations)
+    #   - min_lr = 1e-5 (minimum learning rate floor)
+    #   - lr_factor = 0.5 (learning rate reduction factor)
+    #   - warmup_validations = 5 (number of warmup validations)
     #   - 1.01 multiplier for LR comparison threshold
 
 class TrainerConfig(BaseModel):
