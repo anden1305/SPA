@@ -7,7 +7,6 @@ import numpy as np
 import torch
 from typing import Dict, Optional
 
-
 class EarlyStopping:
     """Early stopping driven by training loss only.
 
@@ -61,22 +60,6 @@ class EarlyStopping:
             self._log_stop(optimizer)
 
         return self._should_stop
-
-    # Back-compat: allow callable-style with dict or float ---------------------------
-    def __call__(self, arg, model: torch.nn.Module, epoch: int, optimizer: Optional[torch.optim.Optimizer] = None) -> bool:
-        """Compatibility wrapper to support existing call-sites.
-
-        Accepts either a dict with key 'train_loss' or a raw float loss.
-        """
-        if isinstance(arg, dict):
-            val = arg.get('train_loss')
-            if not isinstance(val, (int, float)):
-                return False
-            return self.step(float(val), model, epoch, optimizer)
-        elif isinstance(arg, (int, float)):
-            return self.step(float(arg), model, epoch, optimizer)
-        else:
-            return False
 
     # ---- Improvement & Tracking -----------------------------------------------------
     def _is_improvement_loss(self, loss: float) -> bool:

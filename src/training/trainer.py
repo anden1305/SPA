@@ -1,10 +1,8 @@
-from src.data.data_loader import DataLoader
 from src.data.data_loader_collection import DataLoaderCollection
 from src.models.base_model import BaseModel
 from src.validation.validator import Validator
-from src.config.config import GlobalConfig, TrainerConfig
+from src.config.config import GlobalConfig
 from src.training.early_stopping import create_early_stopper
-from src.training.validation_controller import ValidationController
 from src.training.experiment_logger import create_logger
 from src.helpers.profiling import write_cprofile_outputs
 import cProfile
@@ -28,7 +26,6 @@ class Trainer:
         self.current_epoch = 0
         self.validator = validator
         self.early_stopping = create_early_stopper(self.config, self.global_config.verbose)
-        self.validation_controller = ValidationController(validator=self.validator, early_stopper=self.early_stopping, config_trainer=self.config, global_verbose=self.global_config.verbose,)
     
     def __init_optimizer(self):
         if self.config.optimizer == "adam":
@@ -89,7 +86,8 @@ class Trainer:
                     self.scheduler.step()
             self.losses[epoch] = sum(self.epoch_losses) / len(self.epoch_losses)
             self.regularization_losses[epoch] = sum(self.epoch_regularization_losses) / len(self.epoch_regularization_losses)
-            should_stop = self.validation_controller.step(epoch, self.model, self.optimizer)
+            if self.config.validate_per_epoch > 0 and (epoch + 1) % self.config.validate_per_epoch == 0:
+                self.validator.validate_epoch(epoch, self.optimizer)
             lr = self.optimizer.param_groups[0].get('lr')
             val = self.validator.validations.get(epoch, {})
             logger.log_epoch(
@@ -101,7 +99,7 @@ class Trainer:
                 epoch=epoch + 1,
                 run_seed=int(self.global_config.seed),
             )
-            if should_stop:
+            if self.early_stopping is not None and self.early_stopping.step(self.losses[epoch], self.model, epoch, optimizer=self.optimizer):
                 break
             self.epoch_losses.clear()
             self.epoch_regularization_losses.clear()
@@ -128,7 +126,6 @@ class Trainer:
             self.early_stopping = create_early_stopper(self.config, self.global_config.verbose)
         else:
             self.early_stopping = None
-        self.validation_controller = ValidationController(validator=self.validator, early_stopper=self.early_stopping, config_trainer=self.config, global_verbose=self.global_config.verbose)
             
     def __print_training_start(self):
         print("\n" + "=" * 60)
