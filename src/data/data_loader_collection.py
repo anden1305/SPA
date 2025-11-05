@@ -3,7 +3,7 @@ import torch
 from src.config.config import GlobalConfig
 from src.data.base_dataset import BaseDataset
 from src.data.data_loader import DataLoader
-from src.preprocessing.base_transform import BaseTransform
+from src.preprocessing.helpers.base_transform import BaseTransform
 
 
 class DataLoaderCollection:
@@ -47,7 +47,10 @@ class DataLoaderCollection:
     
     def get_state_names(self) -> list[str]:
         return self.state_names
-    
+
+    def get_feature_names(self) -> list[str]:
+        return self.data_loaders[0].get_feature_names()
+
     def get_all_data(self):
         xs = []
         ys = []
@@ -59,6 +62,9 @@ class DataLoaderCollection:
         y_all = torch.cat(ys, dim=1)
         
         return x_all, y_all
+    
+    def has_features_enabled(self):
+        return self.data_loaders[0].has_features_enabled()
     
     def __iter__(self) -> "DataLoaderCollection":
         ## shuffle data loaders at the start of each epoch if required

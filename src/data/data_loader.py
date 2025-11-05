@@ -4,15 +4,28 @@ from typing import Iterator
 import numpy as np
 from src.data.base_dataset import BaseDataset
 from src.config.config import GlobalConfig, TransformsConfig
-from src.preprocessing.base_transform import BaseTransform
+from src.preprocessing.beta_delta_pac import BetaDeltaPAC
+from src.preprocessing.beta_delta_ratio import BetaDeltaRatio
+from src.preprocessing.burst_rate import BurstRate
+from src.preprocessing.envelope_gini import EnvelopeGini
+from src.preprocessing.theta_beta_pac import ThetaBetaPAC
+from src.preprocessing.theta_beta_ratio import ThetaBetaRatio
+from src.preprocessing.theta_delta_pac import ThetaDeltaPAC
+from src.preprocessing.theta_gamma_pac import ThetaGammaPAC
+from src.preprocessing.duty_cycle import DutyCycle
+from src.preprocessing.helpers.base_transform import BaseTransform
 import torch
-from src.preprocessing.LEGACY_batch_raw import BatchRaw
 from src.preprocessing.fft_band_power import FFTBandPower
 from src.preprocessing.fft_log_power import FFTLogPower
 from src.preprocessing.fft_power import FFTPower
-from src.preprocessing.high_pass_filter import HighPassFilter
+from src.preprocessing.fft_relative_band_power import FFTRelativeBandPower
+from src.preprocessing.band_pass_filter import BandPassFilter
+from src.preprocessing.theta_peak_quality import ThetaPeakQuality
 from src.preprocessing.percentile_clipping import PercentileClipping
-from src.preprocessing.LEGACY_reshape import Reshape
+from src.preprocessing.absolute_power import AbsolutePower
+from src.preprocessing.rms import RMS
+from src.preprocessing.theta_delta_ratio import ThetaDeltaRatio
+from src.preprocessing.theta_to_beta_gamma_ratio import ThetaToBetaGammaRatio
 
 class DataLoader(Iterator):
     """Documentation
@@ -35,12 +48,16 @@ class DataLoader(Iterator):
         self.device = device
         self.verbose = self.global_config.verbose
         self._epoch = 0
+        self.has_features: bool = False
         self.__process_data()
     
     def __process_data(self):
         # get data
         x, y = self.dataset[:]
         x, y = self.__apply_transforms(x, y)
+        # flip axis 0 and 1 if data is raw
+        if x.shape[0] == 1:
+            x = x.transpose(1, 0, 2)
         # normalize data
         if self.normalize:
             x = (x - x.mean(axis=(0,1))) / x.std(axis=(0,1))
@@ -101,10 +118,143 @@ class DataLoader(Iterator):
                             sampling_rate=self.dataset.get_sampling_rate()
                         )
                     )
+                case 'fft_relative_band_power':
+                    self.transforms[channel].append(
+                        FFTRelativeBandPower(
+                            config=config,
+                            window_size=self.config.window_size,
+                            stride=self.config.stride,
+                            sampling_rate=self.dataset.get_sampling_rate()
+                        )
+                    )
+                case 'theta_delta_ratio':
+                    self.transforms[channel].append(
+                        ThetaDeltaRatio(
+                            config=config,
+                            window_size=self.config.window_size,
+                            stride=self.config.stride,
+                            sampling_rate=self.dataset.get_sampling_rate()
+                        )
+                    )
+                case 'beta_delta_ratio':
+                    self.transforms[channel].append(
+                        BetaDeltaRatio(
+                            config=config,
+                            window_size=self.config.window_size,
+                            stride=self.config.stride,
+                            sampling_rate=self.dataset.get_sampling_rate()
+                        )
+                    )
+                case 'theta_beta_ratio':
+                    self.transforms[channel].append(
+                        ThetaBetaRatio(
+                            config=config,
+                            window_size=self.config.window_size,
+                            stride=self.config.stride,
+                            sampling_rate=self.dataset.get_sampling_rate()
+                        )
+                    )
+                case 'absolute_power':
+                    self.transforms[channel].append(
+                        AbsolutePower(
+                            config=config,
+                            window_size=self.config.window_size,
+                            stride=self.config.stride,
+                            sampling_rate=self.dataset.get_sampling_rate()
+                        )
+                    )
+                case "rms":
+                    self.transforms[channel].append(
+                        RMS(
+                            config=config,
+                            window_size=self.config.window_size,
+                            stride=self.config.stride,
+                        )
+                    )
+                case "theta_peak_quality":
+                    self.transforms[channel].append(
+                        ThetaPeakQuality(
+                            config=config,
+                            window_size=self.config.window_size,
+                            stride=self.config.stride,
+                            sampling_rate=self.dataset.get_sampling_rate()
+                        )
+                    )
+                case 'duty_cycle':
+                    self.transforms[channel].append(
+                        DutyCycle(
+                            config=config,
+                            window_size=self.config.window_size,
+                            stride=self.config.stride,
+                        )
+                    )
+                case 'theta_to_beta_gamma_ratio':
+                    self.transforms[channel].append(
+                        ThetaToBetaGammaRatio(
+                            config=config,
+                            window_size=self.config.window_size,
+                            stride=self.config.stride,
+                            sampling_rate=self.dataset.get_sampling_rate()
+                        )
+                    )
+                case 'theta_gamma_pac':
+                    self.transforms[channel].append(
+                        ThetaGammaPAC(
+                            config=config,
+                            window_size=self.config.window_size,
+                            stride=self.config.stride,
+                            sampling_rate=self.dataset.get_sampling_rate()
+                        )
+                    )
+                case 'theta_delta_pac':
+                    self.transforms[channel].append(
+                        ThetaDeltaPAC(
+                            config=config,
+                            window_size=self.config.window_size,
+                            stride=self.config.stride,
+                            sampling_rate=self.dataset.get_sampling_rate()
+                        )
+                    )
+                case 'theta_beta_pac':
+                    self.transforms[channel].append(
+                        ThetaBetaPAC(
+                            config=config,
+                            window_size=self.config.window_size,
+                            stride=self.config.stride,
+                            sampling_rate=self.dataset.get_sampling_rate()
+                        )
+                    )
+                case 'beta_delta_pac':
+                    self.transforms[channel].append(
+                        BetaDeltaPAC(
+                            config=config,
+                            window_size=self.config.window_size,
+                            stride=self.config.stride,
+                            sampling_rate=self.dataset.get_sampling_rate()
+                        )
+                    )
+                case 'burst_rate':
+                    self.transforms[channel].append(
+                        BurstRate(
+                            config=config,
+                            window_size=self.config.window_size,
+                            stride=self.config.stride,
+                            sampling_rate=self.dataset.get_sampling_rate()
+                        )
+                    )
+                case 'envelope_gini':
+                    self.transforms[channel].append(
+                        EnvelopeGini(
+                            config=config,
+                            window_size=self.config.window_size,
+                            stride=self.config.stride,
+                            sampling_rate=self.dataset.get_sampling_rate()
+                        )
+                    )
                 case "percentile_clipping":
                     self.transforms[channel].append(PercentileClipping(config=config))
-                case "high_pass_filter":
-                    self.transforms[channel].append(HighPassFilter(config=config, sampling_rate=self.dataset.get_sampling_rate()))
+                case "band_pass_filter":
+                    self.transforms[channel].append(BandPassFilter(config=config, sampling_rate=self.dataset.get_sampling_rate()))
                 case _:
                     raise ValueError(f"Unknown transform: {config.type}.")
     
@@ -132,6 +282,7 @@ class DataLoader(Iterator):
 
         processed_groups: list[np.ndarray] = []
         processed_y = None
+        feature_names = []
         for ch_type, transforms in self.transforms.items():
             
             # find indices for this channel type (case-insensitive)
@@ -145,7 +296,7 @@ class DataLoader(Iterator):
             # convert to (T, C_group) which most transforms expect
             group_x = group_x.transpose(1, 0)
             group_y = y
-
+            
             # split transforms by stage
             pre_transforms = [t for t in transforms if t.get_stage() == "preprocessing"]
             post_transforms = [t for t in transforms if t.get_stage() == "postprocessing"]
@@ -155,9 +306,29 @@ class DataLoader(Iterator):
                 group_x, group_y = t(group_x, group_y)
 
             # apply postprocessing
+            group_x_features = []
+            group_y_features = []
             for t in post_transforms:
-                group_x, group_y = t(group_x, group_y)
+                _group_x, _group_y = t(group_x, group_y)
+                for channel_index in range(_group_x.shape[2]):
+                    for feature_index in range(_group_x.shape[1]):
+                        feature_names.append(f"{t.get_short_name()}{' ' + str(feature_index+1) if _group_x.shape[1] > 1 else ''} ({ch_type}{' ' + str(channel_index+1) if _group_x.shape[2] > 1 else ''})")
+                if _group_x.shape[1] > 1:
+                     _group_x = _group_x.reshape(_group_x.shape[0], 1, _group_x.shape[1] * _group_x.shape[2])
+                group_x_features.append(_group_x)
+                group_y_features.append(_group_y)
             
+            # concatenate postprocessed features along last axis
+            if len(group_x_features) > 0:
+                self.has_features = True
+                group_x = np.concatenate(group_x_features, axis=2)
+                # for labels, ensure consistency across postprocessing transforms
+                first_y = group_y_features[0]
+                for other_y in group_y_features[1:]:
+                    if not np.array_equal(first_y, other_y):
+                        raise ValueError("Labels produced by postprocessing transforms are inconsistent.")
+                group_y = first_y
+
             if group_x.ndim == 2:
                 group_x = np.expand_dims(group_x, axis=0)
 
@@ -182,10 +353,22 @@ class DataLoader(Iterator):
         if len(set(Ns)) > 1 or len(set(Ts)) > 1:
             raise ValueError(f"Transformed channel groups have mismatched shapes: Ns={Ns}, Ts={Ts}.")
 
+        # save feature names
+        self.feature_names = feature_names
+
         # concatenate along last axis (features / channels)
         x_out = np.concatenate(processed_groups, axis=2)
         return x_out, processed_y
     
+    def has_posttransforms(self) -> bool:
+        for channel in self.transforms:
+            for t in self.transforms[channel]:
+                if t.get_stage() == "postprocessing":
+                    return True
+        return False
+    
+    def get_feature_names(self) -> list[str]:
+        return self.feature_names
     
     def __iter__(self) -> "DataLoader":
         """Handles every start of new epoch logic (shuffle etc.)."""
@@ -220,6 +403,9 @@ class DataLoader(Iterator):
         x = np.expand_dims(x, axis=0)
         y = np.expand_dims(y, axis=0)
         return torch.from_numpy(x).to(self.device), torch.from_numpy(y).to(self.device)
+    
+    def has_features_enabled(self) -> bool:
+        return self.has_features
 
     def __print_data_info(self):
         print("\n" + "=" * 60)

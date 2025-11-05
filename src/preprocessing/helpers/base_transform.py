@@ -35,6 +35,10 @@ class BaseTransform(ABC):
     @abstractmethod
     def __str__(self) -> str:
         raise NotImplementedError('This method has to be implemented.')
+    
+    @abstractmethod
+    def get_short_name(self) -> str:
+        raise NotImplementedError('This method has to be implemented.')
 
     def get_stage(self) -> str:
         return self.stage.value

@@ -18,6 +18,8 @@ class MSSVDataset(BaseDataset):
         self.run = config.run if config.run is not None else 1
         self.data_path = f'{self.BASE_PATH}/{config.id}/{self.run}'
         super().__init__(config=config)
+        if self.dataset_config.remove_artifact:
+            self.data, self.labels = self.remove_artifact(self.data, self.labels)
     
     def load_data(self):
         data = None
@@ -31,8 +33,22 @@ class MSSVDataset(BaseDataset):
 
     def load_labels(self):
         labels = np.load(f'{self.data_path}/labels.npy')
+        ordered_unique_labels = np.unique(labels) - 1
+        self.config['stage_names'] = [self.config['stage_names'][i] for i in ordered_unique_labels]
+        self.config['n_stages'] = len(self.config['stage_names'])
         labels = labels - min(labels)
         return labels
+    
+    def remove_artifact(self, data: np.ndarray, labels: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        if not 'Artifact' in self.config['stage_names']:
+            return data, labels
+        artifact_index = self.config['stage_names'].index('Artifact')
+        mask = labels != artifact_index
+        data = data[:, mask]
+        labels = labels[mask]
+        self.config['stage_names'].remove('Artifact')
+        self.config['n_stages'] -= 1
+        return data, labels
 
     def load_config(self):
         config = {}

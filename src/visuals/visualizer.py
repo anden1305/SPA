@@ -24,17 +24,24 @@ class Visualizer:
         self.global_config = config
         self.config = self.global_config.visualizer
         self.validator = validator
-        
+    
     ####### GENERAL METHODS #######
     
     def visualize_data(self):
         path = Path(self.global_config.results_dir) / self.global_config.run_name / "plots"
         path.mkdir(parents=True, exist_ok=True)
+        try:
+            dv = self.validator.get_data_validations()
+        except Exception as e:
+            print('There was no data validations to visualize.')
+            return
         if self.global_config.visualizer.state_distinctness and self.global_config.validator.state_distinctness:
             self.__plot_state_distinctness(path=path)
         if self.global_config.visualizer.summary_statistics and self.global_config.validator.summary_statistics:
             self.__plot_summary_statistics(path=path)
-            self.__plot_frequency_statistics(path=path)
+            self.__plot_feature_statistics(path=path)
+            self.__plot_feature_correlations(path=path)
+        self.__plot_feature_separability(path=path)
     
     def visualize(self, train_details: TrainDetails):
         path = train_details.get_path() / "plots"
@@ -74,107 +81,348 @@ class Visualizer:
     ####### HELPER METHODS #######
     
     
-    def __plot_frequency_statistics(self, path: Path):
-        # load from validator
+    def __plot_feature_statistics(self, path: Path):
+        """Visualise per-state feature statistics supplied by the validator."""
         dv = self.validator.get_data_validations()
-        freq_stats = dv.get("frequency_statistics", {})
-        if not freq_stats:
+        raw_stats = dv.get("feature_statistics", {})
+        if not raw_stats:
             return
 
-        # freq_stats: dict[state_str->array_like (F,)]
-        # Collect states sorted by key (attempt numeric order when possible)
-        def key_fn(k):
-            try:
-                return int(k)
-            except Exception:
-                return k
-
-        states = sorted(list(freq_stats.keys()), key=key_fn)
-
-        # Convert all to numpy arrays and determine frequency length
-        arrays = {}
-        maxF = 0
-        for s in states:
-            v = freq_stats[s]
-            if hasattr(v, 'detach'):
-                # torch tensor
+        def _to_array(value: Any) -> np.ndarray:
+            if value is None:
+                return np.asarray([], dtype=float)
+            if hasattr(value, "detach"):
                 try:
-                    arr = v.detach().cpu().numpy().reshape(-1)
+                    return value.detach().cpu().numpy().reshape(-1)
                 except Exception:
-                    arr = np.asarray(v).reshape(-1)
-            else:
-                arr = np.asarray(v).reshape(-1)
-            arrays[s] = arr
-            if arr.size > maxF:
-                maxF = arr.size
+                    return np.asarray(value).reshape(-1)
+            arr = np.asarray(value)
+            if arr.size == 0:
+                return np.asarray([], dtype=float)
+            return arr.reshape(-1)
 
-        if maxF == 0:
+        # Normalise structure so we always operate on metric -> state -> feature array
+        metrics: dict[str, dict[str, Any]]
+        if isinstance(raw_stats, dict) and raw_stats and all(isinstance(v, dict) for v in raw_stats.values()):
+            metrics = raw_stats  # already metric keyed
+        else:
+            metrics = {"amplitude": raw_stats}
+
+        std_lookup: dict[str, dict[str, Any]] = {
+            key[:-4]: value for key, value in metrics.items()
+            if key.endswith('_std') and isinstance(value, dict)
+        }
+
+        def key_fn(key: str):
+            try:
+                return int(key)
+            except Exception:
+                return key
+
+        # Collect the union of states across all metrics to ensure consistent ordering
+        state_keys: set[str] = set()
+        for metric_values in metrics.values():
+            state_keys.update(metric_values.keys())
+        states = sorted(state_keys, key=key_fn)
+        if not states:
             return
 
-        freq_axis = np.arange(maxF)
-
-        # Combined line plot: all states on a single, publication-ready figure
-        sns.set_style('whitegrid')
-        n_states = len(states)
-        # choose a qualitative palette sized to number of states
-        palette_name = 'tab10' if n_states <= 10 else 'tab20' if n_states <= 20 else 'hsv'
-        try:
-            colors = sns.color_palette(palette_name, n_states)
-        except Exception:
-            colors = sns.color_palette('tab10', n_states)
-
-        fig, ax = plt.subplots(figsize=(12, 6))
-        for i, s in enumerate(states):
-            arr = arrays[s]
-            if arr.size != maxF:
-                padded = np.full(maxF, np.nan)
-                padded[:arr.size] = arr
-                arr = padded
-            # prefer human-readable state names when available
+        state_names = self.data_loader.get_state_names() or []
+        display_labels: dict[str, str] = {}
+        for s in states:
             label = s
             try:
-                if s.isdigit():
-                    names = self.data_loader.get_state_names() or []
-                    if len(names) > int(s):
-                        label = names[int(s)]
+                if str(s).isdigit():
+                    idx = int(s)
+                    if 0 <= idx < len(state_names):
+                        label = state_names[idx]
             except Exception:
                 pass
-            ax.plot(freq_axis, arr, label=label, color=colors[i % len(colors)], linewidth=1.8, alpha=0.9)
+            display_labels[s] = label
 
-        ax.set_xlabel('Frequency bin', fontsize=12)
-        ax.set_ylabel('Average power (a.u.)', fontsize=12)
-        ax.set_title('Per-state average power across frequency bins', fontsize=14)
-        ax.tick_params(axis='both', which='major', labelsize=10)
-        ax.grid(True, which='both', linestyle='--', linewidth=0.4, alpha=0.6)
+        sns.set_style('whitegrid')
+        palette_name = 'tab10' if len(states) <= 10 else 'tab20' if len(states) <= 20 else 'hsv'
+        try:
+            base_colors = sns.color_palette(palette_name, len(states))
+        except Exception:
+            base_colors = sns.color_palette('tab10', len(states))
 
-        # Place legend to the right of the plot for clarity (publication style)
-        leg = ax.legend(loc='center left', bbox_to_anchor=(1.02, 0.5), fontsize='small', frameon=False)
+        metric_store: dict[str, dict[str, np.ndarray]] = {}
+        std_store: dict[str, dict[str, np.ndarray]] = {}
+        global_max_features = 0
 
-        fig.tight_layout(rect=(0, 0, 0.85, 1.0))
-        fig.savefig(path / 'frequency_mean_per_state.png', dpi=300, bbox_inches='tight')
-        plt.close(fig)
+        for metric_key in sorted(metrics.keys()):
+            if metric_key.endswith('_std'):
+                continue
 
-        # Heatmap: states x frequency
-        mat = np.vstack([arrays[s] if arrays[s].size == maxF else np.pad(arrays[s], (0, maxF - arrays[s].size), constant_values=np.nan) for s in states])
-        fig2, ax2 = plt.subplots(figsize=(12, max(2, len(states) * 0.5)))
-        sns.heatmap(mat, ax=ax2, cmap='viridis', cbar_kws={'label': 'Average power'}, xticklabels=10)
-        # yticklabels: use state names when available
-        state_names = self.data_loader.get_state_names() or []
-        ylabels = []
-        for s in states:
-            if s.isdigit() and len(state_names) > int(s):
-                ylabels.append(state_names[int(s)])
+            metric_values = metrics[metric_key]
+            metric_title = metric_key.replace('_', ' ').title()
+            std_values = std_lookup.get(metric_key)
+
+            # Gather arrays per state and track maximum feature count
+            arrays: dict[str, np.ndarray] = {}
+            std_arrays: dict[str, np.ndarray] | None = {} if std_values is not None else None
+            max_features = 0
+            for s in states:
+                arr = _to_array(metric_values.get(s))
+                arrays[s] = arr
+                max_features = max(max_features, arr.size)
+                if std_arrays is not None:
+                    std_arr = _to_array(std_values.get(s)) if std_values is not None else np.asarray([], dtype=float)
+                    std_arrays[s] = std_arr
+                    max_features = max(max_features, std_arr.size)
+
+            if std_arrays is not None:
+                has_valid_std = any(std_arr.size and np.any(np.isfinite(std_arr)) for std_arr in std_arrays.values())
+                if not has_valid_std:
+                    std_arrays = None
+
+            if max_features == 0:
+                continue
+            
+            metric_store[metric_key] = arrays
+            if std_arrays is not None:
+                std_store[metric_key] = std_arrays
+            global_max_features = max(global_max_features, max_features)
+
+            feature_axis = np.arange(1, max_features + 1)
+            # feature_labels = [f"Feature {i}" for i in feature_axis]
+            feature_labels = self.data_loader.get_feature_names()
+
+            # Line plot with optional std shading
+            fig, ax = plt.subplots(figsize=(12, 6))
+            for idx, s in enumerate(states):
+                arr = arrays[s]
+                padded = np.full(max_features, np.nan)
+                if arr.size:
+                    padded[:arr.size] = arr
+                color = base_colors[idx % len(base_colors)]
+
+                if std_arrays is not None:
+                    std_arr = std_arrays.get(s, np.asarray([], dtype=float))
+                    std_padded = np.full(max_features, np.nan)
+                    if std_arr.size:
+                        std_padded[:std_arr.size] = std_arr
+                    valid_mask = np.isfinite(std_padded) & np.isfinite(padded)
+                    if valid_mask.any():
+                        lower = padded.copy()
+                        upper = padded.copy()
+                        lower[valid_mask] = padded[valid_mask] - std_padded[valid_mask]
+                        upper[valid_mask] = padded[valid_mask] + std_padded[valid_mask]
+                        ax.fill_between(feature_axis, lower, upper, where=valid_mask,
+                                        color=color, alpha=0.18, linewidth=0)
+
+                ax.plot(feature_axis, padded, label=display_labels[s],
+                        color=color, linewidth=1.8, alpha=0.9)
+
+            ax.set_xlabel('Feature', fontsize=12)
+            ax.set_ylabel(metric_title, fontsize=12)
+            ax.set_title(f'{metric_title} Per State Across Features', fontsize=14)
+            ax.set_xticks(feature_axis)
+            ax.set_xticklabels(feature_labels, rotation=45, ha='right')
+            ax.tick_params(axis='both', which='major', labelsize=10)
+            ax.grid(True, which='both', linestyle='--', linewidth=0.4, alpha=0.6)
+            ax.legend(loc='upper right', fontsize='small', frameon=False)
+            fig.tight_layout()
+            fig.savefig(path / f'feature_{metric_key.lower()}_per_state.png', dpi=300, bbox_inches='tight')
+            plt.close(fig)
+
+            # Heatmap: states x features for this metric
+            mat = np.full((len(states), max_features), np.nan)
+            for row_idx, s in enumerate(states):
+                arr = arrays[s]
+                if arr.size:
+                    mat[row_idx, :min(arr.size, max_features)] = arr[:max_features]
+
+            fig2, ax2 = plt.subplots(figsize=(12, max(2.5, len(states) * 0.6)))
+            sns.heatmap(mat, ax=ax2, cmap='viridis', cbar_kws={'label': metric_title},
+                        xticklabels=feature_labels, yticklabels=[display_labels[s] for s in states])
+            ax2.set_xlabel('Feature')
+            ax2.set_title(f'{metric_title} Heatmap (State × Feature)')
+            # Make x labels much smaller and keep rotation for readability
+            plt.setp(ax2.get_xticklabels(), fontsize=6, rotation=45, ha='right')
+            # Make y labels horizontal
+            plt.setp(ax2.get_yticklabels(), fontsize=9, rotation=0, ha='right')
+            fig2.tight_layout()
+            fig2.savefig(path / f'feature_{metric_key.lower()}_heatmap.png', dpi=250)
+            plt.close(fig2)
+
+        metrics_to_plot = list(metric_store.keys())
+        if not metrics_to_plot or global_max_features == 0:
+            return
+
+        metric_palette = sns.color_palette('deep', len(metrics_to_plot))
+
+        for feat_idx in range(global_max_features):
+            feature_label = f'Feature {feat_idx + 1}'
+            x_positions = np.arange(len(states))
+
+            values_by_metric: list[np.ndarray] = []
+            errors_by_metric: list[np.ndarray | None] = []
+            for metric_key in metrics_to_plot:
+                arrays = metric_store.get(metric_key, {})
+                std_arrays = std_store.get(metric_key)
+
+                metric_values = []
+                metric_errors = []
+                for s in states:
+                    arr = arrays.get(s, np.asarray([], dtype=float))
+                    val = float(arr[feat_idx]) if arr.size > feat_idx else np.nan
+                    metric_values.append(val)
+                    if std_arrays is not None:
+                        std_arr = std_arrays.get(s, np.asarray([], dtype=float))
+                        err_val = float(std_arr[feat_idx]) if std_arr.size > feat_idx else np.nan
+                    else:
+                        err_val = np.nan
+                    metric_errors.append(err_val)
+
+                values_by_metric.append(np.asarray(metric_values, dtype=float))
+                if std_arrays is not None and not np.all(np.isnan(metric_errors)):
+                    errors_by_metric.append(np.asarray(metric_errors, dtype=float))
+                else:
+                    errors_by_metric.append(None)
+
+            if all(np.all(np.isnan(vals)) for vals in values_by_metric):
+                continue
+
+            width = 0.8 / max(1, len(metrics_to_plot))
+            fig_feat, ax_feat = plt.subplots(figsize=(max(7, len(states) * 1.1), 4.5))
+
+            for metric_idx, metric_key in enumerate(metrics_to_plot):
+                offset = (metric_idx - (len(metrics_to_plot) - 1) / 2) * width
+                positions = x_positions + offset
+                values = values_by_metric[metric_idx]
+                errors = errors_by_metric[metric_idx]
+
+                if np.all(np.isnan(values)):
+                    continue
+
+                bar_kwargs: dict[str, Any] = {
+                    'x': positions,
+                    'height': values,
+                    'width': width * 0.9,
+                    'color': metric_palette[metric_idx % len(metric_palette)],
+                    'alpha': 0.9,
+                    'label': metric_key.replace('_', ' ').title(),
+                }
+
+                if errors is not None:
+                    bar_kwargs['yerr'] = errors
+                    bar_kwargs['capsize'] = 4
+                    bar_kwargs['error_kw'] = {'elinewidth': 1, 'alpha': 0.7}
+
+                ax_feat.bar(**bar_kwargs)
+
+            ax_feat.set_xticks(x_positions)
+            ax_feat.set_xticklabels([display_labels[s] for s in states], rotation=30, ha='right')
+            ax_feat.set_ylabel('Value')
+            ax_feat.set_xlabel('State')
+            ax_feat.set_title(f'{feature_label} – Metrics by State')
+            ax_feat.legend(loc='upper right', fontsize='small', frameon=False)
+            ax_feat.grid(True, axis='y', linestyle='--', linewidth=0.4, alpha=0.6)
+
+            fig_feat.tight_layout()
+            out_name = f'feature_summary_{feat_idx + 1:02d}.png'
+            fig_feat.savefig(path / out_name, dpi=250)
+            plt.close(fig_feat)
+
+    def __plot_feature_correlations(self, path: Path) -> None:
+        """Plot feature-feature correlation heatmaps (overall and per-state) from validator data."""
+        dv = self.validator.get_data_validations()
+        corr = dv.get("feature_correlations", {})
+        if not corr:
+            return
+
+        overall = np.asarray(corr.get("overall", []), dtype=float)
+        per_state: dict[str, Any] = corr.get("per_state", {}) or {}
+        feature_names = corr.get("feature_names") or self.data_loader.get_feature_names() or []
+
+        if overall.size:
+            fig, ax = plt.subplots(figsize=(10, 8))
+            sns.heatmap(overall, ax=ax, cmap='coolwarm', center=0.0, vmin=-1.0, vmax=1.0,
+                        xticklabels=feature_names if len(feature_names) == overall.shape[1] else True,
+                        yticklabels=feature_names if len(feature_names) == overall.shape[0] else True,
+                        square=True, cbar_kws={'label': 'Pearson r'})
+            ax.set_title('Feature Correlation (Overall)')
+            plt.setp(ax.get_xticklabels(), rotation=45, ha='right', fontsize=8)
+            plt.setp(ax.get_yticklabels(), rotation=0, ha='right', fontsize=8)
+            fig.tight_layout()
+            fig.savefig(path / 'feature_correlation_overall.png', dpi=250)
+            plt.close(fig)
+
+        # Per-state heatmaps
+        if per_state:
+            state_names = self.data_loader.get_state_names() or []
+            for k, mat in per_state.items():
+                mat_np = np.asarray(mat, dtype=float)
+                if mat_np.size == 0:
+                    continue
+                try:
+                    idx = int(k)
+                except Exception:
+                    idx = None
+                label = state_names[idx] if (idx is not None and 0 <= idx < len(state_names)) else str(k)
+                fig, ax = plt.subplots(figsize=(10, 8))
+                sns.heatmap(mat_np, ax=ax, cmap='coolwarm', center=0.0, vmin=-1.0, vmax=1.0,
+                            xticklabels=feature_names if len(feature_names) == mat_np.shape[1] else True,
+                            yticklabels=feature_names if len(feature_names) == mat_np.shape[0] else True,
+                            square=True, cbar_kws={'label': 'Pearson r'})
+                ax.set_title(f'Feature Correlation – State {label}')
+                plt.setp(ax.get_xticklabels(), rotation=45, ha='right', fontsize=8)
+                plt.setp(ax.get_yticklabels(), rotation=0, ha='right', fontsize=8)
+                fig.tight_layout()
+                safe_label = str(label).replace(' ', '_')
+                fig.savefig(path / f'feature_correlation_state_{safe_label}.png', dpi=230)
+                plt.close(fig)
+
+    def __plot_feature_separability(self, path: Path) -> None:
+        dv = self.validator.get_data_validations()
+        separability = dv.get("feature_separability", {})
+        if not separability:
+            return
+
+        scores = np.asarray(separability.get("scores", []), dtype=float)
+        if scores.size == 0:
+            return
+
+        feature_names: Optional[Sequence[str]] = separability.get("feature_names")
+        if not feature_names or len(feature_names) != scores.size:
+            fallback_names = self.data_loader.get_feature_names() or []
+            if len(fallback_names) != scores.size:
+                feature_names = [f"Feature {i + 1}" for i in range(scores.size)]
             else:
-                ylabels.append(s)
-        ax2.set_yticks(np.arange(len(states)) + 0.5)
-        ax2.set_yticklabels(ylabels, rotation=0)
-        ax2.set_xlabel('Frequency bin')
-        ax2.set_title('Frequency heatmap (states x frequency)')
-        fig2.tight_layout()
-        fig2.savefig(path / 'frequency_heatmap.png', dpi=200)
-        plt.close(fig2)
+                feature_names = [str(name) for name in fallback_names]
+        else:
+            feature_names = [str(name) for name in feature_names]
 
-        # Individual per-state plots removed — combined figure and heatmap kept
+        order = np.argsort(scores)[::-1]
+        sorted_scores = scores[order]
+        sorted_names = [feature_names[idx] for idx in order]
+
+        sns.set_style('whitegrid')
+        fig_height = max(4.0, 0.35 * len(sorted_scores))
+        fig, ax = plt.subplots(figsize=(12, fig_height))
+
+        y_pos = np.arange(len(sorted_scores))
+        palette = sns.cubehelix_palette(len(sorted_scores), start=0.6, rot=-0.75)
+        bars = ax.barh(y_pos, sorted_scores, color=palette)
+        ax.invert_yaxis()
+        ax.set_yticks(y_pos)
+        ax.set_yticklabels(sorted_names)
+        ax.set_xlabel('Fisher score (higher is better)')
+        ax.set_title('Feature separability ranking')
+
+        max_score = float(np.nanmax(sorted_scores)) if np.isfinite(sorted_scores).any() else 0.0
+        offset = max(max_score * 0.015, 0.01)
+        # Annotate each bar with its score so analysts can compare relative separability at a glance.
+        for idx, bar in enumerate(bars):
+            width = float(bar.get_width())
+            ax.text(width + offset, bar.get_y() + bar.get_height() / 2.0,
+                    f"{sorted_scores[idx]:.3f}", va='center', ha='left', fontsize=8, color='#333333')
+
+        fig.tight_layout()
+        fig.savefig(path / 'feature_separability_ranking.png', dpi=220, bbox_inches='tight')
+        plt.close(fig)
     
     def __plot_summary_statistics(self, path: Path):
         # load from validator
@@ -231,13 +479,6 @@ class Visualizer:
             ax2b = ax2.twinx()
             ax2b.plot(x, means, color='tab:blue', marker='o', linestyle='-', label='Per-class mean')
             ax2b.fill_between(x, means - stds, means + stds, color='tab:blue', alpha=0.15)
-            ax2b.set_ylabel('Mean value')
-
-            # annotate bars with proportions
-            total = counts.sum() if counts.size > 0 else 1
-            for xi, cnt in zip(x, counts):
-                prop = cnt / total if total > 0 else 0.0
-                ax2.text(xi, cnt + max(1.0, total * 0.01), f'{int(cnt)}\n({prop:.1%})', ha='center', va='bottom', fontsize=9)
 
             # Legends
             lines, labels = ax2b.get_legend_handles_labels()
@@ -685,14 +926,7 @@ class Visualizer:
         # Save as HTML
         html_path = out_dir / 'confusion_matrix_dynamic.html'
         fig.write_html(str(html_path))
-        
-        if self.global_config.verbose:
-            print(f"Interactive confusion matrix saved: {html_path}")
-            print(f"   Use Play/Pause controls and speed buttons (0.5x to 4x)")
-            print(f"   Drag slider to navigate epochs manually")
-            print(f"   Animation speed: {fps:.1f} FPS ({frame_duration}ms per frame)")
-            print(f"   Evolution across {len(epochs)} epochs of training")
-
+    
     def __plot_metrics_over_epochs(self, train_details: TrainDetails):
         """Create a beautiful line plot showing NMI and Accuracy over training epochs using seaborn styling."""
         if not train_details.validations:
@@ -861,14 +1095,12 @@ class Visualizer:
         sns.reset_defaults()
         
         if self.global_config.verbose:
-            print(f"    Enhanced metrics plot saved: {png_path}")
-            print(f"    Shows NMI, Accuracy and Loss evolution (epochs: {len(all_epoch_display)})")
             if any(v is not None for v in nmi_values):
-                print(f"    Max NMI at epoch {max_nmi_epoch}: {max_nmi:.4f}")
+                print(f"Max NMI at epoch {max_nmi_epoch}: {max_nmi:.4f}")
             if any(v is not None for v in acc_values):
-                print(f"    Max Accuracy at epoch {max_acc_epoch}: {max_acc:.4f}")
+                print(f"Max Accuracy at epoch {max_acc_epoch}: {max_acc:.4f}")
             if loss_values:
-                print(f"    Min Loss at epoch {min_loss_epoch}: {min_loss:.6g}")
+                print(f"Min Loss at epoch {min_loss_epoch}: {min_loss:.6g}")
 
     def __plot_pca_tripanel(self, train_details: TrainDetails, x: Tensor, y: Tensor):
         """Save tri-panel PCA plots comparing HMM-init, HMM-trained, and True labels."""

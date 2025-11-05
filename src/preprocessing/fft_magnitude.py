@@ -3,8 +3,8 @@ import numpy as np
 
 from src.config.config import TransformsConfig
 from src.data.base_dataset import BaseDataset
-from src.preprocessing.base_transform import BaseTransform
-from src.preprocessing.fft import FFT
+from src.preprocessing.helpers.base_transform import BaseTransform
+from src.preprocessing.helpers.fft import FFT
 
 
 class FFTMagnitude(BaseTransform):
@@ -32,6 +32,9 @@ class FFTMagnitude(BaseTransform):
     
     def __call__(self, x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         return self.fft(x, y)
+
+    def get_short_name(self):
+        return "Magnitude"
 
     def __str__(self) -> str:
         return f"FFTMagnitude(window_size={self.window_size}, stride={self.stride}, sampling_rate={self.sampling_rate})"

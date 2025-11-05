@@ -2,102 +2,51 @@
 
 from typing import Any
 import torch
-from src.config.config import TransformsConfig
-from src.data.data_loader import DataLoader
 from src.data.data_loader_collection import DataLoaderCollection
-from src.preprocessing.LEGACY_fft import FFT
 
 
-def compute_frequency_statistics(x: torch.Tensor, y: torch.Tensor, data_loader: DataLoaderCollection) -> dict[str, Any]:
-    """Compute average power per frequency for each state in `y`.
+def compute_feature_statistics(x: torch.Tensor, y: torch.Tensor, data_loader: DataLoaderCollection, has_features: bool) -> dict[str, Any]:
+    if not has_features:
+        print('Skipping feature statistics calculation due to high dimensionality.')
+        return {}
 
-    Supports `x` shapes:
-    - (B, F)
-    - (B, T, F)
-
-    Supports `y` shapes:
-    - (B,)
-    - (B, T)
-
-    Returns a dict mapping state -> `torch.Tensor` of shape (F,) with the
-    average (mean) across samples belonging to that state.
-    If the dataset transforms do not include an `FFT` transform, returns an
-    empty dict.
-    """
-    # raise NotImplementedError("This function is not yet implemented.")
-    # transforms = data_loader.get_transforms()
-    
-    # eeg_transforms = transforms.get('EEG', []) or []
-    
-    # has_fft = any(
-    #     isinstance(t, FFT) or (hasattr(t, 'type') and 'fft' in getattr(t, 'type'))
-    #     for t in eeg_transforms
-    # )
-    
-    # print('Has FFT transform:', has_fft)
-
-    # if not has_fft:
-    #     fft = FFT(
-    #         config=TransformsConfig(
-    #             type='fft', 
-    #             channel='EEG',
-    #             params={
-    #                 'window_size': 512,
-    #                 'feature': 'power'
-    #             }
-    #         )
-    #     )
-    #     x, y = fft(x[0,:,:].numpy(), y[0].numpy())
-    #     x = torch.from_numpy(x)
-    #     y = torch.from_numpy(y)
-
-    if not isinstance(x, torch.Tensor) or not isinstance(y, torch.Tensor):
-        raise TypeError("x and y must be torch.Tensor instances")
-    
-    # Normalize inputs to sample-level pairs (N, F) and (N,)
-    if x.dim() == 2:
-        # (B, F)
-        x_flat = x
-        if y.dim() == 1:
-            y_flat = y
-        else:
-            raise ValueError(f"y has time dimension but x does not with shapes X: {x.shape} and Y: {y.shape}")
-    elif x.dim() == 3:
-        # (B, T, F)
-        B, T, F = x.shape
-        if y.dim() == 1:
-            # label per batch -> repeat for each time step
-            if y.shape[0] != B:
-                raise ValueError("Batch dimension mismatch between x and y")
-            y_flat = y.unsqueeze(1).expand(-1, T).reshape(-1)
-        elif y.dim() == 2:
-            if y.shape != (B, T):
-                raise ValueError("Shape mismatch: expected y shape (B,T) to match x")
-            y_flat = y.reshape(-1)
-        else:
-            raise ValueError("Unsupported y dimensions for x with time dimension")
-        x_flat = x.reshape(-1, F)
-    else:
-        raise ValueError("Unsupported x dimensions. Expected 2 or 3 dims")
-
-    # Ensure y is 1-D and integer-like for grouping
-    y_flat = y_flat.reshape(-1)
-
-    # Convert y to a tensor we can compare (keep dtype)
+    x_flat = x.reshape(-1, x.shape[-1])
+    y_flat = y.reshape(-1)
     states = torch.unique(y_flat)
 
-    stats: dict[str, Any] = {}
+    means: dict[str, list[float]] = {}
+    stds: dict[str, list[float]] = {}
+    variances: dict[str, list[float]] = {}
+
     for s in states:
         mask = y_flat == s
         key = str(int(s.item()))
         if mask.sum() == 0:
-            stats[key] = [0.0] * x_flat.shape[1]
+            empty = [float('nan')] * x_flat.shape[1]
+            means[key] = empty
+            stds[key] = empty
+            variances[key] = empty
             continue
+
         selected = x_flat[mask]
         mean_vec = selected.mean(dim=0)
+        var_vec = selected.var(dim=0, unbiased=False)
+        std_vec = torch.sqrt(var_vec)
+
         try:
-            stats[key] = mean_vec.detach().cpu().tolist()
+            means[key] = mean_vec.detach().cpu().tolist()
+            variances[key] = var_vec.detach().cpu().tolist()
+            stds[key] = std_vec.detach().cpu().tolist()
         except Exception:
-            stats[key] = mean_vec.tolist()
-    out = {'frequency_statistics': stats}
+            means[key] = mean_vec.tolist()
+            variances[key] = var_vec.tolist()
+            stds[key] = std_vec.tolist()
+
+    out = {
+        'feature_statistics': {
+            'amplitude': means,
+            'amplitude_std': stds,
+            'variance': variances,
+        }
+    }
     return out
