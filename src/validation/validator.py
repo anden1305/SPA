@@ -8,6 +8,7 @@ from src.data.data_loader_collection import DataLoaderCollection
 from src.helpers.accuracy import accuracy
 from src.helpers.align_labels import align_labels_hungarian
 from src.helpers.frequency_statistics import compute_frequency_statistics
+from src.helpers.metrics_aggregation import summarize_metrics
 from src.helpers.nmi import calculate_nmi
 from src.helpers.summary_statistics import compute_summary_statistics
 from src.models.base_model import BaseModel
@@ -104,6 +105,7 @@ class Validator:
         losses = [list(detail.losses.values()) for detail in train_details]
         final_losses = [loss[-1] for loss in losses]
         validations['loss'] = {details.run_number: final_losses[i] for i, details in enumerate(train_details)}
+        summarize_metrics(validations, n_runs=len(train_details), attach_to=validations, namespace="summary", style="nested")
         with open(f"{self.global_config.results_dir}/{self.global_config.run_name}/validations.json", "w") as f:
             json.dump(validations, f)
         return validations
