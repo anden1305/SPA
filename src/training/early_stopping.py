@@ -1,67 +1,46 @@
 """
-Adaptive Early Stopping for Training.
-Automatically switches between supervised and unsupervised metrics.
+Early stopping based solely on training loss.
+Supports a single LR-on-plateau reduction and best-weight restoration.
 """
 
 import numpy as np
 import torch
 from typing import Dict, Optional
 
-
 class EarlyStopping:
-    """Adaptive early stopping with metric auto-selection, Exponential Moving Average (EMA) smoothing and LR-on-plateau.
+    """Early stopping driven by training loss only.
 
-    Modes:
-        - supervised: uses NMI when provided
-        - unsupervised: parameter convergence proxy (inverse relative parameter drift)
     Features:
-        - Exponential Moving Average smoothing (alpha=0.3) to reduce noise
-        - Warmup window (first few validations never trigger stopping)
         - Relative-only improvement threshold (min_delta interpreted as fractional gain)
         - Single learning rate reduction on first plateau, hard stop on second
     """
 
-    _EMA_ALPHA = 0.3
-    _WARMUP_VALIDATIONS = 5
-    _MIN_LR = 1e-5
-    _LR_FACTOR = 0.5
+    min_lr = 1e-5
+    lr_factor = 0.5
 
     def __init__(self, patience: int = 20, min_delta: float = 0.001):
         self.patience = patience              # epochs without sufficient relative improvement
         self.min_delta = min_delta            # required relative improvement (e.g. 0.001 = +0.1%)
         self.restore_best = True              # always restore best
 
-        # Internal state
-        self._mode: Optional[str] = None
-        self._best_score: Optional[float] = None
+    # Internal state
+        self._best_loss: Optional[float] = None
         self._best_weights = None
         self._patience_used = 0
-        self._validations_seen = 0
-        self._ema: Optional[float] = None
-        self._prev_params: Optional[Dict[str, np.ndarray]] = None
         self._lr_reduced = False
         self._should_stop = False
 
-    def __call__(self, validations: Dict, model: torch.nn.Module, epoch: int, optimizer: Optional[torch.optim.Optimizer] = None) -> bool:
-        """Update state from a validation event and decide whether to stop."""
-        self._validations_seen += 1
+    # Public API --------------------------------------------------------------------
+    def step(self, train_loss: float, model: torch.nn.Module, epoch: int, optimizer: Optional[torch.optim.Optimizer] = None) -> bool:
+        """Update early stopping from the current training loss.
 
-        if self._mode is None:
-            self._mode = self._infer_mode(validations)
-            self._log(f"Mode: {self._mode}")
+        Returns True if training should stop, else False.
+        """
+        if train_loss is None or np.isnan(train_loss) or np.isinf(train_loss):
+            return False  # ignore invalid values
 
-        score_raw = self._select_score(validations, model)
-        if score_raw is None:
-            return False
-
-        score_smoothed = self._update_ema(score_raw)
-
-        if self._validations_seen <= self._WARMUP_VALIDATIONS:
-            self._update_best(score_smoothed, model)
-            return False
-
-        if self._is_improvement(score_smoothed):
-            self._update_best(score_raw, model)
+        if self._best_loss is None or self._is_improvement_loss(train_loss):
+            self._update_best(train_loss, model)
             self._patience_used = 0
         else:
             self._patience_used += 1
@@ -82,68 +61,27 @@ class EarlyStopping:
 
         return self._should_stop
 
-    # ---- Metric Selection & Scoring -------------------------------------------------
-    def _infer_mode(self, validations: Dict) -> str:
-        if 'nmi' in validations:
-            return "supervised"
-        return "unsupervised"
-
-    def _select_score(self, validations: Dict, model: torch.nn.Module) -> Optional[float]:
-        return self._score_supervised(validations) if self._mode == "supervised" else self._score_unsupervised(model)
-
-    def _score_supervised(self, validations: Dict) -> Optional[float]:
-        val = validations.get('nmi')
-        if isinstance(val, (int, float)):
-            return float(val)
-        # If we are in supervised mode but nmi missing, treat as no score (caller may raise elsewhere)
-        return None
-
-    def _score_unsupervised(self, model: torch.nn.Module) -> float:
-        current_params: Dict[str, np.ndarray] = {}
-        for name, param in model.named_parameters():
-            if param.requires_grad:
-                current_params[name] = param.detach().cpu().numpy()
-        if self._prev_params is None:
-            self._prev_params = current_params
-            return 1.0
-        total_change = 0.0
-        total_norm = 0.0
-        for name in current_params:
-            if name in self._prev_params:
-                diff = current_params[name] - self._prev_params[name]
-                total_change += np.linalg.norm(diff)
-                total_norm += np.linalg.norm(current_params[name])
-        self._prev_params = current_params
-        if total_norm > 0:
-            rel_change = total_change / total_norm
-            return 1.0 / (1.0 + rel_change)
-        return 1.0
-
     # ---- Improvement & Tracking -----------------------------------------------------
-    def _is_improvement(self, score: float) -> bool:
-        if self._best_score is None:
+    def _is_improvement_loss(self, loss: float) -> bool:
+        """Return True if loss decreased by more than min_delta (relative)."""
+        if self._best_loss is None:
             return True
-        rel = (score - self._best_score) / (abs(self._best_score) + 1e-8)
-        return rel > self.min_delta
+        rel_impr = (self._best_loss - loss) / (abs(self._best_loss) + 1e-8)
+        return rel_impr > self.min_delta
 
-    def _update_best(self, score: float, model: torch.nn.Module) -> None:
-        if self._best_score is None or score > self._best_score:
-            self._best_score = score
+    def _update_best(self, loss: float, model: torch.nn.Module) -> None:
+        if self._best_loss is None or loss < self._best_loss:
+            self._best_loss = loss
             self._best_weights = {k: v.clone() for k, v in model.named_parameters()}
-
-    def _update_ema(self, score: float) -> float:
-        """ Update and return the Exponential Moving Average (EMA) of the score. """
-        self._ema = score if self._ema is None else (self._EMA_ALPHA * score + (1 - self._EMA_ALPHA) * self._ema)
-        return self._ema
 
     # ---- Learning Rate Handling -----------------------------------------------------
     def _apply_lr_reduction(self, optimizer: torch.optim.Optimizer) -> tuple[bool, list[tuple[float, float]]]:
         changes: list[tuple[float, float]] = []
         for param_group in optimizer.param_groups:
             old_lr = param_group.get('lr')
-            if old_lr is None or old_lr <= self._MIN_LR * 1.01:
+            if old_lr is None or old_lr <= self.min_lr * 1.01:
                 continue
-            new_lr = max(self._MIN_LR, old_lr * self._LR_FACTOR)
+            new_lr = max(self.min_lr, old_lr * self.lr_factor)
             if new_lr < old_lr:
                 param_group['lr'] = new_lr
                 changes.append((old_lr, new_lr))
@@ -163,9 +101,9 @@ class EarlyStopping:
         if optimizer and optimizer.param_groups:
             lr = optimizer.param_groups[0].get('lr')
         if lr is not None:
-            self._log(f"Stopping (lr={lr:.6g}, best_score={self._best_score:.6f})")
+            self._log(f"Stopping (lr={lr:.6g}, best_loss={self._best_loss:.6f})")
         else:
-            self._log(f"Stopping (best_score={self._best_score:.6f})")
+            self._log(f"Stopping (best_loss={self._best_loss:.6f})")
 
     def _log(self, msg: str) -> None:
         print(f"[EarlyStopping] {msg}")
@@ -173,13 +111,13 @@ class EarlyStopping:
 
 # Factory ---------------------------------------------------------------------
 def create_early_stopper(config_trainer, verbose: bool = True) -> Optional[EarlyStopping]:
-    es_cfg = getattr(config_trainer, 'early_stopping', None)
-    if es_cfg is None:
+    early_stopping_cfg = getattr(config_trainer, 'early_stopping', None)
+    if early_stopping_cfg is None:
         return None
-    if hasattr(es_cfg, 'enabled') and not es_cfg.enabled:
+    if hasattr(early_stopping_cfg, 'enabled') and not early_stopping_cfg.enabled:
         return None
-    patience = getattr(es_cfg, 'patience', 20)
-    min_delta = getattr(es_cfg, 'min_delta', 0.002)
+    patience = getattr(early_stopping_cfg, 'patience', 20)
+    min_delta = getattr(early_stopping_cfg, 'min_delta', 0.002)
     stopper = EarlyStopping(patience=patience, min_delta=min_delta)
     if verbose:
         print(f"[EarlyStopping] Enabled (patience={patience} epochs, rel_min_delta={min_delta})")
