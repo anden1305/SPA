@@ -21,16 +21,20 @@ ABS_SWEEP_YAML=$(realpath "$SWEEP_YAML")
 
 echo "Creating sweep from $ABS_SWEEP_YAML..."
 # Read 'count' from the sweep YAML (optional). We use a tiny python snippet to parse safely.
-COUNT=$(python3 - <<PY
+# Note: arguments must be provided before the here-doc redirection; otherwise the shell
+# will treat the path after the terminator as a separate command.
+COUNT=$(python3 - "$ABS_SWEEP_YAML" <<'PY'
 import sys, yaml
 try:
-    d = yaml.safe_load(open(sys.argv[1]))
-    c = d.get('count') if isinstance(d, dict) else None
-    print('' if c is None else int(c))
+  path = sys.argv[1]
+  with open(path, 'r') as f:
+    d = yaml.safe_load(f)
+  c = d.get('count') if isinstance(d, dict) else None
+  print('' if c is None else int(c))
 except Exception:
-    print('')
+  print('')
 PY
-"$ABS_SWEEP_YAML")
+)
 
 if [ -n "$COUNT" ]; then
   echo "Sweep YAML requests count=$COUNT trials in total. Enforcing Option B: total_trials = num_agents * trials_per_agent."
@@ -52,7 +56,7 @@ if [ -n "$COUNT" ]; then
   fi
 fi
 
-SWEEP_ID=$(python3 src/training/wandb_sweep_runner.py "$ABS_SWEEP_YAML" --create-only)
+SWEEP_ID=$(source .venv/bin/activate && python3 -m src.training.wandb_sweep_runner "$ABS_SWEEP_YAML" --create-only)
 echo "Created sweep: $SWEEP_ID"
 
 OUTPUT_DIR=$(pwd)/hpc/output
@@ -68,6 +72,6 @@ bsub -J "wandb_sweep_agent[1-${NUM_AGENTS}]" \
   -R "rusage[mem=4GB]" \
   -W "$WALLTIME" \
   -gpu "num=1:mode=exclusive_process" \
-  "bash -lc \"module load cuda/12.8.1; source .venv/bin/activate; python3 src/training/wandb_sweep_runner.py '$ABS_SWEEP_YAML' --agent-only --sweep-id '$SWEEP_ID' --trials-per-agent $TRIALS_PER_AGENT\""
+  "bash -lc \"module load cuda/12.8.1; source .venv/bin/activate; python3 -m src.training.wandb_sweep_runner '$ABS_SWEEP_YAML' --agent-only --sweep-id '$SWEEP_ID' --trials-per-agent $TRIALS_PER_AGENT\""
 
 echo "Submitted array job. Monitor with bjobs and check hpc/output/ for logs."
