@@ -1,0 +1,81 @@
+trainer:
+  epochs: 5000
+  learning_rate: 0.001
+  optimizer: adam
+  grad_clip: 5.0
+  validate_per_epoch: 10
+  early_stopping:
+    enabled: true
+    patience: 25
+    min_delta: 0.001
+  scheduler:
+    enabled: false
+    type: step
+    step_size: 100
+    gamma: 0.99
+validator:
+  accuracy: True
+  nmi: True
+  cross_nmi: True
+  state_distinctness: True
+  summary_statistics: False
+  learning_rate: True
+visualizer:
+  losses: True
+  pca_tripanel: True
+  confusion_matrix: True
+  state_distinctness: True
+  summary_statistics: False
+  learning_rate: True
+  historic_values: True
+dataloader:
+  batch_size: null
+  window_size: 512
+  stride: 512
+  shuffle: True
+  normalize: True
+  transforms:
+    - type: high_pass_filter
+      channel: EEG
+      params: { low_cutoff: 0.5, high_cutoff: 45 }
+    - type: percentile_clipping
+      channel: EEG
+      params: { percentile: 5 }
+    - type: fft_band_power
+      channel: EEG
+      params: { bands: [[0.5, 4], [4, 8], [8, 12], [12, 30], [30, 45]] }
+    - type: high_pass_filter
+      channel: EMG
+      params: { low_cutoff: 0.5, high_cutoff: 45 }
+    - type: percentile_clipping
+      channel: EMG
+      params: { percentile: 1 }
+    - type: fft_band_power
+      channel: EMG
+      params: { bands: [[0.5, 45]] }
+train_datasets:
+  - type: mssv
+    id: sub-017
+    run: 1
+  - type: mssv
+    id: sub-017
+    run: 2
+val_datasets:
+  - type: mssv
+    id: sub-017
+    run: 1
+  - type: mssv
+    id: sub-017
+    run: 2
+model:
+  type: hmm
+  covariance_type: full
+  init_strategy: random_uniform
+  init_noisy: True
+  params: {}
+verbose: true
+seed: 123
+results_dir: results/training/hmm
+run_name: experiment_mssv_features
+runs: 5
+validate_data: True

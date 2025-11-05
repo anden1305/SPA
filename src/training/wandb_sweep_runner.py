@@ -85,6 +85,7 @@ def _apply_wandb_config(base_cfg: GlobalConfig, wb_cfg: Dict[str, Any]) -> Globa
 
 def run_sweep(sweep_yaml_path: str) -> None:
     import wandb  # type: ignore
+
     # Read sweep YAML which may contain: method/metric/parameters/early_terminate, plus custom: base_config, count
     sweep_yaml = yaml.safe_load(Path(sweep_yaml_path).read_text())
     base_config_path = sweep_yaml.get("base_config")
@@ -109,6 +110,8 @@ def run_sweep(sweep_yaml_path: str) -> None:
     metric_spec = sweep_spec.get("metric") or {}
     metric_name: str = metric_spec.get("name") or ("val/nmi" if getattr(base_cfg.validator, "nmi", False) else "train/total_loss")
     metric_goal: str = metric_spec.get("goal", "maximize")
+
+    # Create the sweep on the W&B server
     sweep_id = wandb.sweep(sweep=sweep_spec, project=project, entity=entity)
 
     def _train() -> None:
@@ -156,4 +159,116 @@ def run_sweep(sweep_yaml_path: str) -> None:
             wandb.summary["aggregate/runs"] = int(getattr(cfg, "runs", 1))
         wandb.finish()
 
+    # If environment variable WAND_B_AGENT_ONLY is set, act as an agent for this sweep
+    import os
+    if os.getenv("WAND_B_AGENT_ONLY", "") == "1":
+        # run a single agent (count should be 1 for array-job parallelism)
+        wandb.agent(sweep_id, function=_train, count=1)
+        return
+
+    # Default behaviour: create sweep and run agents inline for the requested count
     wandb.agent(sweep_id, function=_train, count=count)
+
+
+def create_sweep_only(sweep_yaml_path: str) -> str:
+    """Create the sweep and return sweep_id without running agents.
+
+    This is useful to call once and then launch multiple agent jobs (array) that each
+    call the agent-only mode to run a single trial.
+    """
+    import wandb  # type: ignore
+    sweep_yaml = yaml.safe_load(Path(sweep_yaml_path).read_text())
+    base_config_path = sweep_yaml.get("base_config")
+    if not base_config_path:
+        raise ValueError("Sweep YAML must include a 'base_config' path to the experiment config.")
+    base_cfg = GlobalConfig.from_yaml(base_config_path)
+    sweep_spec = {k: v for k, v in sweep_yaml.items() if k in {"method", "metric", "parameters", "early_terminate"}}
+    if not sweep_spec:
+        sweep_spec = _build_sweep_config(base_cfg)
+    project = "SPA"
+    entity = "dtu_projects"
+    sweep_id = wandb.sweep(sweep=sweep_spec, project=project, entity=entity)
+    print(sweep_id)
+    return sweep_id
+
+
+def run_agent_only(sweep_yaml_path: str, sweep_id: str | None = None, trials_per_agent: int = 1) -> None:
+    """Run a single agent for the given sweep. If sweep_id is None, create sweep first.
+
+    This function is intended for array-job style parallelism: create sweep once, then
+    submit multiple agent jobs that each call run_agent_only with the same sweep_id.
+    """
+    import wandb  # type: ignore
+    sweep_yaml = yaml.safe_load(Path(sweep_yaml_path).read_text())
+    base_config_path = sweep_yaml.get("base_config")
+    if not base_config_path:
+        raise ValueError("Sweep YAML must include a 'base_config' path to the experiment config.")
+    base_cfg = GlobalConfig.from_yaml(base_config_path)
+    sweep_spec = {k: v for k, v in sweep_yaml.items() if k in {"method", "metric", "parameters", "early_terminate"}}
+    if not sweep_spec:
+        sweep_spec = _build_sweep_config(base_cfg)
+    project = "SPA"
+    entity = "dtu_projects"
+    if sweep_id is None:
+        sweep_id = wandb.sweep(sweep=sweep_spec, project=project, entity=entity)
+
+    def _train() -> None:
+        import matplotlib
+        try:
+            matplotlib.use("Agg", force=True)
+        except Exception:
+            pass
+        from src.orchestrator.orchestrator import Orchestrator
+        wandb.init(project=project, entity=entity)
+        cfg = _apply_wandb_config(base_cfg, dict(wandb.config))
+        tmp_yaml = _write_temp_yaml(cfg)
+        orch = Orchestrator(str(tmp_yaml))
+        orch.run()
+        # Aggregate best-of and write summary as in run_sweep
+        best_val: float | None = None
+        best_run_number: int | None = None
+        metric_spec = sweep_spec.get("metric") or {}
+        metric_name: str = metric_spec.get("name") or ("val/nmi" if getattr(base_cfg.validator, "nmi", False) else "train/total_loss")
+        metric_goal: str = metric_spec.get("goal", "maximize")
+        for td in getattr(orch, 'train_details', []) or []:
+            current_val: float | None = None
+            if metric_name.startswith("val/"):
+                key = metric_name.split("/", 1)[1]
+                v = td.get_trained_validations().get(key)
+                current_val = float(v) if isinstance(v, (int, float)) else None
+            elif metric_name == "train/total_loss":
+                if td.losses:
+                    last_epoch = max(td.losses.keys())
+                    current_val = float(td.losses[last_epoch])
+            if current_val is None:
+                continue
+            if best_val is None:
+                best_val, best_run_number = current_val, td.run_number
+            else:
+                if (metric_goal == "maximize" and current_val > best_val) or (metric_goal == "minimize" and current_val < best_val):
+                    best_val, best_run_number = current_val, td.run_number
+        if best_val is not None:
+            wandb.summary[metric_name] = float(best_val)
+            wandb.summary["aggregate/best_run_number"] = best_run_number
+            wandb.summary["aggregate/runs"] = int(getattr(cfg, "runs", 1))
+        wandb.finish()
+
+    wandb.agent(sweep_id, function=_train, count=int(trials_per_agent))
+
+
+if __name__ == '__main__':
+    # Provide a tiny CLI for convenience when invoked directly on HPC nodes.
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('sweep_yaml')
+    parser.add_argument('--create-only', action='store_true', help='Only create the sweep and print the sweep id')
+    parser.add_argument('--agent-only', action='store_true', help='Run agent(s) for the specified sweep id (use --sweep-id)')
+    parser.add_argument('--sweep-id', type=str, default=None, help='Existing sweep id to run agent for')
+    parser.add_argument('--trials-per-agent', type=int, default=1, help='Number of trials each agent should run')
+    args = parser.parse_args()
+    if args.create_only:
+        create_sweep_only(args.sweep_yaml)
+    elif args.agent_only:
+        run_agent_only(args.sweep_yaml, sweep_id=args.sweep_id, trials_per_agent=args.trials_per_agent)
+    else:
+        run_sweep(args.sweep_yaml)

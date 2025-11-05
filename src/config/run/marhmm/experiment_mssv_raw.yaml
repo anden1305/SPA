@@ -1,0 +1,64 @@
+trainer:
+  epochs: 5000
+  learning_rate: 0.001
+  optimizer: adam
+  grad_clip: null
+  validate_per_epoch: 10
+  early_stopping:
+    enabled: true
+    patience: 25
+    min_delta: 0.001
+validator:
+  accuracy: True
+  nmi: True
+  cross_nmi: True
+  state_distinctness: True
+  summary_statistics: True
+visualizer:
+  losses: True
+  pca_tripanel: True
+  confusion_matrix: True
+  state_distinctness: True
+  summary_statistics: True
+dataloader:
+  batch_size: null
+  shuffle: True
+  normalize: True
+  transforms:
+    - type: reshape
+      params: {}
+    - type: percentile_clipping
+      params: { percentile: 5 }
+    - type: high_pass_filter
+      params: { low_cutoff: 0.5, high_cutoff: 45, sampling_rate: 128 }
+    - type: batch_raw
+      params: { window_size: 512 }
+train_datasets:
+  - type: mssv
+    id: sub-017
+    run: 1
+  - type: mssv
+    id: sub-017
+    run: 2
+val_datasets:
+  - type: mssv
+    id: sub-017
+    run: 1
+  - type: mssv
+    id: sub-017
+    run: 2
+model:
+  type: marhmm
+  covariance_type: full
+  init_strategy: random_uniform
+  init_noisy: True
+  params:
+    lags: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
+    ridge: 0.001
+    var_reg: 0.001
+verbose: true
+seed: 123
+results_dir: results/training/marhmm
+run_name: experiment_mssv_raw
+runs: 5
+validate_data: True
