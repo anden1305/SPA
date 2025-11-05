@@ -1,6 +1,6 @@
 trainer:
-  epochs: 500
-  learning_rate: 0.05
+  epochs: 250
+  learning_rate: 0.001
   optimizer: adam
   grad_clip: null
   validate_per_epoch: 10
@@ -9,23 +9,23 @@ trainer:
     patience: 25
     min_delta: 0.001
   scheduler:
-    enabled: false
+    enabled: true
     type: step
-    step_size: 100
-    gamma: 0.999
+    step_size: 10
+    gamma: 0.995
 validator:
   accuracy: True
   nmi: True
   cross_nmi: True
   state_distinctness: True
-  summary_statistics: False
+  summary_statistics: True
   learning_rate: True
 visualizer:
   losses: True
   pca_tripanel: True
   confusion_matrix: True
   state_distinctness: True
-  summary_statistics: False
+  summary_statistics: True
   learning_rate: True
   historic_values: True
 dataloader:
@@ -35,57 +35,212 @@ dataloader:
   shuffle: True
   normalize: True
   transforms:
+
     # EEG channel transforms
-    - type: high_pass_filter
+    - type: band_pass_filter
       channel: EEG
       params: {
         "low_cutoff": 0.5,
-        "high_cutoff": 45,
+        "high_cutoff": 30,
       }
     - type: percentile_clipping
       channel: EEG
       params: {
-        "percentile": 5
+        "percentile": 0.5
       }
-    - type: fft_band_power
+    - type: rms
       channel: EEG
-      params: {
-        bands: [[0.5, 4], [4, 8], [8, 12], [12, 30], [30, 45]],
-      }
+      params: {}
+    - type: burst_rate
+      channel: EEG
+      params: {}
+    - type: theta_delta_ratio
+      channel: EEG
+      params: {}
+    - type: theta_beta_ratio
+      channel: EEG
+      params: {}
+    - type: beta_delta_ratio
+      channel: EEG
+      params: {}
+    - type: theta_gamma_pac
+      channel: EEG
+      params: {}
+    - type: fft_relative_band_power
+      channel: EEG
+      params:
+        bands:
+          - [0.5, 4]
+          - [6, 9]
+          - [15, 30]
+
     # EMG channel transforms
-    - type: high_pass_filter
-      channel: EMG
-      params: {
-        "low_cutoff": 0.5,
-        "high_cutoff": 45,
-      }
     - type: percentile_clipping
       channel: EMG
       params: {
-        "percentile": 1
+        "percentile": 0.1
       }
-    - type: fft_band_power
+    - type: rms
       channel: EMG
-      params: {
-        bands: [[0.5, 45]],
-      }
+      params: {}
+
 train_datasets:
   - type: mssv
-    id: sub-017
+    id: sub-038
     run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-038
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-039
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-039
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-039
+    run: 3
+    remove_artifact: True
+  - type: mssv
+    id: sub-041
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-041
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-041
+    run: 3
+    remove_artifact: True
+  - type: mssv
+    id: sub-043
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-048
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-048
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-048
+    run: 3
+    remove_artifact: True
+  - type: mssv
+    id: sub-054
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-054
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-056
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-059
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-060
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-069
+    run: 1
+    remove_artifact: True
+
 val_datasets:
   - type: mssv
-    id: sub-017
+    id: sub-038
     run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-038
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-039
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-039
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-039
+    run: 3
+    remove_artifact: True
+  - type: mssv
+    id: sub-041
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-041
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-041
+    run: 3
+    remove_artifact: True
+  - type: mssv
+    id: sub-043
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-048
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-048
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-048
+    run: 3
+    remove_artifact: True
+  - type: mssv
+    id: sub-054
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-054
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-056
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-059
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-060
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-069
+    run: 1
+    remove_artifact: True
+
 model:
   type: hmm
-  init_strategy: random_uniform
-  init_noisy: True
+  init_strategy: kmeans_pca
+  init_noisy: true
   covariance_type: full
   params: {}
 verbose: true
-seed: 123
+seed: 124
 results_dir: results/training/hmm
 run_name: feature_synthetic_uniform
-runs: 2
+runs: 1
 validate_data: True

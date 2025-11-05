@@ -3,8 +3,8 @@ import numpy as np
 
 from src.config.config import TransformsConfig
 from src.data.base_dataset import BaseDataset
-from src.preprocessing.base_transform import BaseTransform
-from src.preprocessing.fft import FFT
+from src.preprocessing.helpers.base_transform import BaseTransform
+from src.preprocessing.helpers.fft import FFT
 
 
 class FFTBandPower(BaseTransform):
@@ -22,7 +22,7 @@ class FFTBandPower(BaseTransform):
             window_size=window_size,
             stride=stride,
             sampling_rate=sampling_rate,
-            feature='band_power',
+            feature='log_band_power',
             bands=self.bands,
         )
     
@@ -36,6 +36,9 @@ class FFTBandPower(BaseTransform):
     
     def __call__(self, x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         return self.fft(x, y)
+
+    def get_short_name(self):
+        return "BandPower"
 
     def __str__(self) -> str:
         return f"FFTBandPower(window_size={self.window_size}, stride={self.stride}, sampling_rate={self.sampling_rate})"

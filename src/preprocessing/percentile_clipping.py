@@ -2,18 +2,18 @@ import numpy as np
 
 from src.config.config import TransformsConfig
 from src.data.base_dataset import BaseDataset
-from src.preprocessing.base_transform import BaseTransform
+from src.preprocessing.helpers.base_transform import BaseTransform
 
 
 class PercentileClipping(BaseTransform):
 
     def __init__(self, config: TransformsConfig):
         super().__init__(config, stage="preprocessing")
-        self.percentile: int = self.config.params['percentile']
-
+        self.percentile: float = self.config.params['percentile']
+    
     def validate_config(self, _: TransformsConfig):
         assert 'percentile' in self.config.params, "PercentileClipping transform requires 'percentile' parameter."
-        assert isinstance(self.config.params['percentile'], int) and 0 < self.config.params['percentile'] < 10, "Percentile must be an integer between 0 and 10."
+        assert isinstance(self.config.params['percentile'], float) and 0 < self.config.params['percentile'] < 10, f"Percentile must be a float between 0 and 10 with value {self.config.params['percentile']}."
     
     def __clip(self, x: np.ndarray, y: np.ndarray):
         lower_bound = np.percentile(x, self.percentile, axis=0)
@@ -26,6 +26,9 @@ class PercentileClipping(BaseTransform):
         input of shape (T, C) and output should be of shape (T, C).
         """
         return self.__clip(x, y)
+    
+    def get_short_name(self):
+        return "PercentileClipping"
 
     def __str__(self) -> str:
         return f"PercentileClipping(percentile={self.percentile})"

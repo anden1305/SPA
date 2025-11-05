@@ -60,8 +60,28 @@ class FFT:
                     bp = power[..., mask].sum(axis=-1)
                     band_powers.append(bp.astype(np.float32))
             return np.stack(band_powers, axis=-1)
-        raise ValueError(f"Unknown feature '{self.feature}'. Use 'magnitude', 'power', 'log_power', or 'band_power'.")
+        if self.feature == 'log_band_power':
+            if self.sampling_rate is None:
+                raise ValueError("sampling_rate must be set in transform params for log_band_power feature.")
+            power = mag ** 2
+            freqs = np.fft.rfftfreq(self.window_size, d=1.0 / self.sampling_rate)
+            band_logs = []
+            eps = 1e-12
+            for i, (low, high) in enumerate(self.bands):
+                # right-open for all but the last band
+                if i == len(self.bands) - 1:
+                    mask = (freqs >= low) & (freqs <= high)
+                else:
+                    mask = (freqs >= low) & (freqs < high)
+                if not np.any(mask):
+                    band_logs.append(np.full(power.shape[:-1], np.log(eps), dtype=np.float32))
+                else:
+                    bp = power[..., mask].sum(axis=-1)               # sum over bins in the band
+                    band_logs.append(np.log(bp + eps).astype(np.float32))
+            return np.stack(band_logs, axis=-1)
 
+        raise ValueError(f"Unknown feature '{self.feature}'. Use 'magnitude', 'power', 'log_power', or 'band_power'.")
+    
     def __reshape_input(self, x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Reshape input assuming x has shape (T, C) and y has length T.
 

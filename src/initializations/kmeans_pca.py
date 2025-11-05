@@ -16,7 +16,7 @@ def init_kmeans_pca(model: BaseModel, data: torch.Tensor, kmeans_iters: int, est
     
     if X.size(0) < S:
         raise ValueError("Not enough frames for k-means init in PCA space.")
-
+    
     # PCA and subspace selection
     X_centered = X - X.mean(0, keepdim=True)
     _, Svals, Vh = torch.linalg.svd(X_centered, full_matrices=False)

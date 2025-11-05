@@ -1,0 +1,107 @@
+trainer:
+  epochs: 250
+  learning_rate: 0.001
+  optimizer: adam
+  grad_clip: null
+  validate_per_epoch: 10
+  early_stopping:
+    enabled: false
+    patience: 25
+    min_delta: 0.001
+  scheduler:
+    enabled: true
+    type: step
+    step_size: 10
+    gamma: 0.995
+validator:
+  accuracy: True
+  nmi: True
+  cross_nmi: True
+  state_distinctness: True
+  summary_statistics: True
+  learning_rate: True
+visualizer:
+  losses: True
+  pca_tripanel: True
+  confusion_matrix: True
+  state_distinctness: True
+  summary_statistics: True
+  learning_rate: True
+  historic_values: True
+dataloader:
+  batch_size: null
+  window_size: 512
+  stride: 512
+  shuffle: True
+  normalize: True
+  transforms:
+
+    # EEG channel transforms
+    - type: band_pass_filter
+      channel: EEG
+      params: {
+        "low_cutoff": 0.5,
+        "high_cutoff": 30,
+      }
+    - type: percentile_clipping
+      channel: EEG
+      params: {
+        "percentile": 0.5
+      }
+    - type: rms
+      channel: EEG
+      params: {}
+    - type: theta_delta_ratio
+      channel: EEG
+      params: {}
+    - type: theta_beta_ratio
+      channel: EEG
+      params: {}
+    - type: beta_delta_ratio
+      channel: EEG
+      params: {}
+    - type: theta_gamma_pac
+      channel: EEG
+      params: {}
+    - type: fft_relative_band_power
+      channel: EEG
+      params:
+        bands:
+          - [0.5, 4]
+          - [6, 9]
+          - [15, 30]
+
+    # EMG channel transforms
+    - type: percentile_clipping
+      channel: EMG
+      params: {
+        "percentile": 0.1
+      }
+    - type: rms
+      channel: EMG
+      params: {}
+
+train_datasets:
+  - type: mssv
+    id: sub-038
+    run: 1
+    remove_artifact: True
+
+val_datasets:
+  - type: mssv
+    id: sub-038
+    run: 1
+    remove_artifact: True
+
+model:
+  type: hmm
+  init_strategy: kmeans_pca
+  init_noisy: true
+  covariance_type: full
+  params: {}
+verbose: true
+seed: 124
+results_dir: results/training/hmm
+run_name: feature_synthetic_uniform
+runs: 1
+validate_data: True

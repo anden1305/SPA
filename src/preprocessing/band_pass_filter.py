@@ -3,10 +3,10 @@ from scipy.signal import butter, filtfilt
 
 from src.config.config import TransformsConfig
 from src.data.base_dataset import BaseDataset
-from src.preprocessing.base_transform import BaseTransform
+from src.preprocessing.helpers.base_transform import BaseTransform
 
 
-class HighPassFilter(BaseTransform):
+class BandPassFilter(BaseTransform):
     
     def __init__(self, config: TransformsConfig, sampling_rate: int):
         self.sampling_rate = sampling_rate
@@ -14,7 +14,7 @@ class HighPassFilter(BaseTransform):
         nyquist = 0.5 * self.sampling_rate
         self.low = self.config.params['low_cutoff'] / nyquist
         self.high = self.config.params['high_cutoff'] / nyquist
-
+    
     def validate_config(self, _: TransformsConfig):
         assert type(self.sampling_rate) in [int, float] and self.sampling_rate > 0, "sampling_rate must be a positive number."
         assert 'low_cutoff' in self.config.params, "HighPassFilter transform requires 'low_cutoff' parameter."
@@ -33,6 +33,9 @@ class HighPassFilter(BaseTransform):
         input of shape (T, C) and output should be of shape (T, C).
         """
         return self.__filter(x, y)
-
+    
+    def get_short_name(self):
+        return "BandPassFilter"
+    
     def __str__(self) -> str:
-        return f"HighPassFilter(low={self.low}, high={self.high})"
+        return f"BandPassFilter(low={self.config.params['low_cutoff']}, high={self.config.params['high_cutoff']})"

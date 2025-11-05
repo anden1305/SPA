@@ -66,6 +66,7 @@ class DatasetConfig(BaseModel):
     type: str = Field(..., pattern="^(synthetic|mssv)$")
     id: str = Field(..., description="Dataset identifier or path.")
     run: int | None = Field(default=None, ge=1)
+    remove_artifact: bool = Field(False, description="Whether to remove artifacts from the dataset.")
     # No hardcoded constants - dataset selection is fully configurable
 
 class ModelConfig(BaseModel):
