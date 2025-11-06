@@ -3,11 +3,10 @@ import torch
 import numpy as np
 from typing import Any, Optional
 from src.config.config import GlobalConfig
-from src.data.data_loader import DataLoader
 from src.data.data_loader_collection import DataLoaderCollection
 from src.helpers.accuracy import accuracy
 from src.helpers.align_labels import align_labels_hungarian
-from src.helpers.frequency_statistics import compute_frequency_statistics, compute_feature_statistics
+from src.helpers.frequency_statistics import compute_feature_statistics
 from src.helpers.metrics_aggregation import summarize_metrics
 from src.helpers.nmi import calculate_nmi
 from src.helpers.summary_statistics import compute_summary_statistics

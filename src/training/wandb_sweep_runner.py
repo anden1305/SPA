@@ -257,7 +257,7 @@ def run_agent_only(sweep_yaml_path: str, sweep_id: str | None = None, trials_per
             wandb.summary["aggregate/runs"] = int(getattr(cfg, "runs", 1))
         wandb.finish()
 
-    wandb.agent(sweep_id, function=_train, count=int(trials_per_agent))
+    wandb.agent(sweep_id, function=_train, entity=entity, project=project, count=int(trials_per_agent))
 
 
 if __name__ == '__main__':

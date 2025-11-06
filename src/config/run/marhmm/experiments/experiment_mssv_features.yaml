@@ -6,7 +6,7 @@ trainer:
   validate_per_epoch: 10
   early_stopping:
     enabled: true
-    patience: 25
+    patience: 20
     min_delta: 0.001
   scheduler:
     enabled: true
