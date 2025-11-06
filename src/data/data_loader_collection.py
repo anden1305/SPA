@@ -1,4 +1,5 @@
 
+import numpy as np
 import torch
 from src.config.config import GlobalConfig
 from src.data.base_dataset import BaseDataset
@@ -24,9 +25,19 @@ class DataLoaderCollection:
         self.device = device
         self.shuffle = self.config.shuffle
         self.random_seed = self.global_config.seed
-        self._epoch = 0
-        self._current_loader = 0
-        self._current_batch = 0
+        self.x, self.y = self.prepare_data()
+        self.batches_per_next = 1024
+    
+    def prepare_data(self) -> tuple[np.ndarray, np.ndarray]:
+        x = []
+        y = []
+        for dl in self.data_loaders:
+            x_dl, y_dl = dl.get_data()
+            x.append(x_dl)
+            y.append(y_dl)
+        x_all = np.concatenate(x, axis=0)
+        y_all = np.concatenate(y, axis=0)
+        return x_all, y_all
     
     def __build_data_loaders_in_parallel(self, device: torch.device):
         with ThreadPoolExecutor(max_workers=20) as ex:
@@ -75,31 +86,44 @@ class DataLoaderCollection:
         return self.data_loaders[0].has_features_enabled()
     
     def __iter__(self) -> "DataLoaderCollection":
-        ## shuffle data loaders at the start of each epoch if required
+        # Reset cursor and (optionally) shuffle order for a new pass
+        self._num_batches = int(self.x.shape[0])
+        self._cursor = 0
+        # Track epochs to vary shuffle across iterations if desired
+        if not hasattr(self, "_epoch"):
+            self._epoch = 0
+        # Build index order using numpy (self.x/self.y are numpy arrays)
         if self.shuffle:
-            generator = torch.Generator()
-            generator.manual_seed(self.random_seed + self._epoch)
-            indices = torch.randperm(len(self.data_loaders), generator=generator).tolist()
-            self.data_loaders = [iter(self.data_loaders[i]) for i in indices]
+            # Deterministic RNG based on seed + epoch when seed is provided
+            if self.random_seed is not None:
+                rng = np.random.default_rng(int(self.random_seed) + int(self._epoch))
+            else:
+                rng = np.random.default_rng()
+            self._order = rng.permutation(self._num_batches)
+        else:
+            self._order = np.arange(self._num_batches)
         self._epoch += 1
-        self._current_loader = 0
-        self._current_batch = 0
         return self
     
     def __next__(self) -> tuple[torch.Tensor, torch.Tensor]:
-        """Returns the next batch from the current DataLoader. Moves to the next DataLoader when the current one is exhausted."""
-        if self._current_loader >= len(self.data_loaders):
+        # Stop when we've consumed all batches
+        if not hasattr(self, "_cursor"):
+            # Support calling next() without an explicit iter() first
+            _ = iter(self)
+        if self._cursor >= self._num_batches:
             raise StopIteration
-        current_loader = self.data_loaders[self._current_loader]
-        try:
-            batch = next(current_loader)
-            self._current_batch += 1
-            return batch
-        except StopIteration:
-            self._current_loader += 1
-            self._current_batch = 0
-            return self.__next__()
-
+        # Compute slice of indices for this step
+        start = self._cursor
+        end = min(start + int(self.batches_per_next), self._num_batches)
+        idx = self._order[start:end]
+        # Gather with numpy indexing; convert to torch tensors only at return time
+        x_np = self.x[idx]
+        y_np = self.y[idx]
+        self._cursor = end
+        x_t = torch.as_tensor(x_np, device=self.device)
+        y_t = torch.as_tensor(y_np, device=self.device)
+        return x_t, y_t
+    
     def __str__(self) -> str:
         return (f"DataLoaderCollection(\n"
                 f"  num_datasets={len(self.datasets)},\n"

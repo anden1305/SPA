@@ -370,6 +370,9 @@ class DataLoader(Iterator):
     def get_feature_names(self) -> list[str]:
         return self.feature_names
     
+    def get_data(self) -> tuple[np.ndarray, np.ndarray]:
+        return self.data
+    
     def __iter__(self) -> "DataLoader":
         """Handles every start of new epoch logic (shuffle etc.)."""
         self._size = self.data[0].shape[0]
@@ -385,27 +388,14 @@ class DataLoader(Iterator):
     
     def __next__(self) -> tuple[torch.Tensor, torch.Tensor]:
         """Loads, transforms and returns the next batch of data."""
-        # if self._batch_cursor >= getattr(self, "_num_batches", 0):
-        #     raise StopIteration
-        # x = self.data[0][self._batch_order[self._batch_cursor]]
-        # y = self.data[1][self._batch_order[self._batch_cursor]]
-        # x = np.expand_dims(x, axis=0)
-        # self._batch_cursor += 1
-        # return torch.from_numpy(x).to(self.device), torch.from_numpy(y).to(self.device)
         if self._batch_cursor >= getattr(self, "_num_batches", 0):
             raise StopIteration
-        remaining = self._num_batches - self._batch_cursor
-        n_batches = min(128, remaining)
-        indices = self._batch_order[self._batch_cursor : self._batch_cursor + n_batches]
-        # gather up to 4 batches and stack them along a new batch dimension
-        xs = np.stack([self.data[0][i] for i in indices], axis=0)
-        ys = np.stack([self.data[1][i] for i in indices], axis=0)
-        # ensure contiguous memory
-        xs = np.ascontiguousarray(xs)
-        ys = np.ascontiguousarray(ys)
-        self._batch_cursor += n_batches
-        return torch.from_numpy(xs).to(self.device), torch.from_numpy(ys).to(self.device)
-
+        x = self.data[0][self._batch_order[self._batch_cursor]]
+        y = self.data[1][self._batch_order[self._batch_cursor]]
+        x = np.expand_dims(x, axis=0)
+        self._batch_cursor += 1
+        return torch.from_numpy(x).to(self.device), torch.from_numpy(y).to(self.device)
+    
     def get_feature_dim(self) -> int:
         return self.data[0].shape[2]
     
