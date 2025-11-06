@@ -162,7 +162,7 @@ class HMM(BaseModel):
             m = alpha.max(dim=1, keepdim=True).values                 # (B,1)
             v = torch.exp(alpha - m)                                   # (B,S)
             u = v @ A_prob                                             # (B,S)
-            alpha = log_emiss[:, t, :] + m.squeeze(1) + torch.log(u.clamp_min(eps))
+            alpha = log_emiss[:, t, :] + m + torch.log(u.clamp_min(eps))
         return torch.logsumexp(alpha, dim=1)  # (B,)
 
     @torch.no_grad()
