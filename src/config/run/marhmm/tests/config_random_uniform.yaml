@@ -3,7 +3,7 @@ trainer:
   learning_rate: 0.01
   optimizer: adam
   grad_clip: 5.0
-  validate_per_epoch: 10
+  validate_per_epoch: 100
   early_stopping:
     enabled: true   
     patience: 25
