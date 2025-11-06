@@ -4,7 +4,7 @@ from src.config.config import GlobalConfig
 from src.data.base_dataset import BaseDataset
 from src.data.data_loader import DataLoader
 from src.preprocessing.helpers.base_transform import BaseTransform
-
+from concurrent.futures import ThreadPoolExecutor
 
 class DataLoaderCollection:
     """
@@ -18,7 +18,8 @@ class DataLoaderCollection:
         self.global_config = config
         self.config = self.global_config.dataloader
         self.datasets = datasets
-        self.data_loaders = [DataLoader(dataset=ds, config=self.global_config, device=device) for ds in self.datasets]
+        # self.data_loaders = [DataLoader(dataset=ds, config=self.global_config, device=device) for ds in self.datasets]
+        self.__build_data_loaders_in_parallel(device)
         self.__validate_data()
         self.device = device
         self.shuffle = self.config.shuffle
@@ -26,7 +27,14 @@ class DataLoaderCollection:
         self._epoch = 0
         self._current_loader = 0
         self._current_batch = 0
-        
+    
+    def __build_data_loaders_in_parallel(self, device: torch.device):
+        with ThreadPoolExecutor(max_workers=20) as ex:
+            self.data_loaders = list(
+                ex.map(lambda ds: DataLoader(dataset=ds, config=self.global_config, device=device),
+                        self.datasets)
+            )
+    
     def __validate_data(self):
         num_states = set([ds.get_num_states() for ds in self.datasets])
         assert len(num_states) == 1, "All datasets must have the same number of states."
