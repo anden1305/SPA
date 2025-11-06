@@ -25,8 +25,6 @@ from src.initializations.kmeans_pca import init_kmeans_pca
 from src.initializations.apply_noise import apply_noise_and_bias
 from line_profiler import profile
 
- 
-
 class HMM(BaseModel):
     def __init__(self,
                  data_loader: DataLoaderCollection,
@@ -153,7 +151,7 @@ class HMM(BaseModel):
         log_likelihood : (B,)
         """
         _, T, _ = log_emiss.shape
-        # Numerically-stable probability-space matmul, autograd-friendly (no out= / in-place on graph tensors)
+        #Numerically-stable probability-space matmul, autograd-friendly (no out= / in-place on graph tensors)
         A_prob = torch.exp(log_A)  # (S,S)
         eps = torch.finfo(log_emiss.dtype).tiny
         # alpha_0
@@ -164,6 +162,34 @@ class HMM(BaseModel):
             u = v @ A_prob                                             # (B,S)
             alpha = log_emiss[:, t, :] + m + torch.log(u.clamp_min(eps))
         return torch.logsumexp(alpha, dim=1)  # (B,)
+
+        # eps = torch.finfo(log_emiss.dtype).tiny
+        # # ---- 1. transition matrix in probability space (once) ----------------
+        # A = torch.exp(log_A)                                   # (S, S)
+        # # ---- 2. initialise α₀ ------------------------------------------------
+        # alpha = log_pi.unsqueeze(0) + log_emiss[:, 0]          # (B, S)
+        # # ---- 3. cumulative max + log-sum-exp trick (no Python loop) ----------
+        # #   α_t = log_emiss_t + log( Aᵀ * exp(α_{t-1} - m_{t-1}) ) + m_{t-1}
+        # #   where m_{t-1} = max α_{t-1}  (stabilises exponentials)
+        # #   We compute everything in a single pass with cumsum/cumlogsumexp.
+        # #   The trick is to keep the *scaled* alpha in log-space.
+        # #   (B, T-1, S)  ->  log-emission for t = 1 … T-1
+        # log_emiss_rest = log_emiss[:, 1:]                       # (B, T-1, S)
+        # #   scaling factor per time step (B, T-1, 1)
+        # max_prev, _ = torch.max(alpha, dim=1, keepdim=True)    # (B, 1)
+        # max_prev = max_prev.expand(-1, T-1, -1)                # (B, T-1, 1)
+        # #   exp(alpha_{t-1} - max)  -> (B, T-1, S)
+        # scaled = torch.exp(alpha.unsqueeze(1) - max_prev)      # (B, 1, S) -> (B, T-1, S)
+        # #   transition: (B, T-1, S) @ (S, S) -> (B, T-1, S)
+        # transitioned = scaled @ A                               # (B, T-1, S)
+        # #   log(transitioned) with clamp
+        # log_trans = torch.log(transitioned.clamp_min(eps))     # (B, T-1, S)
+        # #   add emission + previous scaling
+        # alpha_next = log_emiss_rest + log_trans + max_prev.squeeze(-1)  # (B, T-1, S)
+        # #   concatenate α₀ with the rest
+        # alpha_all = torch.cat([alpha.unsqueeze(1), alpha_next], dim=1)  # (B, T, S)
+        # #   final log-likelihood = log-sum-exp over states
+        # return torch.logsumexp(alpha_all, dim=2).diagonal(dim1=1, dim2=2)  # (B,)
 
     @torch.no_grad()
     def predict(self, x: Tensor) -> Tensor:
@@ -179,6 +205,7 @@ class HMM(BaseModel):
         """
         x = self.__validate_input(x)
         B, T, D = x.shape
+
         log_pi = torch.log_softmax(self.initial_logits, dim=-1)
         log_A = torch.log_softmax(self.transition_logits, dim=-1)
         log_emiss = self.__emission_log_prob(x)  # (B,T,S)
@@ -194,6 +221,30 @@ class HMM(BaseModel):
         last = torch.argmax(delta, dim=1)  # (B,)
         return self.__backtrace(backptr, last)
 
+        
+        # S = self.num_states
+        # log_pi = torch.log_softmax(self.initial_logits, dim=-1)      # (S,)
+        # log_A  = torch.log_softmax(self.transition_logits, dim=-1)   # (S, S)
+        # log_emiss = self.__emission_log_prob(x)                     # (B, T, S)
+        # # ---- initialise δ₀ --------------------------------------------------
+        # delta = log_pi.unsqueeze(0) + log_emiss[:, 0]                # (B, S)
+        # # ---- back-pointer tensor ------------------------------------------------
+        # backptr = x.new_zeros((B, T, S), dtype=torch.long)
+        # # ---- DP recurrence in one batched operation -------------------------
+        # #   δ_t(j) = max_i [ δ_{t-1}(i) + log A(i,j) ] + log_emiss_t(j)
+        # #   we broadcast δ_{t-1} (B,1,S) + log_Aᵀ (1,S,S) → (B,S,S)
+        # log_A_T = log_A.t().contiguous()                            # (S, S)
+
+        # for t in range(1, T):
+        #     scores = delta.unsqueeze(1) + log_A_T                    # (B, S, S)
+        #     delta, idx = torch.max(scores, dim=2)                   # (B, S)
+        #     delta = delta + log_emiss[:, t]                         # (B, S)
+        #     backptr[:, t] = idx
+        # # ---- termination ----------------------------------------------------
+        # best_path_score, best_path_last = torch.max(delta, dim=1)   # (B,)
+        # # ---- back-trace (still a tiny loop, but *pure PyTorch* – see below) --
+        # return self.__backtrace(backptr, best_path_last)        
+
     def __backtrace(self, backptr: Tensor, last: Tensor) -> Tensor:
         """Backtrace Viterbi path given backpointers and last-state indices using PyTorch only."""
         B, T, _ = backptr.shape
@@ -204,51 +255,19 @@ class HMM(BaseModel):
         for t in range(T - 2, -1, -1):
             path[:, t] = backptr[arange_B, t + 1, path[:, t + 1]]
         return path
-
-    @torch.no_grad()
-    def benchmark_backtrace(self, x: Tensor, reps: int = 3) -> dict:
-        """Benchmark backtrace only (not DP), comparing PyTorch vs Numba (if available).
-
-        Returns a dict with average milliseconds per backtrace and speedup factor.
-        """
-        import time
-        x = self.__validate_input(x)
-        B, T, D = x.shape
-        log_pi = torch.log_softmax(self.initial_logits, dim=-1)
-        log_A = torch.log_softmax(self.transition_logits, dim=-1)
-        log_emiss = self.__emission_log_prob(x)
-        # Build backptr and last via DP (same as __decode_viterbi up to backtrace)
-        backptr = x.new_zeros((B, T, self.num_states), dtype=torch.long)
-        log_A_T = log_A.transpose(0, 1).contiguous()
-        delta = log_pi.unsqueeze(0) + log_emiss[:, 0, :]
-        for t in range(1, T):
-            scores = delta.unsqueeze(1) + log_A_T
-            delta, idx = torch.max(scores, dim=2)
-            delta = delta + log_emiss[:, t, :]
-            backptr[:, t, :] = idx
-        last = torch.argmax(delta, dim=1)
-
-        def _sync():
-            if x.is_cuda:
-                torch.cuda.synchronize()
-
-        # Torch loop timing
-        t0 = 0.0
-        for _ in range(reps):
-            _sync()
-            s = time.perf_counter()
-            _ = self.__backtrace(backptr, last, use_numba=False)
-            _sync()
-            t0 += (time.perf_counter() - s)
-
-        ms_torch = (t0 / reps) * 1e3
-        # No Numba path; return torch timing only and NaNs for compatibility
-        result = {
-            'torch_backtrace_ms': ms_torch,
-            'numba_backtrace_ms': float('nan'),
-            'speedup_x': float('nan'),
-        }
-        return result
+    
+        # device = backptr.device
+        # # start from the end
+        # path = last.unsqueeze(1)                                     # (B, 1)
+        # # indices for the *previous* time step:  t-1  for t = T-1 … 0
+        # timesteps = torch.arange(T - 1, -1, -1, device=device)       # (T,)
+        # # broadcast to (B, T)
+        # batch_idx = torch.arange(B, device=device).unsqueeze(1)      # (B, 1)
+        # # gather previous states in one go
+        # prev = backptr[batch_idx, timesteps, path]                  # (B, T)
+        # # the first column is the final state, shift everything one step left
+        # path = torch.cat([prev[:, 1:], last.unsqueeze(1)], dim=1)   # (B, T)
+        # return path
     
     def prepare_for_training(self):
         self.train()
