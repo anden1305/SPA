@@ -29,7 +29,7 @@ visualizer:
   summary_statistics: True
   historic_values: True
 dataloader:
-  batch_size: null
+  batch_size: 100
   window_size: 512
   stride: 171
   shuffle: True
@@ -92,7 +92,7 @@ model:
   type: marhmm
   covariance_type: full
   init_strategy: kmeans_pca
-  init_noisy: True
+  init_noisy: false
   params:
     lags: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
     ridge: 0.1
@@ -102,6 +102,6 @@ model:
 verbose: True
 seed: 123
 results_dir: results/training/marhmm
-run_name: experiment_mssv_features
+run_name: experiment_synth_features
 runs: 5
 validate_data: True

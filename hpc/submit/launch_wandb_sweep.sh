@@ -85,9 +85,14 @@ echo "Submitted array job. Monitor with bjobs and check hpc/output/sweep_${SWEEP
 
 ### Example usage:
 
-### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/hmm_mssv_features.yaml 15 1
-### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/marhmm_mssv_features.yaml 15 1
+### Synthetic
+### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/hmm/hmm_synth_features.yaml 15 1
+### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/marhmm/marhmm_synth_features.yaml 15 1
+### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/hmm/hmm_synth_raw.yaml 15 1
+### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/marhmm/marhmm_synth_raw.yaml 15 1
 
-### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/hmm_synth_features_small.yaml 6 1
-### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/hmm_synth_features.yaml 15 1
-### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/marhmm_synth_features.yaml 15 1
+### MSSV
+### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/hmm/hmm_mssv_features.yaml 15 1
+### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/marhmm/marhmm_mssv_features.yaml 15 1
+
+

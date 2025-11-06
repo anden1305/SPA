@@ -29,7 +29,7 @@ visualizer:
   summary_statistics: True
   historic_values: True
 dataloader:
-  batch_size: null
+  batch_size: 100
   window_size: 512
   stride: 171
   shuffle: True
@@ -92,11 +92,11 @@ model:
   type: hmm
   covariance_type: full
   init_strategy: kmeans_pca
-  init_noisy: true
+  init_noisy: false
   params: {}
 verbose: true
 seed: 123
 results_dir: results/training/hmm
-run_name: experiment_mssv_features
+run_name: experiment_synth_features
 runs: 5
 validate_data: True

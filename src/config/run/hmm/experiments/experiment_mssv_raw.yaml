@@ -200,7 +200,7 @@ model:
   type: hmm
   covariance_type: full
   init_strategy: kmeans_pca
-  init_noisy: true
+  init_noisy: false
   params: {}
 verbose: true
 seed: 123
