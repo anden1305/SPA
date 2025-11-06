@@ -6,7 +6,7 @@ trainer:
   validate_per_epoch: 10
   early_stopping:
     enabled: true
-    patience: 20
+    patience: 100
     min_delta: 0.001
   scheduler:
     enabled: true
@@ -84,10 +84,10 @@ dataloader:
       params: {}
 train_datasets:
   - type: synthetic
-    id: test3
+    id: experiments
 val_datasets:
   - type: synthetic
-    id: test3
+    id: experiments
 model:
   type: marhmm
   covariance_type: full

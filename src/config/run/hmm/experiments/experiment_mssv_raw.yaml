@@ -5,7 +5,7 @@ trainer:
   grad_clip: 5.0
   validate_per_epoch: 10
   early_stopping:
-    enabled: true
+    enabled: true   
     patience: 100
     min_delta: 0.001
   scheduler:
@@ -29,60 +29,26 @@ visualizer:
   summary_statistics: True
   historic_values: True
 dataloader:
-  batch_size: null
-  window_size: 512
-  stride: 171
+  batch_size: 16384
   shuffle: True
   normalize: True
   transforms:
-    # EEG channel transforms
-    - type: band_pass_filter
-      channel: EEG
+    - type: reshape
+      params: {}
+    - type: percentile_clipping
+      params: {
+        "percentile": 5
+      }
+    - type: high_pass_filter
       params: {
         "low_cutoff": 0.5,
-        "high_cutoff": 30,
+        "high_cutoff": 45,
+        "sampling_rate": 128
       }
-    - type: percentile_clipping
-      channel: EEG
+    - type: batch_raw
       params: {
-        "percentile": 0.5
+        "window_size": 512
       }
-    - type: rms
-      channel: EEG
-      params: {}
-    - type: burst_rate
-      channel: EEG
-      params: {}
-    - type: theta_delta_ratio
-      channel: EEG
-      params: {}
-    - type: theta_beta_ratio
-      channel: EEG
-      params: {}
-    - type: beta_delta_ratio
-      channel: EEG
-      params: {}
-    - type: theta_gamma_pac
-      channel: EEG
-      params: {}
-    - type: fft_relative_band_power
-      channel: EEG
-      params:
-        bands:
-          - [0.5, 4]
-          - [6, 9]
-          - [15, 30]
-
-    # EMG channel transforms
-    - type: percentile_clipping
-      channel: EMG
-      params: {
-        "percentile": 0.1
-      }
-    - type: rms
-      channel: EMG
-      params: {}
-
 train_datasets:
   - type: mssv
     id: sub-038
@@ -231,19 +197,14 @@ val_datasets:
     run: 1
     remove_artifact: True
 model:
-  type: marhmm
+  type: hmm
   covariance_type: full
   init_strategy: kmeans_pca
-  init_noisy: True
-  params:
-    lags: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
-    ridge: 0.1
-    var_reg: 0.05
-    sticky_coef: 0.1
-    sticky_kappa: 0.9
-verbose: True
+  init_noisy: true
+  params: {}
+verbose: true
 seed: 123
-results_dir: results/training/marhmm
+results_dir: results/training/hmm
 run_name: experiment_mssv_features
 runs: 5
 validate_data: True

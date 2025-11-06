@@ -6,7 +6,7 @@ trainer:
   validate_per_epoch: 10
   early_stopping:
     enabled: true   
-    patience: 20
+    patience: 100
     min_delta: 0.001
   scheduler:
     enabled: true
@@ -238,7 +238,7 @@ model:
   params: {}
 verbose: true
 seed: 123
-results_dir: results/training/marhmm
+results_dir: results/training/hmm
 run_name: experiment_mssv_features
 runs: 5
 validate_data: True

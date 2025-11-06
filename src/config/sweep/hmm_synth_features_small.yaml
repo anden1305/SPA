@@ -1,0 +1,10 @@
+method: grid
+metric:
+  name: train/total_loss
+  goal: minimize
+parameters:
+  trainer.learning_rate:
+    values: [0.001, 0.0005]
+  model.init_strategy:
+    values: [random_uniform, kmeans_pca]
+base_config: src/config/run/hmm/experiments/experiment_synth_features.yaml
