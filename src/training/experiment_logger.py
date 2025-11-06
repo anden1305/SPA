@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, Optional
+import os
 
 class ExperimentLogger:
     """Tiny logger wrapper to keep trainer.py uncluttered.
@@ -90,10 +91,13 @@ def create_logger(global_config) -> ExperimentLogger:
     enabled = getattr(wb_cfg, 'enabled', True) if wb_cfg is not None else False
     group = getattr(wb_cfg, 'group', None) if wb_cfg is not None else None
     tags = getattr(wb_cfg, 'tags', None) if wb_cfg is not None else None
+    # Allow environment to override defaults to match HPC/team settings
+    project = os.getenv('WANDB_PROJECT', 'SPA')
+    entity = os.getenv('WANDB_ENTITY', 'dtu_projects')
     return ExperimentLogger(
         enabled=enabled,
-        project="SPA",
-        entity="dtu_projects",
+        project=project,
+        entity=entity,
         group=group,
         tags=tags,
     )

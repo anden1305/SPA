@@ -96,8 +96,10 @@ def run_sweep(sweep_yaml_path: str) -> None:
 
     base_cfg = GlobalConfig.from_yaml(base_config_path)
     wb_settings = base_cfg.wandb
-    project = "SPA"
-    entity = "dtu_projects"
+    # Allow environment to override hardcoded defaults so HPC can target the right W&B project/team
+    import os
+    project = os.getenv("WANDB_PROJECT", "SPA")
+    entity = os.getenv("WANDB_ENTITY", "dtu_projects")
     group = getattr(wb_settings, "group", None) if wb_settings is not None else None
     tags = getattr(wb_settings, "tags", None) if wb_settings is not None else None
 
@@ -185,8 +187,9 @@ def create_sweep_only(sweep_yaml_path: str) -> str:
     sweep_spec = {k: v for k, v in sweep_yaml.items() if k in {"method", "metric", "parameters", "early_terminate"}}
     if not sweep_spec:
         sweep_spec = _build_sweep_config(base_cfg)
-    project = "SPA"
-    entity = "dtu_projects"
+    import os
+    project = os.getenv("WANDB_PROJECT", "SPA")
+    entity = os.getenv("WANDB_ENTITY", "dtu_projects")
     sweep_id = wandb.sweep(sweep=sweep_spec, project=project, entity=entity)
     print(sweep_id)
     return sweep_id
@@ -207,8 +210,9 @@ def run_agent_only(sweep_yaml_path: str, sweep_id: str | None = None, trials_per
     sweep_spec = {k: v for k, v in sweep_yaml.items() if k in {"method", "metric", "parameters", "early_terminate"}}
     if not sweep_spec:
         sweep_spec = _build_sweep_config(base_cfg)
-    project = "SPA"
-    entity = "dtu_projects"
+    import os
+    project = os.getenv("WANDB_PROJECT", "SPA")
+    entity = os.getenv("WANDB_ENTITY", "dtu_projects")
     if sweep_id is None:
         sweep_id = wandb.sweep(sweep=sweep_spec, project=project, entity=entity)
 

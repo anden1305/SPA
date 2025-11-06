@@ -13,65 +13,61 @@ NUM_AGENTS=$2
 ### default values for optional arguments. Default is 1 trial per agent
 TRIALS_PER_AGENT=${3:-1}
 ### default is 4 hours per job
-WALLTIME=${4:-04:00}
-### default is gpuv100
-QUEUE=${5:-gpuv100}
+WALLTIME=${4:-01:30}
+### default is gpuv100, but options are [gpuv100, gpua100, gpua10, gpul40s]
+### bqueues | grep -i gpu
+QUEUE=${5:-gpul40s}
+### bjobs -p
 
 ABS_SWEEP_YAML=$(realpath "$SWEEP_YAML")
 
 echo "Creating sweep from $ABS_SWEEP_YAML..."
-# Read 'count' from the sweep YAML (optional). We use a tiny python snippet to parse safely.
-# Note: arguments must be provided before the here-doc redirection; otherwise the shell
-# will treat the path after the terminator as a separate command.
-COUNT=$(python3 - "$ABS_SWEEP_YAML" <<'PY'
-import sys, yaml
-try:
-  path = sys.argv[1]
-  with open(path, 'r') as f:
-    d = yaml.safe_load(f)
-  c = d.get('count') if isinstance(d, dict) else None
-  print('' if c is None else int(c))
-except Exception:
-  print('')
-PY
-)
 
-if [ -n "$COUNT" ]; then
-  echo "Sweep YAML requests count=$COUNT trials in total. Enforcing Option B: total_trials = num_agents * trials_per_agent."
-  # If user didn't pass TRIALS_PER_AGENT explicitly (i.e. only 2 args), compute it if divisible
-  if [ "$#" -lt 3 ]; then
-    if [ $((COUNT % NUM_AGENTS)) -ne 0 ]; then
-      echo "ERROR: count ($COUNT) is not divisible by num_agents ($NUM_AGENTS). Provide a trials_per_agent or choose a different num_agents." >&2
-      exit 1
-    fi
-    TRIALS_PER_AGENT=$((COUNT / NUM_AGENTS))
-    echo "Auto-set TRIALS_PER_AGENT=$TRIALS_PER_AGENT to evenly split $COUNT trials across $NUM_AGENTS agents."
-  else
-    # Validate provided TRIALS_PER_AGENT yields exact count
-    PRODUCT=$((NUM_AGENTS * TRIALS_PER_AGENT))
-    if [ "$PRODUCT" -ne "$COUNT" ]; then
-      echo "ERROR: NUM_AGENTS * TRIALS_PER_AGENT = $PRODUCT, but sweep YAML count = $COUNT. Adjust arguments so product equals count." >&2
-      exit 1
-    fi
-  fi
+# If a .env file exists, export its variables (API key, project, entity)
+if [ -f .env ]; then
+  echo "Loading environment from .env"
+  set -a
+  # shellcheck disable=SC1091
+  source .env
+  set +a
 fi
 
-SWEEP_ID=$(source .venv/bin/activate && python3 -m src.training.wandb_sweep_runner "$ABS_SWEEP_YAML" --create-only)
+# Capture only the last line (our printed id) and strip whitespace to avoid
+# picking up any extra wandb stdout like "Create sweep with ID: ..."
+SWEEP_ID=$(source .venv/bin/activate && python3 -m src.training.wandb_sweep_runner "$ABS_SWEEP_YAML" --create-only | tail -n 1 | tr -d '[:space:]')
 echo "Created sweep: $SWEEP_ID"
+
+if [ -z "$SWEEP_ID" ]; then
+  echo "ERROR: Failed to obtain a W&B sweep id. Ensure WANDB_API_KEY is set and you have network access. Aborting."
+  exit 2
+fi
 
 OUTPUT_DIR=$(pwd)/hpc/output
 mkdir -p "$OUTPUT_DIR"
 
 echo "Submitting $NUM_AGENTS agent jobs as an LSF array (each agent runs $TRIALS_PER_AGENT trials)..."
+### NOTE:
+### Avoid single quotes around shell variables inside the command string passed to bsub.
+### Single quotes prevent expansion in this shell, so the remote shell would see an empty --sweep-id.
+### Use escaped double quotes instead to both expand here and preserve spaces.
 bsub -J "wandb_sweep_agent[1-${NUM_AGENTS}]" \
   -q "$QUEUE" \
   -o "$OUTPUT_DIR/wandb_sweep_%J_%I.out" \
   -e "$OUTPUT_DIR/wandb_sweep_%J_%I.err" \
   -n 4 \
-  -R "span[hosts=1]" \
   -R "rusage[mem=4GB]" \
+  -R "span[hosts=1]" \
   -W "$WALLTIME" \
-  -gpu "num=1:mode=exclusive_process" \
-  "bash -lc \"module load cuda/12.8.1; source .venv/bin/activate; python3 -m src.training.wandb_sweep_runner '$ABS_SWEEP_YAML' --agent-only --sweep-id '$SWEEP_ID' --trials-per-agent $TRIALS_PER_AGENT\""
+  -gpu "num=1" \
+  "bash -lc \"module load cuda/12.8.1; source .venv/bin/activate; \
+  # Load .env inside the remote job if present (API key, project, entity)
+  if [ -f .env ]; then set -a; source .env; set +a; fi; \
+  # Propagate W&B routing and API key from submitter/session if set
+  export WANDB_API_KEY=\${WANDB_API_KEY:-}; export WANDB_PROJECT=\${WANDB_PROJECT:-}; export WANDB_ENTITY=\${WANDB_ENTITY:-}; \
+  echo Running agent for sweep: \"$SWEEP_ID\"; \
+  python3 -m src.training.wandb_sweep_runner \"$ABS_SWEEP_YAML\" --agent-only --sweep-id \"$SWEEP_ID\" --trials-per-agent \"$TRIALS_PER_AGENT\"\""
 
 echo "Submitted array job. Monitor with bjobs and check hpc/output/ for logs."
+
+### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/hmm_mssv_features.yaml 15 1
+### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/marhmm_mssv_features.yaml 15 1

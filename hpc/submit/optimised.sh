@@ -13,5 +13,4 @@
 module load cuda/12.8.1
 source .venv/bin/activate
 mkdir -p output
-mkdir -p results
-python3 cuda.py
+python3 cuda.py main.py --config configs/optimised.yaml --output_dir hpc/output
