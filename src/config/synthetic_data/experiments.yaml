@@ -21,8 +21,8 @@ frequency_bins:
 stage_band_powers:
   - [0.60, 0.10, 0.10, 0.10, 0.10]
   - [0.10, 0.60, 0.10, 0.10, 0.10]
-  - [0.10, 0.10, 0.60, 0.10, 0.10]
   - [0.10, 0.10, 0.10, 0.60, 0.10]
+  - [0.20, 0.20, 0.20, 0.20, 0.20]
 
 stage_bin_selection_probability:
   - [0.2, 0.2, 0.2, 0.2, 0.2]
@@ -31,7 +31,7 @@ stage_bin_selection_probability:
   - [0.2, 0.2, 0.2, 0.2, 0.2]
 
 components_per_epoch: 1000
-amplitude_jitter_range: [0.8, 1.2]
+amplitude_jitter_range: [0.25, 1.75]
 stage_mean_amplitudes: [0.3, 0.2, 0.1, 0.0]
 
 overlap_s: 0.25
