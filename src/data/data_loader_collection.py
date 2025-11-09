@@ -26,7 +26,7 @@ class DataLoaderCollection:
         self.shuffle = self.config.shuffle
         self.random_seed = self.global_config.seed
         self.x, self.y = self.prepare_data()
-        self.batches_per_next = 1024
+        self.batches_per_next = self.config.num_batches
     
     def prepare_data(self) -> tuple[np.ndarray, np.ndarray]:
         x = []
