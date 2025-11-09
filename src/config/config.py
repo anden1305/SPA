@@ -58,6 +58,7 @@ class TransformsConfig(BaseModel):
     params: dict[str, Any] = Field(...)
 
 class DataLoaderConfig(BaseModel):
+    num_batches: int = Field(..., ge=1, description="Number of batches per forward backward.")
     batch_size: int | None = Field(..., ge=1, description="Number of windows. If None, use full dataset.")
     window_size: int | None = Field(..., ge=1, description="Size of each data window in timesteps.")
     stride: int | None = Field(..., ge=1, description="Stride between windows in timesteps.")
