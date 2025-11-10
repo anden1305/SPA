@@ -134,9 +134,9 @@ class Trainer:
 
     def __print_epoch(self):
         epoch_str = f"Epoch {self.current_epoch + 1}/{self.config.epochs}"
-        total_loss_str = f"Total Loss: {self.losses[self.current_epoch]:.4f}"
-        loss_str = f"Loss: {self.losses[self.current_epoch]-self.regularization_losses[self.current_epoch]:.4f}"
-        reg_loss_str = f"Reg Loss: {self.regularization_losses[self.current_epoch]:.4f}" if self.regularization_losses else "Reg Loss: 0.0000"
+        total_loss_str = f"Total Loss: {self.losses[self.current_epoch]:.5f}"
+        loss_str = f"Loss: {self.losses[self.current_epoch]-self.regularization_losses[self.current_epoch]:.5f}"
+        reg_loss_str = f"Reg Loss: {self.regularization_losses[self.current_epoch]:.5f}" if self.regularization_losses else "Reg Loss: 0.0000"
         
         print(f"{epoch_str:<15} | {total_loss_str} | {loss_str} | {reg_loss_str}", flush=True)
 

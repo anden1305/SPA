@@ -1,6 +1,6 @@
 trainer:
   epochs: 100000
-  learning_rate: 0.0001
+  learning_rate: 0.00005
   optimizer: adam
   grad_clip: null
   validate_per_epoch: 500
@@ -95,11 +95,16 @@ val_datasets:
     remove_artifact: True
 
 model:
-  type: hmm
-  init_strategy: random_uniform
-  init_noisy: false
+  type: marhmm
   covariance_type: full
-  params: {}
+  init_strategy: random_uniform
+  init_noisy: True
+  params:
+    lags: [1, 2, 4, 8]
+    ridge: 0.1
+    var_reg: 0.05
+    sticky_coef: 0.1
+    sticky_kappa: 0.9
 verbose: true
 seed: 123
 results_dir: results/training/hmm
