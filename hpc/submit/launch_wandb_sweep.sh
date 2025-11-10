@@ -13,10 +13,10 @@ NUM_AGENTS=$2
 ### default values for optional arguments. Default is 1 trial per agent
 TRIALS_PER_AGENT=${3:-1}
 ### default is 4 hours per job
-WALLTIME=${4:-3:00}
+WALLTIME=${4:-8:00}
 ### default is gpuv100, but options are [gpuv100, gpua100, gpua10, gpul40s]
 ### bqueues | grep -i gpu
-QUEUE=${5:-gpul40s}
+QUEUE=${5:-gpuv100}
 ### bjobs -p
 
 ABS_SWEEP_YAML=$(realpath "$SWEEP_YAML")
@@ -87,20 +87,20 @@ echo "Submitted array job. Monitor with bjobs and check hpc/output/sweep_${SWEEP
 
 ### Synthetic
 ###    features
-### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/hmm/hmm_synth_features.yaml 12 1
-### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/marhmm/marhmm_synth_features.yaml 12 1 03:00 gpuv100
+### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/hmm/hmm_synth_features.yaml 9 1
+### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/marhmm/marhmm_synth_features.yaml 9 1 03:00 gpuv100
 
 ###      raw
-### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/hmm/hmm_synth_raw.yaml 12 1
-### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/marhmm/marhmm_synth_raw.yaml 12 1
+### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/hmm/hmm_synth_raw.yaml 9 1
+### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/marhmm/marhmm_synth_raw.yaml 9 1
 
 
 ### MSSV
 ###    features
-### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/hmm/hmm_mssv_features.yaml 12 1
-### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/marhmm/marhmm_mssv_features.yaml 12 1
+### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/hmm/hmm_mssv_features.yaml 9 1
+### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/marhmm/marhmm_mssv_features.yaml 9 1
 
 ###    raw
-### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/hmm/hmm_mssv_raw.yaml 12 1
-### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/marhmm/marhmm_mssv_raw.yaml 12 1
+### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/hmm/hmm_mssv_raw.yaml 9 1
+### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/marhmm/marhmm_mssv_raw.yaml 9 1
 
