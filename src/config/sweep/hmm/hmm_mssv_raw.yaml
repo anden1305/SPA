@@ -4,7 +4,7 @@ metric:
   goal: minimize
 parameters:
   trainer.learning_rate:
-    values: [0.01, 0.001, 0.0005, 0.0001]
+    values: [0.0005, 0.0001, 0.00005]
   model.init_strategy:
     values: [random_uniform, random_separated, kmeans_pca]
 base_config: src/config/run/marhmm/experiments/experiment_mssv_raw.yaml

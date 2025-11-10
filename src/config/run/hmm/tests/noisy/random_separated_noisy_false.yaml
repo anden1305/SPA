@@ -1,18 +1,18 @@
 trainer:
-  epochs: 10000
-  learning_rate: 0.005
+  epochs: 25000
+  learning_rate: 0.0001
   optimizer: adam
   grad_clip: 5.0
   validate_per_epoch: 100
   early_stopping:
-    enabled: true   
-    patience: 150
+    enabled: false  
+    patience: 1000
     min_delta: 0.001
   scheduler:
-    enabled: false
+    enabled: true
     type: exponential
     step_size: Null
-    gamma: 0.99986 # Half LR after 1000 epochs
+    gamma: 0.99993
 validator:
   nmi: True
   accuracy: True
@@ -84,20 +84,40 @@ dataloader:
       channel: EMG
       params: {}
 train_datasets:
-  - type: synthetic
-    id: experiments
+  - type: mssv
+    id: sub-041
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-041
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-041
+    run: 3
+    remove_artifact: True
 val_datasets:
-  - type: synthetic
-    id: experiments
+  - type: mssv
+    id: sub-041
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-041
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-041
+    run: 3
+    remove_artifact: True
 model:
   type: hmm
   covariance_type: full
-  init_strategy: random_uniform
+  init_strategy: random_separated
   init_noisy: false
   params: {}
 verbose: true
 seed: 123
 results_dir: results/training/hmm
-run_name: exp_hmm_synth_features
-runs: 5
+run_name: noisy_random_separated_false_full_mssv_features
+runs: 3
 validate_data: True

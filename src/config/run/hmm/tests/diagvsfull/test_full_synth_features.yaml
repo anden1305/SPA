@@ -6,10 +6,10 @@ trainer:
   validate_per_epoch: 100
   early_stopping:
     enabled: true   
-    patience: 150
+    patience: 1000
     min_delta: 0.001
   scheduler:
-    enabled: false
+    enabled: true
     type: exponential
     step_size: Null
     gamma: 0.99986 # Half LR after 1000 epochs
@@ -98,6 +98,6 @@ model:
 verbose: true
 seed: 123
 results_dir: results/training/hmm
-run_name: exp_hmm_synth_features
+run_name: test_full_synth_features
 runs: 5
 validate_data: True

@@ -16,7 +16,7 @@ class SchedulerConfig(BaseModel):
 
 class EarlyStoppingConfig(BaseModel):
     enabled: bool = Field(True, description="Enable adaptive early stopping.")
-    patience: int = Field(..., ge=1, le=100, description="Epochs without relative improvement before action.")
+    patience: int = Field(..., ge=1, le=1000, description="Epochs without relative improvement before action.")
     min_delta: float = Field(..., ge=0, le=0.5, description="Minimum relative improvement fraction required (e.g. 0.01 = 1%). Always relative.")
     # Hardcoded in src/training/early_stopping.py:
     #   - min_lr = 1e-5 (minimum learning rate floor)
@@ -76,7 +76,7 @@ class DatasetConfig(BaseModel):
 
 class ModelConfig(BaseModel):
     type: str = Field(..., pattern="^(hmm|marhmm)$", description="Type of model, e.g., 'hmm'.")
-    covariance_type: str = Field(..., pattern="^(diag|full|meanonly)$", description="Covariance structure: 'diag' (diagonal), 'full' (Cholesky-factorized with softplus), or 'meanonly' (identity, HMM only).")
+    covariance_type: str = Field(..., pattern="^(diag|full)$", description="Covariance structure: 'diag' (diagonal), 'full' (Cholesky-factorized with softplus).")
     init_strategy: str = Field(..., pattern="^(random_uniform|random_dirichlet|random_separated|kmeans|kmeans_pca)$", description="Initialization strategy for the model.")
     init_noisy: bool = Field(...)  # Adds Gaussian noise to initialization; noise levels hardcoded below
     params: dict[str, Any] = Field(..., description="Model-specific parameters.")

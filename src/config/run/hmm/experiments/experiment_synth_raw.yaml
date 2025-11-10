@@ -1,6 +1,6 @@
 trainer:
   epochs: 5000
-  learning_rate: 0.001
+  learning_rate: 0.01
   optimizer: adam
   grad_clip: 5.0
   validate_per_epoch: 100
@@ -12,7 +12,7 @@ trainer:
     enabled: true
     type: exponential
     step_size: Null
-    gamma: 0.99931 # Half LR after 1000 epochs
+    gamma: 0.99986 # Half LR after 1000 epochs
 validator:
   nmi: True
   accuracy: True
@@ -29,7 +29,8 @@ visualizer:
   summary_statistics: True
   historic_values: True
 dataloader:
-  batch_size: 51200
+  num_batches: 128
+  batch_size: 16384
   window_size: null
   stride: null
   shuffle: True
@@ -91,12 +92,12 @@ val_datasets:
 model:
   type: hmm
   covariance_type: full
-  init_strategy: kmeans_pca
+  init_strategy: random_uniform
   init_noisy: false
   params: {}
 verbose: true
 seed: 123
 results_dir: results/training/hmm
-run_name: experiment_synth_raw
+run_name: exp_hmm_synth_raw
 runs: 5
 validate_data: True
