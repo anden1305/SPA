@@ -86,8 +86,10 @@ class MARHMM(BaseModel):
 		  and by feature dimension to keep magnitudes comparable across configs.
 		- Returns the mean across the batch.
 		"""
+		B = x.shape[0]
 		T = x.shape[1]
 		D = x.shape[2]
+		logp = logp / B
 		logp = logp / T
 		logp = logp / D
 		nll = -logp

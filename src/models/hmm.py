@@ -73,8 +73,10 @@ class HMM(BaseModel):
         return self.negative_log_likelihood(x, logp)
 
     def negative_log_likelihood(self, x: Tensor, logp: Tensor) -> Tensor:
+        B = x.shape[0]
         T = x.shape[1]
         D = x.shape[2]
+        logp = logp / B
         logp = logp / T
         logp = logp / D
         nll = -logp
