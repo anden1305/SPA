@@ -12,8 +12,15 @@ def init_random_dirichlet(
     S, D = model.num_states, model.num_features
     device = model.emission_mean.device
 
-    # Random means and identity covariance
-    model.emission_mean.copy_(mean_std * torch.randn(S, D, device=device))
+    # Random means (HMM) or AR coeffs (MAR-HMM)
+    if hasattr(model, 'emission_mean'):
+        model.emission_mean.copy_(mean_std * torch.randn(S, D, device=device))
+    elif hasattr(model, 'coeffs'):
+        L = len(model.lags)
+        model.coeffs.copy_(mean_std * torch.randn(S, D, D * L, device=device))
+        if hasattr(model, 'bias'):
+            model.bias.copy_(0.1 * mean_std * torch.randn(S, D, device=device))
+
     set_identity_covariance(model)
 
     # Dirichlet-sampled transitions

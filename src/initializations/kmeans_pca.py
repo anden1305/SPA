@@ -46,7 +46,16 @@ def init_kmeans_pca(model: BaseModel, data: torch.Tensor, kmeans_iters: int, est
         raise RuntimeError("PCA subspace selection failed.")
 
     # Set parameters
-    model.emission_mean.copy_(torch.stack([X[best_assign == k].mean(0) for k in range(S)]))
+    if hasattr(model, 'emission_mean'):
+        model.emission_mean.copy_(torch.stack([X[best_assign == k].mean(0) for k in range(S)]))
+    elif hasattr(model, 'coeffs'):
+        # For MAR-HMM, use k-means centers to initialize AR coefficients for each state
+        # A simple approach is to set the bias term to the centers and initialize coeffs to zero.
+        centers = torch.stack([X[best_assign == k].mean(0) for k in range(S)])
+        if hasattr(model, 'bias'):
+            model.bias.copy_(centers)
+        model.coeffs.zero_()
+        
     set_covariance_from_assignments(model, X, best_assign)
     set_transition_params(model, best_assign, B, T, S, estimate_transitions)
 

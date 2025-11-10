@@ -13,8 +13,17 @@ def init_kmeans(model: BaseModel, data: torch.Tensor, kmeans_iters: int, estimat
     flat = data.reshape(-1, D).to(model.device)
     centers, assign = run_kmeans(flat, S, int(kmeans_iters))
     
-    # Set emission means directly from k-means centers
-    model.emission_mean.copy_(centers)
+    # Set emission means (HMM) or AR coeffs (MAR-HMM)
+    if hasattr(model, 'emission_mean'):
+        model.emission_mean.copy_(centers)
+    elif hasattr(model, 'coeffs'):
+        # For MAR-HMM, use k-means centers to initialize AR coefficients for each state
+        # This is a heuristic: we can't directly map centers to AR coeffs.
+        # A simple approach is to set the bias term to the centers and initialize coeffs to zero.
+        if hasattr(model, 'bias'):
+            model.bias.copy_(centers)
+        model.coeffs.zero_()
+
     set_covariance_from_assignments(model, flat, assign)
     
     # Set transition parameters
@@ -71,11 +80,20 @@ def set_covariance_from_assignments(model: BaseModel, X: torch.Tensor, assign: t
 
 def set_diag_covariance_from_assignments(model: BaseModel, X: torch.Tensor, assign: torch.Tensor) -> None:
     """Compute and set diagonal covariance from assignments (keeps current means)."""
-    resid = X - model.emission_mean[assign]
-    var = torch.zeros_like(model.emission_mean)
+    if hasattr(model, 'emission_mean'):
+        resid = X - model.emission_mean[assign]
+    elif hasattr(model, 'bias'):
+        resid = X - model.bias[assign]
+    else:
+        resid = X
+    var = torch.zeros_like(model.emission_mean if hasattr(model, 'emission_mean') else model.bias)
     var.scatter_add_(0, assign.view(-1, 1).expand_as(resid), resid.pow(2))
     counts = torch.bincount(assign, minlength=model.num_states).clamp_min(1)
-    model.emission_logvar.copy_((var / counts.view(-1, 1)).clamp_min(1e-6).log())
+    
+    if hasattr(model, 'emission_logvar'):
+        model.emission_logvar.copy_((var / counts.view(-1, 1)).clamp_min(1e-6).log())
+    elif hasattr(model, 'log_var'):
+        model.log_var.copy_((var / counts.view(-1, 1)).clamp_min(1e-6).log())
 
 def set_full_covariance_from_assignments(model: BaseModel, X: torch.Tensor, assign: torch.Tensor) -> None:
     """Set Cholesky-parameterized full covariances using softplus mapping.

@@ -14,6 +14,11 @@ from src.data.data_loader import DataLoader
 from src.helpers.exponential_lags import exponential_lags
 from src.helpers.fit_ar_ls import fit_ar_ls
 from src.initializations.random_uniform import init_random_uniform
+from src.initializations.random_dirichlet import init_random_dirichlet
+from src.initializations.random_separated import init_random_separated
+from src.initializations.kmeans import init_kmeans
+from src.initializations.kmeans_pca import init_kmeans_pca
+from src.initializations.apply_noise import apply_noise_and_bias
 
 class MARHMM(BaseModel):
 	"""Multivariate Autoregressive HMM with state-specific AR(p) emissions."""
@@ -289,11 +294,35 @@ class MARHMM(BaseModel):
 	def __initialize_weights(self, coeff_std: float = 0.03, jitter_std: float = 0.05, var_init: float = 1.0) -> None:
 		"""Parameter initialization with support for different strategies."""
 		strategy = getattr(self.global_config.model, 'init_strategy', 'default').lower()
-		
+		init_noisy = getattr(self.global_config.model, 'init_noisy', False)
+
+		# Handle aliasing for noisy versions
+		if strategy == "kmeans_pca_noisy":
+			strategy = "kmeans_pca"
+			init_noisy = True
+
 		if strategy == "random_uniform":
 			init_random_uniform(self, coeff_std=coeff_std, jitter_std=jitter_std, var_init=var_init)
+		elif strategy == "random_dirichlet":
+			init_random_dirichlet(self, coeff_std=coeff_std, jitter_std=jitter_std, var_init=var_init)
+		elif strategy == "random_separated":
+			init_random_separated(self, coeff_std=coeff_std, jitter_std=jitter_std, var_init=var_init)
+		elif strategy == "kmeans":
+			init_kmeans(self)
+		elif strategy == "kmeans_pca":
+			init_kmeans_pca(self)
 		else:
 			raise ValueError(f"Unknown initialization strategy: {strategy}")
+
+		if init_noisy:
+			noise_config = self.global_config.model.noise_config
+			apply_noise_and_bias(
+				self,
+				mean_std=noise_config.mean_std,
+				cov_noise_std=noise_config.cov_noise_std,
+				init_logits_std=noise_config.init_logits_std,
+				self_transition_bias=noise_config.self_transition_bias,
+			)
 
 	def __validate_input(self, x: Tensor) -> Tensor:
 		"""Strict validator: require (B,T,D) with D==obs_dim; no reshaping."""

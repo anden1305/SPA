@@ -15,9 +15,15 @@ def init_random_separated(model: BaseModel, spread: float = 2.0, jitter_std: flo
         dirs = torch.randn(S, D, device=device)
         dirs = dirs / dirs.norm(dim=1, keepdim=True).clamp_min(1e-8)
     
-    # Separated means with jitter
-    means = spread * dirs + jitter_std * torch.randn(S, D, device=device)
-    model.emission_mean.copy_(means)
+    # Separated means (HMM) or AR coeffs (MAR-HMM)
+    if hasattr(model, 'emission_mean'):
+        means = spread * dirs + jitter_std * torch.randn(S, D, device=device)
+        model.emission_mean.copy_(means)
+    elif hasattr(model, 'coeffs'):
+        coeffs = spread * dirs.view(S, D, 1).expand(-1, -1, D * len(model.lags)) + jitter_std * torch.randn(S, D, D*len(model.lags), device=device)
+        model.coeffs.copy_(coeffs)
+        if hasattr(model, 'bias'):
+            model.bias.copy_(0.1 * spread * torch.randn(S, D, device=device))
     
     # Identity covariance and uniform transitions
     set_identity_covariance(model)
