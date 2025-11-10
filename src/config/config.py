@@ -77,7 +77,7 @@ class DatasetConfig(BaseModel):
 class ModelConfig(BaseModel):
     type: str = Field(..., pattern="^(hmm|marhmm)$", description="Type of model, e.g., 'hmm'.")
     covariance_type: str = Field(..., pattern="^(diag|full)$", description="Covariance structure: 'diag' (diagonal), 'full' (Cholesky-factorized with softplus).")
-    init_strategy: str = Field(..., pattern="^(random_uniform|random_dirichlet|random_separated|kmeans|kmeans_pca)$", description="Initialization strategy for the model.")
+    init_strategy: str = Field(..., pattern="^(random_uniform|random_dirichlet|random_separated|kmeans|kmeans_pca|kmeans_pca_noisy)$", description="Initialization strategy for the model.")
     init_noisy: bool = Field(...)  # Adds Gaussian noise to initialization; noise levels hardcoded below
     params: dict[str, Any] = Field(..., description="Model-specific parameters.")
     # MAR-HMM params (via params dict - these ARE configurable):

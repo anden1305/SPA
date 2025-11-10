@@ -273,6 +273,11 @@ class HMM(BaseModel):
         Data is optional (not needed for random*).
         """
         strategy = self.global_config.model.init_strategy.lower()
+        init_noisy = self.global_config.model.init_noisy
+        if strategy == "kmeans_pca_noisy":
+            strategy = "kmeans_pca"
+            init_noisy = True
+
         if strategy in {"kmeans", "kmeans_pca"}:
             data, _ = self.data_loader.get_all_data()
             data = self.__validate_input(data)
@@ -290,7 +295,6 @@ class HMM(BaseModel):
         else:
             raise ValueError("strategy must be one of {'random','random_separated','random_uniform','random_dirichlet','kmeans','kmeans_noisy','kmeans_pca','sticky_em_warmstart'}")
 
-        init_noisy = self.global_config.model.init_noisy
         if init_noisy:
             apply_noise_and_bias(self, mean_std=mean_std, cov_noise_std=cov_noise_std, init_logits_std=init_logits_std, self_transition_bias=self_transition_bias)
         self.clear_param_grads()
