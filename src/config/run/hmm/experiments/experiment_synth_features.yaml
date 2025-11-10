@@ -1,18 +1,18 @@
 trainer:
-  epochs: 10000
-  learning_rate: 0.005
+  epochs: 100000
+  learning_rate: 0.0001
   optimizer: adam
-  grad_clip: 5.0
-  validate_per_epoch: 100
+  grad_clip: null
+  validate_per_epoch: 500
   early_stopping:
-    enabled: true   
-    patience: 150
+    enabled: false   
+    patience: 100
     min_delta: 0.001
   scheduler:
-    enabled: false
+    enabled: true
     type: exponential
-    step_size: Null
-    gamma: 0.99986 # Half LR after 1000 epochs
+    step_size: null
+    gamma: 0.999972
 validator:
   nmi: True
   accuracy: True
@@ -49,9 +49,6 @@ dataloader:
         "percentile": 0.5
       }
     - type: rms
-      channel: EEG
-      params: {}
-    - type: burst_rate
       channel: EEG
       params: {}
     - type: theta_delta_ratio
@@ -99,5 +96,5 @@ verbose: true
 seed: 123
 results_dir: results/training/hmm
 run_name: exp_hmm_synth_features
-runs: 5
+runs: 3
 validate_data: True
