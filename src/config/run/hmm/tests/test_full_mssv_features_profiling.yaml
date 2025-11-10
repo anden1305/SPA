@@ -1,0 +1,108 @@
+trainer:
+  epochs: 2000
+  learning_rate: 0.0005
+  optimizer: adam
+  grad_clip: 5.0
+  validate_per_epoch: 100
+  early_stopping:
+    enabled: false  
+    patience: 1000
+    min_delta: 0.001
+  scheduler:
+    enabled: true
+    type: exponential
+    step_size: Null
+    gamma: 0.99986 # Half LR after 5000 epochs gamma = exp(log(0.5) / 5000) ≈ 0.9998614
+validator:
+  nmi: True
+  accuracy: True
+  cross_nmi: True
+  learning_rate: True
+  state_distinctness: True
+  summary_statistics: True
+visualizer:
+  losses: True
+  learning_rate: True
+  pca_tripanel: True
+  confusion_matrix: True
+  state_distinctness: True
+  summary_statistics: True
+  historic_values: True
+dataloader:
+  num_batches: 2048
+  batch_size: 100
+  window_size: 512
+  stride: 512
+  shuffle: True
+  normalize: True
+  transforms:
+    # EEG channel transforms
+    - type: band_pass_filter
+      channel: EEG
+      params: {
+        "low_cutoff": 0.5,
+        "high_cutoff": 30,
+      }
+    - type: percentile_clipping
+      channel: EEG
+      params: {
+        "percentile": 0.5
+      }
+    - type: rms
+      channel: EEG
+      params: {}
+    - type: burst_rate
+      channel: EEG
+      params: {}
+    - type: theta_delta_ratio
+      channel: EEG
+      params: {}
+    - type: theta_beta_ratio
+      channel: EEG
+      params: {}
+    - type: beta_delta_ratio
+      channel: EEG
+      params: {}
+    - type: theta_gamma_pac
+      channel: EEG
+      params: {}
+    - type: fft_relative_band_power
+      channel: EEG
+      params:
+        bands:
+          - [0.5, 4]
+          - [6, 9]
+          - [15, 30]
+
+    # EMG channel transforms
+    - type: percentile_clipping
+      channel: EMG
+      params: {
+        "percentile": 0.1
+      }
+    - type: rms
+      channel: EMG
+      params: {}
+
+train_datasets:
+  - type: mssv
+    id: sub-041
+    run: 1
+    remove_artifact: True
+val_datasets:
+  - type: mssv
+    id: sub-041
+    run: 1
+    remove_artifact: True
+model:
+  type: hmm
+  covariance_type: full
+  init_strategy: random_uniform
+  init_noisy: false
+  params: {}
+verbose: true
+seed: 124
+results_dir: results/training/hmm
+run_name: test_full_mssv_features
+runs: 1
+validate_data: True
