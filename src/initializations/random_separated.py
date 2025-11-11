@@ -5,7 +5,7 @@ from src.initializations.random_uniform import set_identity_covariance
 def init_random_separated(model: BaseModel, spread: float = 2.0, jitter_std: float = 0.05) -> None:
     """Structured random initialization that separates state means."""
     S, D = model.num_states, model.num_features
-    device = model.emission_mean.device
+    device = next(model.parameters()).device
     
     # Create orthogonal directions
     if D >= S:

@@ -33,6 +33,11 @@ def init_kmeans(model: BaseModel, data: torch.Tensor, kmeans_iters: int, estimat
     
     set_transition_params(model, assign, B, T, S, estimate_transitions)
 
+    # New: estimate state-wise AR coefficients by ridge least squares using assignments
+    if hasattr(model, 'coeffs'):
+        assign_bt = assign.view(B, T)
+        estimate_statewise_ar_coeffs(model, data.to(model.device), assign_bt)
+
 def run_kmeans(Z: torch.Tensor, K: int, iters: int) -> tuple[torch.Tensor, torch.Tensor]:
     """Run k-means clustering."""
     centers = kmeans_plus_init(Z, K)
@@ -148,4 +153,159 @@ def set_transition_params(model: BaseModel, assign: torch.Tensor, B: int, T: int
     
     model.initial_logits.copy_(pi.clamp_min(1e-12).log())
     model.transition_logits.copy_(A.clamp_min(1e-12).log())
+
+
+@torch.no_grad()
+def estimate_statewise_ar_coeffs(model: BaseModel, data: torch.Tensor, assign_bt: torch.Tensor) -> None:
+    """Estimate MARHMM AR coefficients and bias per state via ridge least squares on assigned frames.
+
+    - data: (B,T,D)
+    - assign_bt: (B,T) state index per frame
+    Updates:
+      model.coeffs: (S,D,D*L)
+      model.bias:   (S,D)
+    Uses model.lags, model.max_lag, and model.ridge.
+    Also recomputes emission covariance from AR residuals to match the fitted dynamics.
+    """
+    if not hasattr(model, 'coeffs'):
+        return
+    # Ensure computations happen on the same device as model parameters during init
+    param_device = next(model.parameters()).device
+    data = data.to(param_device)
+    assign_bt = assign_bt.to(param_device)
+
+    B, T, D = data.shape
+    S = model.num_states
+    Ls = list(getattr(model, 'lags', []))
+    if not Ls:
+        return
+    max_lag = int(getattr(model, 'max_lag', max(Ls)))
+    L = len(Ls)
+    DL = D * L
+
+    device = param_device
+    dtype_z = data.dtype
+    # Build lagged design once
+    lag_stack = torch.zeros((B, T, DL), device=device, dtype=dtype_z)
+    for j, lag in enumerate(Ls):
+        if lag < T:
+            lag_stack[:, lag:, j * D:(j + 1) * D] = data[:, :-lag, :]
+
+    param_dtype = next(model.parameters()).dtype
+    coeffs = torch.zeros((S, D, DL), device=device, dtype=param_dtype)
+    bias = torch.zeros((S, D), device=device, dtype=param_dtype)
+    ridge = float(getattr(model, 'ridge', 0.0))
+
+    # Mask out frames without full lags
+    valid_mask = torch.ones((B, T), device=device, dtype=torch.bool)
+    if max_lag > 0:
+        valid_mask[:, :max_lag] = False
+
+    for s in range(S):
+        mask_s = (assign_bt == s) & valid_mask
+        Ns = int(mask_s.sum().item())
+        if Ns <= 0:
+            continue
+        Zs = lag_stack[mask_s]  # (Ns, DL)
+        Ys = data[mask_s]       # (Ns, D)
+        if Zs.ndim != 2 or Zs.shape[0] < 2:
+            continue
+        # Augment with ones to fit bias
+        ones = torch.ones((Zs.shape[0], 1), device=device, dtype=dtype_z)
+        Zs_aug = torch.cat([Zs, ones], dim=1)  # (Ns, DL+1)
+        XtX = Zs_aug.T @ Zs_aug  # (DL+1, DL+1)
+        if ridge > 0.0:
+            I = torch.eye(XtX.size(0), device=device, dtype=dtype_z)
+            # Do not regularize the bias term (last diagonal)
+            I[-1, -1] = 0.0
+            XtX = XtX + ridge * I
+        XtY = Zs_aug.T @ Ys  # (DL+1, D)
+        try:
+            W = torch.linalg.solve(XtX, XtY)  # (DL+1, D)
+        except RuntimeError:
+            W = torch.linalg.pinv(XtX) @ XtY
+        A = W[:-1, :]  # (DL, D)
+        b = W[-1, :]   # (D,)
+        coeffs[s] = A.T.to(coeffs.dtype)  # (D, DL)
+        bias[s] = b.to(bias.dtype)
+
+    model.coeffs.copy_(coeffs.to(model.coeffs.dtype))
+    if hasattr(model, 'bias'):
+        model.bias.copy_(bias.to(model.bias.dtype))
+
+    # Recompute emission covariance from AR residuals to align likelihood with fitted dynamics
+    recompute_covariance_from_ar(model, data, assign_bt, lag_stack, valid_mask)
+
+
+@torch.no_grad()
+def recompute_covariance_from_ar(model: BaseModel, data: torch.Tensor, assign_bt: torch.Tensor,
+                                 lag_stack: torch.Tensor | None = None, valid_mask: torch.Tensor | None = None) -> None:
+    """Recompute emission covariance per state using residuals from current AR params.
+
+    Accepts optionally precomputed lag_stack and valid_mask for efficiency.
+    """
+    if not hasattr(model, 'coeffs'):
+        return
+    # Align devices with model parameters during initialization
+    param_device = next(model.parameters()).device
+    data = data.to(param_device)
+    assign_bt = assign_bt.to(param_device)
+    if lag_stack is not None:
+        lag_stack = lag_stack.to(param_device)
+    if valid_mask is not None:
+        valid_mask = valid_mask.to(param_device)
+
+    B, T, D = data.shape
+    S = model.num_states
+    Ls = list(getattr(model, 'lags', []))
+    L = len(Ls)
+    DL = D * L
+    device = param_device
+    dtype_z = data.dtype
+
+    if lag_stack is None:
+        lag_stack = torch.zeros((B, T, DL), device=device, dtype=dtype_z)
+        for j, lag in enumerate(Ls):
+            if lag < T:
+                lag_stack[:, lag:, j * D:(j + 1) * D] = data[:, :-lag, :]
+    if valid_mask is None:
+        valid_mask = torch.ones((B, T), device=device, dtype=torch.bool)
+        max_lag = int(getattr(model, 'max_lag', max(Ls)))
+        if max_lag > 0:
+            valid_mask[:, :max_lag] = False
+
+    # Compute residuals by state
+    for s in range(S):
+        mask_s = (assign_bt == s) & valid_mask
+        Ns = int(mask_s.sum().item())
+        if Ns <= 0:
+            continue
+        Zs = lag_stack[mask_s]  # (Ns, DL)
+        Ys = data[mask_s]       # (Ns, D)
+        pred = Zs @ model.coeffs[s].T  # (Ns, D)
+        if hasattr(model, 'bias'):
+            pred = pred + model.bias[s].view(1, D)
+        resid = (Ys - pred)
+
+        if model.covariance_type == 'diag':
+            var = resid.var(dim=0, unbiased=False).clamp_min(1e-6)  # (D,)
+            if hasattr(model, 'log_var'):
+                model.log_var[s].copy_(var.log().to(model.log_var.dtype))
+            elif hasattr(model, 'emission_logvar'):
+                model.emission_logvar[s].copy_(var.log().to(model.emission_logvar.dtype))
+        elif model.covariance_type == 'full':
+            resid_c = resid - resid.mean(0, keepdim=True)
+            Ck = (resid_c.T @ resid_c) / max(Ns - 1, 1)
+            I = torch.eye(D, device=device, dtype=dtype_z)
+            Ck = Ck + model.jitter * I
+            try:
+                Lk = torch.linalg.cholesky(Ck)
+            except RuntimeError:
+                Lk = torch.linalg.cholesky(Ck + 1e-4 * I)
+            raw = model.emission_cholesky_raw
+            raw_k = torch.tril(Lk)
+            target = (torch.diagonal(Lk) - model.jitter).clamp_min(1e-8)
+            diag_raw = torch.log(torch.expm1(target))
+            raw_k.diagonal().copy_(diag_raw)
+            raw[s].copy_(raw_k.to(raw.dtype))
 

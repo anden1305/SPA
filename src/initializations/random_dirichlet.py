@@ -10,7 +10,7 @@ def init_random_dirichlet(
 ) -> None:
     """Fully random means, unit covariance, Dirichlet-sampled π and A."""
     S, D = model.num_states, model.num_features
-    device = model.emission_mean.device
+    device = next(model.parameters()).device
 
     # Random means (HMM) or AR coeffs (MAR-HMM)
     if hasattr(model, 'emission_mean'):
