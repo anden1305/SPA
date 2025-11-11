@@ -1,5 +1,5 @@
 trainer:
-  epochs: 5000
+  epochs: 3000
   learning_rate: 0.00005
   optimizer: adam
   grad_clip: null
@@ -105,6 +105,6 @@ model:
 verbose: True
 seed: 123
 results_dir: results/training/marhmm
-run_name: test_marhmm_kmeans_pca_noisy_mssv_41_features
+run_name: test_marhmm_kmeans_pca_noisy_mssv_features
 runs: 1
 validate_data: True

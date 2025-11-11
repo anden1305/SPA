@@ -3,6 +3,14 @@ from pathlib import Path
 from torch import Tensor
 import numpy as np
 import seaborn as sns
+import matplotlib
+# Force a non-interactive backend to avoid Tkinter dependency/issues on Windows or headless runs
+try:
+    if str(matplotlib.get_backend()).lower() != 'agg':
+        matplotlib.use('Agg')
+except Exception:
+    # If backend is already set or unavailable, ignore and proceed
+    pass
 import matplotlib.pyplot as plt
 import torch
 import plotly.graph_objects as go
