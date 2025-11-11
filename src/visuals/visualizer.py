@@ -1422,28 +1422,72 @@ class Visualizer:
                 _save(fig, 'transition_diag_probs.png')
 
         # Optional: interactive sliders for small params (kept lightweight)
+        import traceback
         for name, series in hist.items():
             try:
+                # Basic sanity: need at least one sample and not too large
+                if not series:
+                    continue
                 sample = _to_np(series[0])
-                if sample.ndim <= 2 and sample.size <= 4000:  # avoid huge HTML
-                    frames = []
-                    for i, s in enumerate(series):
-                        arr2 = _to_np(s)
-                        if arr2.ndim == 1:
-                            frames.append(go.Frame(data=[go.Scatter(y=arr2, mode='lines')], name=str(i)))
-                        elif arr2.ndim == 2:
-                            frames.append(go.Frame(data=[go.Heatmap(z=arr2)], name=str(i)))
-                        else:
-                            continue
-                    if frames:
-                        if sample.ndim == 1:
-                            fig = go.Figure(data=[go.Scatter(y=_to_np(series[0]), mode='lines')], frames=frames)
-                        else:
-                            fig = go.Figure(data=[go.Heatmap(z=_to_np(series[0]))], frames=frames)
-                        fig.update_layout(title=f"{name} (epoch slider)", updatemenus=[{'type':'buttons','buttons':[{'label':'Play','method':'animate','args':[None,{'frame':{'duration':120,'redraw':True},'fromcurrent':True}]},{'label':'Pause','method':'animate','args':[[None],{'frame':{'duration':0,'redraw':False}}]}]}], sliders=[{'steps':[{'args':[[str(i)],{'frame':{'duration':0,'redraw':True},'mode':'immediate'}],'label':str(i),'method':'animate'} for i in range(len(frames))], 'currentvalue':{'prefix':'Epoch: '}}])
-                        fig.write_html(str(base / f"{name}_slider.html"))
+                if sample is None:
+                    continue
+                if sample.ndim > 2 or sample.size > 4000:
+                    # Skip very large or high-rank tensors
+                    continue
+
+                # Ensure all frames are consistent (same ndim and shape)
+                target_ndim = sample.ndim
+                target_shape = sample.shape
+                frames = []
+                for i, s in enumerate(series):
+                    arr2 = _to_np(s)
+                    if arr2 is None:
+                        continue
+                    if arr2.ndim != target_ndim or arr2.shape != target_shape:
+                        # skip mismatched frames
+                        continue
+                    if arr2.ndim == 1:
+                        frames.append(go.Frame(data=[go.Scatter(y=arr2, mode='lines')], name=f"frame{i}"))
+                    elif arr2.ndim == 2:
+                        frames.append(go.Frame(data=[go.Heatmap(z=arr2)], name=f"frame{i}"))
+
+                if not frames:
+                    continue
+
+                # Create base figure using the first (consistent) sample
+                if target_ndim == 1:
+                    fig = go.Figure(data=[go.Scatter(y=_to_np(series[0]), mode='lines')], frames=frames)
+                else:
+                    fig = go.Figure(data=[go.Heatmap(z=_to_np(series[0]))], frames=frames)
+
+                # Build slider steps referencing the explicit frame names
+                steps = []
+                for idx in range(len(frames)):
+                    steps.append(dict(
+                        method='animate',
+                        args=[[f"frame{idx}"], {'frame': {'duration': 0, 'redraw': True}, 'mode': 'immediate'}],
+                        label=str(idx)
+                    ))
+
+                fig.update_layout(
+                    title=f"{name} (epoch slider)",
+                    updatemenus=[{
+                        'type': 'buttons',
+                        'buttons': [
+                            {'label': 'Play', 'method': 'animate', 'args': [None, {'frame': {'duration': 120, 'redraw': True}, 'fromcurrent': True}]},
+                            {'label': 'Pause', 'method': 'animate', 'args': [[None], {'frame': {'duration': 0, 'redraw': False}}]}
+                        ]
+                    }],
+                    sliders=[{
+                        'steps': steps,
+                        'currentvalue': {'prefix': 'Epoch: '}
+                    }]
+                )
+
+                fig.write_html(str(base / f"{name}_slider.html"))
             except Exception as e:
-                print(f"Interactive slider for {name} failed: {e}")
+                tb = traceback.format_exc()
+                print(f"Interactive slider for {name} failed: {type(e).__name__}: {e}\n{tb}")
 
     def __plot_losses(self, train_details: TrainDetails) -> None:
         losses = list(train_details.losses.values())

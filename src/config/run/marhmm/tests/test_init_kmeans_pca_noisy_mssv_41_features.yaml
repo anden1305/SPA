@@ -1,5 +1,5 @@
 trainer:
-  epochs: 3000
+  epochs: 5000
   learning_rate: 0.00005
   optimizer: adam
   grad_clip: null
@@ -94,7 +94,7 @@ val_datasets:
 model:
   type: marhmm
   covariance_type: full
-  init_strategy: kmeans_pca
+  init_strategy: kmeans_pca_noisy
   init_noisy: false
   params:
     lags: [1, 2, 4, 8]
@@ -105,6 +105,6 @@ model:
 verbose: True
 seed: 123
 results_dir: results/training/marhmm
-run_name: test_marhmm_kmeans_pca_mssv_features
+run_name: test_marhmm_kmeans_pca_noisy_mssv_41_features
 runs: 1
 validate_data: True
