@@ -54,8 +54,6 @@ class MARHMM(BaseModel):
 		self.max_lag: int = max(lags)
 		self.ridge = float(params.get("ridge", 0.0))  # L2 coeff penalty
 		self.var_reg = float(params.get("var_reg", 0.0))  # variance stabiliser
-		# MAR-specific noise control for init (decoupled from HMM)
-		self.ar_noise_std_init = float(params.get("ar_noise_std", 0.01))
 		# Optional sticky transition prior
 		self.sticky_coef = float(params.get("sticky_coef", 0.0))
 		self.sticky_kappa = float(params.get("sticky_kappa", 0.9))
@@ -292,16 +290,17 @@ class MARHMM(BaseModel):
 	@torch.no_grad()
 	def __initialize_weights(
 		self,
-		coeff_std: float = 1.0,
-		jitter_std: float = 0.0,
-		var_init: float = 1.0,
+		coeff_std: float = 0.05,
+		jitter_std: float = 0.05,
+		var_init: float = 0.05,
 		kmeans_iters: int = 150,
 		estimate_transitions: bool = True,
-		mean_std: float = 0.05,
-		cov_noise_std: float = 0.05,
-		init_logits_std: float = 0.05,
-		self_transition_bias: float = 0.05,
+		mean_std: float = 0.01,
+		cov_noise_std: float = 0.01,
+		init_logits_std: float = 0.01,
+		self_transition_bias: float = 0.01,
 		jitter_std_separated: float = 0.05,
+		ar_noise_std_init: float = 0.0001,
 		spread: float = 0.05,
 	) -> None:
 		"""Parameter initialization with support for different strategies.
@@ -319,7 +318,7 @@ class MARHMM(BaseModel):
 		"""
 		strategy = getattr(self.global_config.model, 'init_strategy', 'default').lower()
 		init_noisy = getattr(self.global_config.model, 'init_noisy', False)
-
+		
 		# Handle aliasing for noisy versions
 		if strategy == "kmeans_pca_noisy":
 			strategy = "kmeans_pca"
@@ -350,8 +349,7 @@ class MARHMM(BaseModel):
 				cov_noise_std=cov_noise_std,
 				init_logits_std=init_logits_std,
 				self_transition_bias=self_transition_bias,
-				# Use a much smaller noise just for AR params to keep MAR stable at init
-				ar_noise_std=self.ar_noise_std_init,
+				ar_noise_std=ar_noise_std_init,
 			)
 
 	def __validate_input(self, x: Tensor) -> Tensor:
