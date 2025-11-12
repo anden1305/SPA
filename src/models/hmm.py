@@ -82,7 +82,6 @@ class HMM(BaseModel):
         nll = -logp
         return nll.mean()
     
-    @profile
     def __emission_log_prob(self, x: Tensor) -> Tensor:
         """Return log p(x_t | z_t) for all states.
 
@@ -139,30 +138,76 @@ class HMM(BaseModel):
         L = L + torch.diag_embed(diag_pos - diag_raw)
         return L
 
-    @profile
-    def __forward_algorithm(self, log_emiss: Tensor, log_pi: Tensor, log_A: Tensor) -> Tensor:
-        """Run forward algorithm.
+    def __log_semiring_matmul(self, X: torch.Tensor, Y: torch.Tensor) -> torch.Tensor:
+        # X(..., S, S), Y(..., S, S) -> Z(..., S, S) with logsumexp over k of X[i,k] + Y[k,j]
+        return torch.logsumexp(X.unsqueeze(-1) + Y.unsqueeze(-3), dim=-2)
 
-        Parameters
-        ----------
-        log_emiss : (B,T,S)
-        log_pi : (S,)
-        log_A : (S,S)
-        Returns
-        -------
-        log_likelihood : (B,)
+    def __log_semiring_vec_matmul(self, v: torch.Tensor, M: torch.Tensor) -> torch.Tensor:
+        # v(..., S), M(..., S, S) -> out(..., S) with logsumexp over i of v[i] + M[i,j]
+        return torch.logsumexp(v.unsqueeze(-1) + M, dim=-2)
+
+    def __reduce_time_block(self, M_blk: torch.Tensor) -> torch.Tensor:
         """
-        _, T, _ = log_emiss.shape
-        A_prob = torch.exp(log_A)  # (S,S)
-        eps = torch.finfo(log_emiss.dtype).tiny
-        # alpha_0
-        alpha = log_pi.unsqueeze(0) + log_emiss[:, 0, :]  # (B,S)
-        for t in range(1, T):
-            m = alpha.max(dim=1, keepdim=True).values                 # (B,1)
-            v = torch.exp(alpha - m)                                   # (B,S)
-            u = v @ A_prob                                             # (B,S)
-            alpha = log_emiss[:, t, :] + m + torch.log(u.clamp_min(eps))
-        return torch.logsumexp(alpha, dim=1)  # (B,)
+        Reduce a block of time-dependent semiring matrices with pairwise reduction.
+        M_blk: (B, L, S, S). Returns (B, S, S) representing product over this block.
+        """
+        B, L, S, _ = M_blk.shape
+        device, dtype = M_blk.device, M_blk.dtype
+        if L == 1:
+            return M_blk[:, 0]
+        # pad to even length
+        if L % 2 == 1:
+            E = torch.full((B, 1, S, S), float("-inf"), dtype=dtype, device=device)
+            idx = torch.arange(S, device=device)
+            E[:, 0, idx, idx] = 0.0
+            M_blk = torch.cat([M_blk, E], dim=1)
+            L = M_blk.size(1)
+        # pairwise reduce
+        left = M_blk[:, 0::2]
+        right = M_blk[:, 1::2]
+        return self.__log_semiring_matmul(left, right)  # (B, L/2, S, S) or (B, S, S) after recursion
+
+    def __forward_algorithm(self, log_emiss: torch.Tensor, log_pi: torch.Tensor, log_A: torch.Tensor) -> torch.Tensor:
+        """
+        Parallel, chunked forward with log-sum-exp semiring.
+
+        log_emiss: (B, T, S)
+        log_pi:    (S,)
+        log_A:     (S, S)
+        returns:   (B,)
+        """
+        B, T, S = log_emiss.shape
+        device = log_emiss.device
+        dtype = log_emiss.dtype
+
+        # alpha at t=0
+        alpha = log_pi.unsqueeze(0) + log_emiss[:, 0, :]  # (B, S)
+        if T == 1:
+            return torch.logsumexp(alpha, dim=-1)
+
+        # Build per-time matrices M_t[i,j] = log_A[i,j] + log_emiss[b,t,j] for t=1..T-1
+        # We process in blocks to bound memory.
+        # Tune this depending on S and VRAM:
+        BLOCK = int(self.global_config.model.params.get("forward_block", 128))
+
+        t = 1
+        while t < T:
+            # [t, t+L) block
+            L = min(BLOCK, T - t)
+            # Shape: (B, L, S, S)
+            M_blk = log_A.view(1, 1, S, S) + log_emiss[:, t:t+L, :].unsqueeze(-2)
+
+            # Reduce the block to a single (B, S, S) via pairwise semiring matmul
+            # If L > 1, __reduce_time_block returns (B, L/2, S, S), recurse until (B, S, S)
+            while M_blk.ndim == 4 and M_blk.size(1) > 1:
+                M_blk = self.__reduce_time_block(M_blk)  # shrinks time dimension
+
+            # Now M_blk is (B, S, S). Apply to current alpha.
+            alpha = self.__log_semiring_vec_matmul(alpha, M_blk)  # (B, S)
+
+            t += L
+
+        return torch.logsumexp(alpha, dim=-1)
 
     @torch.no_grad()
     def predict(self, x: Tensor) -> Tensor:
@@ -170,7 +215,6 @@ class HMM(BaseModel):
         return self.__decode_viterbi(x)
 
     @torch.no_grad()
-    @profile
     def __decode_viterbi(self, x: Tensor) -> Tensor:
         """Most likely state sequence (Viterbi path).
 

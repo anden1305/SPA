@@ -1,9 +1,9 @@
 trainer:
-  epochs: 100000
+  epochs: 10000
   learning_rate: 0.0001
   optimizer: adam
   grad_clip: null
-  validate_per_epoch: 500
+  validate_per_epoch: 10
   early_stopping:
     enabled: false   
     patience: 100
@@ -30,7 +30,7 @@ visualizer:
   historic_values: True
 dataloader:
   num_batches: 2048
-  batch_size: 128
+  batch_size: 16
   window_size: 512
   stride: 512
   shuffle: True

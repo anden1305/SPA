@@ -10,14 +10,16 @@ fi
 
 SWEEP_YAML=$1
 NUM_AGENTS=$2
-### default values for optional arguments. Default is 1 trial per agent
-TRIALS_PER_AGENT=${3:-1}
-### default is 4 hours per job
+### default values for optional arguments. Bundle several trials per agent to reduce concurrent GPUs
+TRIALS_PER_AGENT=${3:-3}   # was 1; increase to 3 to run multiple trials per GPU job by default
+### default is 8 hours per job
 WALLTIME=${4:-8:00}
 ### default is gpuv100, but options are [gpuv100, gpua100, gpua10, gpul40s]
 ### bqueues | grep -i gpu
 QUEUE=${5:-gpuv100}
 ### bjobs -p
+### optional concurrency cap for LSF arrays: pass an integer N to limit concurrent array tasks with %N
+CONCURRENCY=${6:-}         # empty => no explicit % limit; set to e.g. 2 or 4 to cap concurrency
 
 ABS_SWEEP_YAML=$(realpath "$SWEEP_YAML")
 
@@ -58,20 +60,26 @@ fi
 OUTPUT_DIR=$(pwd)/hpc/output/sweep_${SWEEP_ID}
 mkdir -p "$OUTPUT_DIR"
 
-echo "Submitting $NUM_AGENTS agent jobs as an LSF array (each agent runs $TRIALS_PER_AGENT trials)..."
+if [ -n "$CONCURRENCY" ]; then
+  ARRAY_SPEC="wandb_sweep_agent[1-${NUM_AGENTS}%${CONCURRENCY}]"
+  echo "Submitting $NUM_AGENTS agent jobs as an LSF array (each agent runs $TRIALS_PER_AGENT trials) with concurrency %${CONCURRENCY}..."
+else
+  ARRAY_SPEC="wandb_sweep_agent[1-${NUM_AGENTS}]"
+  echo "Submitting $NUM_AGENTS agent jobs as an LSF array (each agent runs $TRIALS_PER_AGENT trials)..."
+fi
 ### NOTE:
 ### Avoid single quotes around shell variables inside the command string passed to bsub.
 ### Single quotes prevent expansion in this shell, so the remote shell would see an empty --sweep-id.
 ### Use escaped double quotes instead to both expand here and preserve spaces.
-bsub -J "wandb_sweep_agent[1-${NUM_AGENTS}]" \
+bsub -J "$ARRAY_SPEC" \
   -q "$QUEUE" \
   -o "$OUTPUT_DIR/sweep_${SWEEP_ID}_job_%J_agent_%I.out" \
   -e "$OUTPUT_DIR/sweep_${SWEEP_ID}_job_%J_agent_%I.err" \
   -n 4 \
   -R "rusage[mem=4GB]" \
   -R "span[hosts=1]" \
+  -gpu "num=1:mode=exclusive_process" \
   -W "$WALLTIME" \
-  -gpu "num=1" \
   "bash -lc \"# Minimal, quiet init to avoid 'Modules Release ... Usage' banner
   source /etc/profile.d/modules.sh >/dev/null 2>&1 || true; \
   module --silent try-load cuda/12.8.1 >/dev/null 2>&1 || true; \

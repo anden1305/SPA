@@ -405,7 +405,12 @@ class DataLoader(Iterator):
         x = x.reshape(-1, x.shape[2])
         x = np.expand_dims(x, axis=0)
         y = np.expand_dims(y, axis=0)
-        return torch.from_numpy(x).to(self.device), torch.from_numpy(y).to(self.device)
+        if self.device.type == "cuda":
+            xt = torch.from_numpy(x).pin_memory().to(self.device, non_blocking=True)
+            yt = torch.from_numpy(y).pin_memory().to(self.device, non_blocking=True)
+            return xt, yt
+        else:
+            return torch.from_numpy(x).to(self.device), torch.from_numpy(y).to(self.device)
     
     def has_features_enabled(self) -> bool:
         return self.has_features

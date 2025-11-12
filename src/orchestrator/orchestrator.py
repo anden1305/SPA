@@ -159,11 +159,13 @@ class Orchestrator:
     def __get_model(self, device: torch.device):
         match self.global_config.model.type:
             case "hmm":
-                return HMM(data_loader=self.train_loader, config=self.global_config, device=device)
+                model = HMM(data_loader=self.train_loader, config=self.global_config, device=device)
             case "marhmm":
-                return MARHMM(data_loader=self.train_loader, config=self.global_config, device=device)
+                model = MARHMM(data_loader=self.train_loader, config=self.global_config, device=device)
             case _:
                 raise ValueError(f"Unknown model type: {self.global_config.model.type}")
+        compiled_model = torch.compile(model, fullgraph=False, dynamic=True)
+        return compiled_model
     
     def __initial_print(self):
         print("\n" + "=" * 60)
