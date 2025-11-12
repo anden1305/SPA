@@ -135,9 +135,6 @@ class MARHMM(BaseModel):
 			log_2pi = self._log_2pi.to(dtype=x.dtype)
 			lp = -0.5 * (resid.pow(2) * torch.exp(-log_var) + log_var + log_2pi)
 			lp = lp.sum(dim=-1)
-			
-			# More conservative clamping to prevent numerical issues
-			lp = torch.clamp(lp, min=-100, max=10)
 		else:  # full covariance
 			# Full covariance with Cholesky factorization
 			L_chol = self.__full_cov_cholesky()  # (S,D,D)
@@ -157,8 +154,6 @@ class MARHMM(BaseModel):
 				lp_s = -0.5 * (m_dist2 + log_det[s] + D * log_2pi)  # (B,T)
 				log_probs.append(lp_s.unsqueeze(-1))  # (B,T,1)
 			lp = torch.cat(log_probs, dim=-1)  # (B,T,S)
-			# Clamp like diag case to avoid extreme initial losses
-			lp = torch.clamp(lp, min=-100, max=10)
 		
 		if self.max_lag > 0:
 			lp[:, : self.max_lag, :] = 0.0
@@ -302,12 +297,12 @@ class MARHMM(BaseModel):
 		var_init: float = 1.0,
 		kmeans_iters: int = 150,
 		estimate_transitions: bool = True,
-		mean_std: float = 1.0,
-		cov_noise_std: float = 0.02,
-		init_logits_std: float = 0.1,
+		mean_std: float = 0.05,
+		cov_noise_std: float = 0.05,
+		init_logits_std: float = 0.05,
 		self_transition_bias: float = 0.05,
 		jitter_std_separated: float = 0.05,
-		spread: float = 2.0,
+		spread: float = 0.05,
 	) -> None:
 		"""Parameter initialization with support for different strategies.
 
