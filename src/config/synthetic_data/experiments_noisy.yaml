@@ -1,0 +1,43 @@
+
+name: experiments_noisy
+sampling_rate_hz: 128
+epoch_length_s: 4
+n_epochs: 10000
+n_stages: 4
+
+transition_matrix:
+  - [0.79, 0.07, 0.07, 0.07]
+  - [0.07, 0.79, 0.07, 0.07]
+  - [0.07, 0.07, 0.79, 0.07]
+  - [0.07, 0.07, 0.07, 0.79]
+
+frequency_bins:
+  - [0.5, 4.0]    # Delta
+  - [4.0, 8.0]    # Theta
+  - [8.0, 12.0]   # Alpha
+  - [12.0, 30.0]  # Beta
+  - [30.0, 100.0]  # Gamma
+
+stage_band_powers:
+  - [0.60, 0.10, 0.10, 0.10, 0.10]
+  - [0.10, 0.60, 0.10, 0.10, 0.10]
+  - [0.10, 0.10, 0.10, 0.60, 0.10]
+  - [0.20, 0.20, 0.20, 0.20, 0.20]
+
+stage_bin_selection_probability:
+  - [0.2, 0.2, 0.2, 0.2, 0.2]
+  - [0.2, 0.2, 0.2, 0.2, 0.2]
+  - [0.2, 0.2, 0.2, 0.2, 0.2]
+  - [0.2, 0.2, 0.2, 0.2, 0.2]
+
+components_per_epoch: 35
+amplitude_jitter_range: [0.1, 3.0]
+stage_mean_amplitudes: [0.2, 0.1, -0.1, -0.1]
+
+overlap_s: 0.5
+stage_rms_scales: [1.3, 1.2, 1.1, 1.1]
+
+normalize_epoch: False
+seed: 1234
+
+stage_names: [Stage1, Stage2, Stage3, Stage4]
