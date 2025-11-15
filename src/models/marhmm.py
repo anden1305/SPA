@@ -133,9 +133,6 @@ class MARHMM(BaseModel):
 			log_2pi = self._log_2pi.to(dtype=x.dtype)
 			lp = -0.5 * (resid.pow(2) * torch.exp(-log_var) + log_var + log_2pi)
 			lp = lp.sum(dim=-1)
-			
-			# More conservative clamping to prevent numerical issues
-			lp = torch.clamp(lp, min=-100, max=10)
 		else:  # full covariance
 			# Full covariance with Cholesky factorization
 			L_chol = self.__full_cov_cholesky()  # (S,D,D)
@@ -291,37 +288,68 @@ class MARHMM(BaseModel):
 		self.__initialize_weights()
 
 	@torch.no_grad()
-	def __initialize_weights(self, coeff_std: float = 0.03, jitter_std: float = 0.05, var_init: float = 1.0) -> None:
-		"""Parameter initialization with support for different strategies."""
+	def __initialize_weights(
+		self,
+		coeff_std: float = 0.05,
+		jitter_std: float = 0.05,
+		var_init: float = 0.05,
+		kmeans_iters: int = 150,
+		estimate_transitions: bool = True,
+		mean_std: float = 0.01,
+		cov_noise_std: float = 0.01,
+		init_logits_std: float = 0.01,
+		self_transition_bias: float = 0.01,
+		jitter_std_separated: float = 0.05,
+		ar_noise_std_init: float = 0.0001,
+		spread: float = 0.05,
+	) -> None:
+		"""Parameter initialization with support for different strategies.
+
+		Default hyperparameters act as a stable baseline:
+		- coeff_std=1.0: unit-scale AR coefficient magnitude similar to random_uniform success case.
+		- jitter_std=0.0: avoid extra noise; training will shape dynamics.
+		- mean_std=1.0: same scale for random_dirichlet means for parity with coeff_std.
+		- cov_noise_std=0.02: light emission variance/logvar perturbation when noisy init is requested.
+		- init_logits_std=0.1: mild spread to break symmetry without inducing extreme priors.
+		- self_transition_bias=0.05: slight persistence encouragement; small enough to not lock states.
+		- jitter_std_separated=0.05: small jitter to avoid exact overlaps in random_separated.
+		- spread=2.0: separation between states for random_separated while keeping features in reasonable range.
+		Adjust per dataset scale if features are pre-normalized or heavily scaled.
+		"""
 		strategy = getattr(self.global_config.model, 'init_strategy', 'default').lower()
 		init_noisy = getattr(self.global_config.model, 'init_noisy', False)
-
+		
 		# Handle aliasing for noisy versions
 		if strategy == "kmeans_pca_noisy":
 			strategy = "kmeans_pca"
 			init_noisy = True
 
+		data = None
+		if strategy in {"kmeans", "kmeans_pca"}:
+			data, _ = self.data_loader.get_all_data()
+			data = self.__validate_input(data)
+
 		if strategy == "random_uniform":
 			init_random_uniform(self, coeff_std=coeff_std, jitter_std=jitter_std, var_init=var_init)
 		elif strategy == "random_dirichlet":
-			init_random_dirichlet(self, coeff_std=coeff_std, jitter_std=jitter_std, var_init=var_init)
+			init_random_dirichlet(self, mean_std=mean_std, self_transition_bias=self_transition_bias)
 		elif strategy == "random_separated":
-			init_random_separated(self, coeff_std=coeff_std, jitter_std=jitter_std, var_init=var_init)
+			init_random_separated(self, spread=spread, jitter_std=jitter_std_separated)
 		elif strategy == "kmeans":
-			init_kmeans(self)
+			init_kmeans(self, data, kmeans_iters=kmeans_iters, estimate_transitions=estimate_transitions)
 		elif strategy == "kmeans_pca":
-			init_kmeans_pca(self)
+			init_kmeans_pca(self, data, kmeans_iters=kmeans_iters, estimate_transitions=estimate_transitions)
 		else:
 			raise ValueError(f"Unknown initialization strategy: {strategy}")
 
 		if init_noisy:
-			noise_config = self.global_config.model.noise_config
 			apply_noise_and_bias(
 				self,
-				mean_std=noise_config.mean_std,
-				cov_noise_std=noise_config.cov_noise_std,
-				init_logits_std=noise_config.init_logits_std,
-				self_transition_bias=noise_config.self_transition_bias,
+				mean_std=mean_std,
+				cov_noise_std=cov_noise_std,
+				init_logits_std=init_logits_std,
+				self_transition_bias=self_transition_bias,
+				ar_noise_std=ar_noise_std_init,
 			)
 
 	def __validate_input(self, x: Tensor) -> Tensor:

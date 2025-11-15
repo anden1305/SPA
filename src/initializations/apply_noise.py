@@ -7,18 +7,24 @@ def apply_noise_and_bias(
     cov_noise_std: float,
     init_logits_std: float,
     self_transition_bias: float,
+    ar_noise_std: float | None = None,
 ) -> None:
     """Apply small Gaussian noise to emissions and logits, and add optional self-transition bias."""
     if mean_std > 0:
         if hasattr(model, 'emission_mean'):
             noise = torch.randn(model.emission_mean.shape, device=model.emission_mean.device)
             model.emission_mean.add_(mean_std * noise)
+        # For MARHMM, allow a separate, smaller noise scale for AR params to avoid destabilizing init
         if hasattr(model, 'coeffs'):
-            noise = torch.randn(model.coeffs.shape, device=model.coeffs.device)
-            model.coeffs.add_(mean_std * noise)
+            coeff_noise_std = mean_std if ar_noise_std is None else float(ar_noise_std)
+            if coeff_noise_std > 0:
+                noise = torch.randn(model.coeffs.shape, device=model.coeffs.device)
+                model.coeffs.add_(coeff_noise_std * noise)
         if hasattr(model, 'bias'):
-            noise = torch.randn(model.bias.shape, device=model.bias.device)
-            model.bias.add_(mean_std * noise)
+            bias_noise_std = mean_std if ar_noise_std is None else float(ar_noise_std)
+            if bias_noise_std > 0:
+                noise = torch.randn(model.bias.shape, device=model.bias.device)
+                model.bias.add_(bias_noise_std * noise)
 
     if cov_noise_std > 0:
         # Diagonal covariance

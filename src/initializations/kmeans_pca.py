@@ -1,7 +1,7 @@
 import torch
 from src.models.base_model import BaseModel
 from src.helpers.calinski_harabasz import calinski_harabasz_score
-from src.initializations.kmeans import kmeans_plus_init, run_kmeans, set_covariance_from_assignments, set_transition_params
+from src.initializations.kmeans import run_kmeans, set_covariance_from_assignments, set_transition_params, estimate_statewise_ar_coeffs
 
 @torch.no_grad()
 def init_kmeans_pca(model: BaseModel, data: torch.Tensor, kmeans_iters: int, estimate_transitions: bool) -> None:
@@ -58,6 +58,11 @@ def init_kmeans_pca(model: BaseModel, data: torch.Tensor, kmeans_iters: int, est
         
     set_covariance_from_assignments(model, X, best_assign)
     set_transition_params(model, best_assign, B, T, S, estimate_transitions)
+
+    # New: estimate state-wise AR coefficients via ridge LS using PCA-based assignments
+    if hasattr(model, 'coeffs'):
+        assign_bt = best_assign.view(B, T)
+        estimate_statewise_ar_coeffs(model, data.to(model.device), assign_bt)
 
 
 
