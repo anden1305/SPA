@@ -27,6 +27,18 @@ class DataLoaderCollection:
         self.random_seed = self.global_config.seed
         self.x, self.y = self.prepare_data()
         self.batches_per_next = self.config.num_batches
+        # Hardcoded attempt to preload full dataset to GPU if CUDA device; fallback gracefully on OOM.
+        self._preloaded = False
+        if self.device.type == "cuda":
+            try:
+                x_cpu = torch.from_numpy(self.x).pin_memory()
+                y_cpu = torch.from_numpy(self.y).pin_memory()
+                self.x_gpu = x_cpu.to(self.device, non_blocking=True)
+                self.y_gpu = y_cpu.to(self.device, non_blocking=True)
+                self._preloaded = True
+            except RuntimeError as e:
+                print(f"[DataLoaderCollection] Preload failed (likely OOM); falling back to per-batch transfer. Error: {e}")
+                self._preloaded = False
     
     def prepare_data(self) -> tuple[np.ndarray, np.ndarray]:
         x = []
@@ -116,12 +128,21 @@ class DataLoaderCollection:
         start = self._cursor
         end = min(start + int(self.batches_per_next), self._num_batches)
         idx = self._order[start:end]
-        # Gather with numpy indexing; convert to torch tensors only at return time
+        self._cursor = end
+        # Fast path if preloaded: direct GPU indexing (views) without host transfer
+        if self._preloaded:
+            return self.x_gpu[idx], self.y_gpu[idx]
+        # Otherwise gather with numpy and transfer per batch
         x_np = self.x[idx]
         y_np = self.y[idx]
-        self._cursor = end
-        x_t = torch.as_tensor(x_np, device=self.device)
-        y_t = torch.as_tensor(y_np, device=self.device)
+        if self.device.type == "cuda":
+            x_t_cpu = torch.from_numpy(x_np).pin_memory()
+            y_t_cpu = torch.from_numpy(y_np).pin_memory()
+            x_t = x_t_cpu.to(self.device, non_blocking=True)
+            y_t = y_t_cpu.to(self.device, non_blocking=True)
+        else:
+            x_t = torch.from_numpy(x_np).to(self.device)
+            y_t = torch.from_numpy(y_np).to(self.device)
         return x_t, y_t
     
     def __str__(self) -> str:

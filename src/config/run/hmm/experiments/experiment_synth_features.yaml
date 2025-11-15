@@ -30,7 +30,7 @@ visualizer:
   historic_values: True
 dataloader:
   num_batches: 2048
-  batch_size: 128
+  batch_size: 32
   window_size: 512
   stride: 512
   shuffle: True
