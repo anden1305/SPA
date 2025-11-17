@@ -124,15 +124,6 @@ class Orchestrator:
         with open(Path(self.global_config.results_dir) / self.global_config.run_name / "config.json", "w") as f:
             json.dump(self.global_config.model_dump(), f)
 
-    def __get_dataset(self):
-        match self.global_config.dataset.type:
-            case "synthetic":
-                return SyntheticDataset(config=self.global_config)
-            case "mssv":
-                return MSSVDataset(config=self.global_config)
-            case _:
-                raise ValueError(f"Unknown dataset type: {self.global_config.dataset.type}")
-    
     def get_train_datasets(self):
         datasets = []
         for config in self.global_config.train_datasets:
@@ -160,11 +151,13 @@ class Orchestrator:
     def __get_model(self, device: torch.device):
         match self.global_config.model.type:
             case "hmm":
-                return HMM(data_loader=self.train_loader, config=self.global_config, device=device)
+                model = HMM(data_loader=self.train_loader, config=self.global_config, device=device)
             case "marhmm":
-                return MARHMM(data_loader=self.train_loader, config=self.global_config, device=device)
+                model = MARHMM(data_loader=self.train_loader, config=self.global_config, device=device)
             case _:
                 raise ValueError(f"Unknown model type: {self.global_config.model.type}")
+        compiled_model = torch.compile(model, fullgraph=False, dynamic=True)
+        return compiled_model
     
     def __initial_print(self):
         print("\n" + "=" * 60)
