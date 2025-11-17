@@ -1,4 +1,5 @@
 import json
+import time
 import torch
 import numpy as np
 from typing import Any, Optional
@@ -34,7 +35,7 @@ class Validator:
     def validate(self, epoch: int = 0):
         if not self.historic_values:
             self.historic_values = {name: [] for name, p in self.model.named_parameters() if p.requires_grad}
-
+        
         self.validations[epoch] = {}
         self.model.prepare_for_inference()
         xt, yt = self.data_loader.get_all_data()
@@ -57,13 +58,16 @@ class Validator:
         self.__print_validation(epoch)
     
     def validate_epoch(self, epoch: int, optimizer: torch.optim.Optimizer):
-        """Validate model at a specific epoch during training."""          
+        """Validate model at a specific epoch during training."""
+        start_time = time.time()          
         self.validations[epoch] = {}
         self.model.prepare_for_inference()
         xt, yt = self.data_loader.get_all_data()
         y = yt.detach().cpu().numpy().flatten()
         with torch.no_grad():
+            start_time = time.time()  
             predst = self.model.predict(xt)
+            print(f'Prediction took {time.time() - start_time:.2f}s')
             preds = predst.detach().cpu().numpy().flatten()
             if self.config.nmi:
                 nmi = calculate_nmi(preds, y)

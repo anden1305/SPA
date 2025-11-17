@@ -168,41 +168,92 @@ class HMM(BaseModel):
     def predict(self, x: Tensor) -> Tensor:
         """Alias returning Viterbi path for compatibility with sklearn-like API."""
         return self.__decode_viterbi(x)
-
+    
     @torch.no_grad()
     @profile
     def __decode_viterbi(self, x: Tensor) -> Tensor:
         """Most likely state sequence (Viterbi path).
-
+        
         Expects input of shape (B,T,D); returns (B,T) int64.
         """
         x = self.__validate_input(x)
         B, T, D = x.shape
+        S = self.num_states
 
-        log_pi = torch.log_softmax(self.initial_logits, dim=-1)
-        log_A = torch.log_softmax(self.transition_logits, dim=-1)
-        log_emiss = self.__emission_log_prob(x)  # (B,T,S)
-        backptr = x.new_zeros((B, T, self.num_states), dtype=torch.long)
-        # Use transposed transition to reduce over last dim
-        log_A_T = log_A.transpose(0, 1).contiguous()  # (S,S)
-        delta = log_pi.unsqueeze(0) + log_emiss[:, 0, :]  # (B,S)
-        for t in range(1, T):
-            scores = delta.unsqueeze(1) + log_A_T  # (B,S,S)
-            delta, idx = torch.max(scores, dim=2)            # (B,S)
-            delta = delta + log_emiss[:, t, :]
-            backptr[:, t, :] = idx
-        last = torch.argmax(delta, dim=1)  # (B,)
+        # Mixed precision during inference to accelerate GPU matmuls
+        use_autocast = torch.cuda.is_available()
+        with torch.autocast(device_type="cuda", dtype=torch.float16, enabled=use_autocast):
+            log_pi = torch.log_softmax(self.initial_logits, dim=-1)          # (S,)
+            log_A = torch.log_softmax(self.transition_logits, dim=-1)        # (S,S)
+            log_A_T = log_A.transpose(0, 1).contiguous()                     # (S,S)
+
+            # Choose compact dtype for backpointers when possible
+            bp_dtype = torch.int16 if S <= 32767 else torch.int32
+            backptr = torch.empty((B, T, S), dtype=bp_dtype, device=self.device)
+
+            # Precompute constants/caches for emissions
+            if self.covariance_type == "diag":
+                logvar = self.emission_logvar                                  # (S,D)
+                inv_var = torch.exp(-logvar)                                   # (S,D)
+                const_s = -0.5 * (logvar.sum(-1) + D * self._log_2pi)         # (S,)
+            elif self.covariance_type == "full":
+                L = self.__full_cov_cholesky()                                 # (S,D,D)
+                log_det = 2 * torch.log(torch.diagonal(L, dim1=1, dim2=2)).sum(-1)  # (S,)
+                const = D * self._log_2pi
+            else:  # meanonly
+                const = -0.5 * (D * self._log_2pi)
+
+            # t = 0 emissions (B,S)
+            x0 = x[:, 0, :]                                                   # (B,D)
+            if self.covariance_type == "diag":
+                diff0 = x0.unsqueeze(1) - self.emission_mean                  # (B,S,D)
+                e0 = -0.5 * (diff0.pow(2) * inv_var).sum(-1) + const_s.unsqueeze(0)
+            elif self.covariance_type == "full":
+                d_sdb = (x0.unsqueeze(1) - self.emission_mean).permute(1, 2, 0)   # (S,D,B)
+                y = torch.linalg.solve_triangular(L, d_sdb, upper=False)          # (S,D,B)
+                md2 = y.pow(2).sum(dim=1).transpose(0, 1)                          # (B,S)
+                e0 = -0.5 * (md2 + log_det.unsqueeze(0) + const)
+            else:  # meanonly
+                diff0 = x0.unsqueeze(1) - self.emission_mean                  # (B,S,D)
+                quad = diff0.pow(2).sum(-1)                                   # (B,S)
+                e0 = -0.5 * quad + const
+
+            delta = log_pi.unsqueeze(0) + e0                                   # (B,S)
+
+            # Streaming DP over time without materializing (B,T,S)
+            for t in range(1, T):
+                xt = x[:, t, :]                                               # (B,D)
+
+                if self.covariance_type == "diag":
+                    diff = xt.unsqueeze(1) - self.emission_mean               # (B,S,D)
+                    et = -0.5 * (diff.pow(2) * inv_var).sum(-1) + const_s.unsqueeze(0)
+                elif self.covariance_type == "full":
+                    d_sdb = (xt.unsqueeze(1) - self.emission_mean).permute(1, 2, 0)  # (S,D,B)
+                    y = torch.linalg.solve_triangular(L, d_sdb, upper=False)         # (S,D,B)
+                    md2 = y.pow(2).sum(dim=1).transpose(0, 1)                         # (B,S)
+                    et = -0.5 * (md2 + log_det.unsqueeze(0) + const)
+                else:  # meanonly
+                    diff = xt.unsqueeze(1) - self.emission_mean               # (B,S,D)
+                    quad = diff.pow(2).sum(-1)                                # (B,S)
+                    et = -0.5 * quad + const
+
+                scores = delta.unsqueeze(1) + log_A_T                         # (B,S,S)
+                delta, idx = torch.max(scores, dim=2)                         # (B,S)
+                delta = delta + et                                            # (B,S)
+                backptr[:, t, :] = idx.to(bp_dtype)
+
+            last = torch.argmax(delta, dim=1)                                  # (B,)
         return self.__backtrace(backptr, last)
 
     def __backtrace(self, backptr: Tensor, last: Tensor) -> Tensor:
         """Backtrace Viterbi path given backpointers and last-state indices using PyTorch only."""
         B, T, _ = backptr.shape
         device = backptr.device
-        path = backptr.new_zeros((B, T))
-        path[:, -1] = last
+        path = torch.empty((B, T), dtype=torch.long, device=device)
+        path[:, -1] = last.to(torch.long)
         arange_B = torch.arange(B, device=device)
         for t in range(T - 2, -1, -1):
-            path[:, t] = backptr[arange_B, t + 1, path[:, t + 1]]
+            path[:, t] = backptr[arange_B, t + 1, path[:, t + 1]].to(torch.long)
         return path
     
     def prepare_for_training(self):
