@@ -27,20 +27,8 @@ class DataLoaderCollection:
         self.random_seed = self.global_config.seed
         self.x, self.y = self.prepare_data()
         self.batches_per_next = self.config.num_batches
-        # Hardcoded attempt to preload full dataset to GPU if CUDA device; fallback gracefully on OOM.
-        self._preloaded = False
-        if self.device.type == "cuda":
-            try:
-                x_cpu = torch.from_numpy(self.x).pin_memory()
-                y_cpu = torch.from_numpy(self.y).pin_memory()
-                self.x_gpu = x_cpu.to(self.device, non_blocking=True)
-                self.y_gpu = y_cpu.to(self.device, non_blocking=True)
-                self._preloaded = True
-            except RuntimeError as e:
-                print(f"[DataLoaderCollection] Preload failed (likely OOM); falling back to per-batch transfer. Error: {e}")
-                self._preloaded = False
     
-    def prepare_data(self) -> tuple[np.ndarray, np.ndarray]:
+    def prepare_data(self) -> tuple[torch.Tensor, torch.Tensor]:
         x = []
         y = []
         for dl in self.data_loaders:
@@ -49,6 +37,15 @@ class DataLoaderCollection:
             y.append(y_dl)
         x_all = np.concatenate(x, axis=0)
         y_all = np.concatenate(y, axis=0)
+        # save as torch
+        x_all = torch.from_numpy(x_all)
+        y_all = torch.from_numpy(y_all)
+        # move to device and pin memory if cuda
+        if self.device.type == "cuda":
+            x_all = x_all.pin_memory()
+            y_all = y_all.pin_memory()
+            x_all = x_all.to(self.device, non_blocking=True)
+            y_all = y_all.to(self.device, non_blocking=True)
         return x_all, y_all
     
     def __build_data_loaders_in_parallel(self, device: torch.device):
@@ -129,21 +126,7 @@ class DataLoaderCollection:
         end = min(start + int(self.batches_per_next), self._num_batches)
         idx = self._order[start:end]
         self._cursor = end
-        # Fast path if preloaded: direct GPU indexing (views) without host transfer
-        if self._preloaded:
-            return self.x_gpu[idx], self.y_gpu[idx]
-        # Otherwise gather with numpy and transfer per batch
-        x_np = self.x[idx]
-        y_np = self.y[idx]
-        if self.device.type == "cuda":
-            x_t_cpu = torch.from_numpy(x_np).pin_memory()
-            y_t_cpu = torch.from_numpy(y_np).pin_memory()
-            x_t = x_t_cpu.to(self.device, non_blocking=True)
-            y_t = y_t_cpu.to(self.device, non_blocking=True)
-        else:
-            x_t = torch.from_numpy(x_np).to(self.device)
-            y_t = torch.from_numpy(y_np).to(self.device)
-        return x_t, y_t
+        return self.x[idx], self.y[idx]
     
     def __str__(self) -> str:
         return (f"DataLoaderCollection(\n"
