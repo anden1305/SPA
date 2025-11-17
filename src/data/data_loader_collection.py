@@ -28,7 +28,7 @@ class DataLoaderCollection:
         self.x, self.y = self.prepare_data()
         self.batches_per_next = self.config.num_batches
     
-    def prepare_data(self) -> tuple[np.ndarray, np.ndarray]:
+    def prepare_data(self) -> tuple[torch.Tensor, torch.Tensor]:
         x = []
         y = []
         for dl in self.data_loaders:
@@ -37,6 +37,15 @@ class DataLoaderCollection:
             y.append(y_dl)
         x_all = np.concatenate(x, axis=0)
         y_all = np.concatenate(y, axis=0)
+        # save as torch
+        x_all = torch.from_numpy(x_all)
+        y_all = torch.from_numpy(y_all)
+        # move to device and pin memory if cuda
+        if self.device.type == "cuda":
+            x_all = x_all.pin_memory()
+            y_all = y_all.pin_memory()
+            x_all = x_all.to(self.device, non_blocking=True)
+            y_all = y_all.to(self.device, non_blocking=True)
         return x_all, y_all
     
     def __build_data_loaders_in_parallel(self, device: torch.device):
@@ -116,13 +125,8 @@ class DataLoaderCollection:
         start = self._cursor
         end = min(start + int(self.batches_per_next), self._num_batches)
         idx = self._order[start:end]
-        # Gather with numpy indexing; convert to torch tensors only at return time
-        x_np = self.x[idx]
-        y_np = self.y[idx]
         self._cursor = end
-        x_t = torch.as_tensor(x_np, device=self.device)
-        y_t = torch.as_tensor(y_np, device=self.device)
-        return x_t, y_t
+        return self.x[idx], self.y[idx]
     
     def __str__(self) -> str:
         return (f"DataLoaderCollection(\n"

@@ -98,7 +98,7 @@ echo "Submitted array job. Monitor with bjobs and check hpc/output/sweep_${SWEEP
 ### MSSV
 ###    features
 ### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/hmm/hmm_mssv_features.yaml 9 1
-### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/marhmm/marhmm_mssv_features.yaml 9 1
+### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/marhmm/marhmm_mssv_features.yaml 9 1 12:00 gpua100
 
 ###    raw
 ### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/hmm/hmm_mssv_raw.yaml 9 1

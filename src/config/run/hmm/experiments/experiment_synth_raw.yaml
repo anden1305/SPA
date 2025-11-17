@@ -1,5 +1,5 @@
 trainer:
-  epochs: 5000
+  epochs: 100000
   learning_rate: 0.01
   optimizer: adam
   grad_clip: 5.0
@@ -29,8 +29,8 @@ visualizer:
   summary_statistics: True
   historic_values: True
 dataloader:
-  num_batches: 128
-  batch_size: 16384
+  num_batches: 32000
+  batch_size: 2048
   window_size: null
   stride: null
   shuffle: True
@@ -48,41 +48,12 @@ dataloader:
       params: {
         "percentile": 0.5
       }
-    - type: rms
-      channel: EEG
-      params: {}
-    - type: burst_rate
-      channel: EEG
-      params: {}
-    - type: theta_delta_ratio
-      channel: EEG
-      params: {}
-    - type: theta_beta_ratio
-      channel: EEG
-      params: {}
-    - type: beta_delta_ratio
-      channel: EEG
-      params: {}
-    - type: theta_gamma_pac
-      channel: EEG
-      params: {}
-    - type: fft_relative_band_power
-      channel: EEG
-      params:
-        bands:
-          - [0.5, 4]
-          - [6, 9]
-          - [15, 30]
-
     # EMG channel transforms
     - type: percentile_clipping
       channel: EMG
       params: {
         "percentile": 0.1
       }
-    - type: rms
-      channel: EMG
-      params: {}
 train_datasets:
   - type: synthetic
     id: experiments
@@ -99,5 +70,5 @@ verbose: true
 seed: 123
 results_dir: results/training/hmm
 run_name: exp_hmm_synth_raw
-runs: 5
+runs: 2
 validate_data: True

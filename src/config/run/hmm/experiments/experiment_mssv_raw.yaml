@@ -1,5 +1,5 @@
 trainer:
-  epochs: 5000
+  epochs: 100000
   learning_rate: 0.01
   optimizer: adam
   grad_clip: 5.0
@@ -29,26 +29,30 @@ visualizer:
   summary_statistics: True
   historic_values: True
 dataloader:
-  num_batches: 128
-  batch_size: 16384
+  num_batches: 8194
+  batch_size: 1024
+  window_size: null
+  stride: null
   shuffle: True
   normalize: True
   transforms:
-    - type: reshape
-      params: {}
-    - type: percentile_clipping
-      params: {
-        "percentile": 5
-      }
-    - type: high_pass_filter
+    # EEG channel transforms
+    - type: band_pass_filter
+      channel: EEG
       params: {
         "low_cutoff": 0.5,
-        "high_cutoff": 45,
-        "sampling_rate": 128
+        "high_cutoff": 30,
       }
-    - type: batch_raw
+    - type: percentile_clipping
+      channel: EEG
       params: {
-        "window_size": 512
+        "percentile": 0.5
+      }
+    # EMG channel transforms
+    - type: percentile_clipping
+      channel: EMG
+      params: {
+        "percentile": 0.1
       }
 train_datasets:
   - type: mssv
