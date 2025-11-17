@@ -1,5 +1,6 @@
 
 
+import copy
 import json
 from pathlib import Path
 import datetime
@@ -91,7 +92,7 @@ class Orchestrator:
         self.train_datasets = self.get_train_datasets()
         self.val_datasets = self.get_val_datasets()
         self.train_loader = DataLoaderCollection(datasets=self.train_datasets, config=self.global_config, device=self.device)
-        self.val_loader = DataLoaderCollection(datasets=self.val_datasets, config=self.global_config, device=self.device)
+        self.val_loader = DataLoaderCollection(datasets=self.val_datasets, config=self.global_config, for_validation=True, device=self.device)
         self.model = self.__get_model(self.device)
         self.validator = Validator(data_loader=self.val_loader, model=self.model, config=self.global_config)
         self.trainer = Trainer(data_loader=self.train_loader, model=self.model, config=self.global_config, validator=self.validator)

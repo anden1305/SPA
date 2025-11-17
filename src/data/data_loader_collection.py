@@ -1,4 +1,5 @@
 
+import copy
 import numpy as np
 import torch
 from src.config.config import GlobalConfig
@@ -15,9 +16,13 @@ class DataLoaderCollection:
     def __init__(self, 
                  datasets: list[BaseDataset], 
                  config: GlobalConfig,
+                 for_validation: bool = False,
                  device: torch.device = torch.device("cpu")):
-        self.global_config = config
-        self.config = self.global_config.dataloader
+        self.global_config = copy.deepcopy(config)
+        self.config = copy.deepcopy(self.global_config.dataloader)
+        if for_validation:
+            self.global_config.dataloader.batch_size = None
+            self.config.batch_size = None
         self.datasets = datasets
         # self.data_loaders = [DataLoader(dataset=ds, config=self.global_config, device=device) for ds in self.datasets]
         self.__build_data_loaders_in_parallel(device)
@@ -78,18 +83,9 @@ class DataLoaderCollection:
 
     def get_feature_names(self) -> list[str]:
         return self.data_loaders[0].get_feature_names()
-
+    
     def get_all_data(self):
-        xs = []
-        ys = []
-        for dl in self.data_loaders:
-            x, y = dl.get_all_data()
-            xs.append(x)
-            ys.append(y)
-        x_all = torch.cat(xs, dim=1)
-        y_all = torch.cat(ys, dim=1)
-        
-        return x_all, y_all
+        return self.x, self.y
     
     def has_features_enabled(self):
         return self.data_loaders[0].has_features_enabled()
