@@ -21,8 +21,8 @@ class DataLoaderCollection:
         self.global_config = copy.deepcopy(config)
         self.config = copy.deepcopy(self.global_config.dataloader)
         if for_validation:
-            self.global_config.dataloader.batch_size = None
-            self.config.batch_size = None
+            self.global_config.dataloader.batch_size = 512 * 16
+            self.config.batch_size = 512 * 16
         self.datasets = datasets
         # self.data_loaders = [DataLoader(dataset=ds, config=self.global_config, device=device) for ds in self.datasets]
         self.__build_data_loaders_in_parallel(device)
@@ -83,7 +83,7 @@ class DataLoaderCollection:
 
     def get_feature_names(self) -> list[str]:
         return self.data_loaders[0].get_feature_names()
-    
+
     def get_all_data(self):
         return self.x, self.y
     
