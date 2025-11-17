@@ -1,5 +1,5 @@
 trainer:
-  epochs: 100000
+  epochs: 30000
   learning_rate: 0.0001
   optimizer: adam
   grad_clip: null
@@ -29,8 +29,8 @@ visualizer:
   learning_rate: True
   historic_values: True
 dataloader:
-  num_batches: 100
-  batch_size: 100
+  num_batches: 8192
+  batch_size: 32
   window_size: 512
   stride: 512
   shuffle: True
@@ -103,6 +103,6 @@ model:
 verbose: true
 seed: 123
 results_dir: results/training/hmm
-run_name: feature_synthetic_uniform
+run_name: preloader_test
 runs: 1
 validate_data: True

@@ -1,18 +1,18 @@
 trainer:
-  epochs: 100000
-  learning_rate: 0.01
+  epochs: 10000
+  learning_rate: 0.005
   optimizer: adam
-  grad_clip: 5.0
-  validate_per_epoch: 100
+  grad_clip: null
+  validate_per_epoch: 1000
   early_stopping:
-    enabled: true   
+    enabled: false
     patience: 100
     min_delta: 0.001
   scheduler:
     enabled: true
     type: exponential
     step_size: Null
-    gamma: 0.99986 # Half LR after 1000 epochs
+    gamma: 0.99993
 validator:
   nmi: True
   accuracy: True
@@ -29,8 +29,8 @@ visualizer:
   summary_statistics: True
   historic_values: True
 dataloader:
-  num_batches: 32000
-  batch_size: 2048
+  num_batches: 3200000
+  batch_size: 120
   window_size: null
   stride: null
   shuffle: True
@@ -63,7 +63,7 @@ val_datasets:
 model:
   type: hmm
   covariance_type: full
-  init_strategy: random_uniform
+  init_strategy: random_separated
   init_noisy: false
   params: {}
 verbose: true
