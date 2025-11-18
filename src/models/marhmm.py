@@ -317,7 +317,7 @@ class MARHMM(BaseModel):
 		Adjust per dataset scale if features are pre-normalized or heavily scaled.
 		"""
 
-		if self.global_config.model.features:
+		if not self.global_config.model.features:
 			coeff_std = 0.4
 			var_init = 0.2
 			jitter_std_separated = 0.5
