@@ -13,7 +13,7 @@ NUM_AGENTS=$2
 ### default values for optional arguments. Default is 1 trial per agent
 TRIALS_PER_AGENT=${3:-1}
 ### default is 4 hours per job
-WALLTIME=${4:-8:00}
+WALLTIME=${4:-12:00}
 ### default is gpuv100, but options are [gpuv100, gpua100, gpua10, gpul40s]
 ### bqueues | grep -i gpu
 QUEUE=${5:-gpuv100}

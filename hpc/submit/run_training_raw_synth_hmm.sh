@@ -1,10 +1,10 @@
 #!/bin/bash
 #BSUB -J raw_synth_hmm          
 #BSUB -q gpuv100            
-#BSUB -W 08:00  
+#BSUB -W 4:00  
 #BSUB -n 4
 #BSUB -R "span[hosts=1]"                      
-#BSUB -R "rusage[mem=4GB]"
+#BSUB -R "rusage[mem=8GB]"
 #BSUB -o hpc/output/raw_synth_hmm%J.out          
 #BSUB -e hpc/output/raw_synth_hmm%J.err     
 #BSUB -gpu "num=1:mode=exclusive_process"  

@@ -1,5 +1,5 @@
 trainer:
-  epochs: 50000
+  epochs: 30000
   learning_rate: 0.001
   optimizer: adam
   grad_clip: null
@@ -31,6 +31,7 @@ visualizer:
 dataloader:
   num_batches: 3200000
   batch_size: 120
+  validation_batch_size: 4096
   window_size: null
   stride: null
   shuffle: True
@@ -204,8 +205,9 @@ val_datasets:
 model:
   type: hmm
   covariance_type: full
-  init_strategy: random_separated
-  init_noisy: false
+  init_strategy: random_uniform
+  init_noisy: true
+  features: false
   params: {}
 verbose: true
 seed: 123
