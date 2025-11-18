@@ -274,9 +274,11 @@ class HMM(BaseModel):
         """
         if self.global_config.model.features:
             mean_std = 0.5
-            self_transition_bias = 0.1
+            self_transition_bias = 0.01
             spread = 0.5
             jitter_std = 0.5
+            cov_noise_std = 0.5
+            init_logits_std = 0.5
         
         strategy = self.global_config.model.init_strategy.lower()
         init_noisy = self.global_config.model.init_noisy
