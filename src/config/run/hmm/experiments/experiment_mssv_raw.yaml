@@ -38,12 +38,6 @@ dataloader:
   normalize: True
   transforms:
     # EEG channel transforms
-    - type: band_pass_filter
-      channel: EEG
-      params: {
-        "low_cutoff": 0.5,
-        "high_cutoff": 30,
-      }
     - type: percentile_clipping
       channel: EEG
       params: {
