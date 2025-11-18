@@ -1,5 +1,5 @@
 trainer:
-  epochs: 10000
+  epochs: 50000
   learning_rate: 0.001
   optimizer: adam
   grad_clip: null
@@ -211,5 +211,5 @@ verbose: true
 seed: 123
 results_dir: results/training/hmm
 run_name: exp_hmm_mssv_raw
-runs: 5
+runs: 3
 validate_data: True

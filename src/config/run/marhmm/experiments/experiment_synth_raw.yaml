@@ -1,18 +1,18 @@
 trainer:
-  epochs: 5000
-  learning_rate: 0.01
+  epochs: 50000
+  learning_rate: 0.001
   optimizer: adam
-  grad_clip: 5.0
-  validate_per_epoch: 100
+  grad_clip: null
+  validate_per_epoch: 500
   early_stopping:
-    enabled: true
+    enabled: false
     patience: 100
     min_delta: 0.001
   scheduler:
     enabled: true
     type: exponential
     step_size: Null
-    gamma: 0.99986 # Half LR after 1000 epochs
+    gamma: 0.99993
 validator:
   nmi: True
   accuracy: True
@@ -29,8 +29,8 @@ visualizer:
   summary_statistics: True
   historic_values: True
 dataloader:
-  num_batches: 128
-  batch_size: 16384
+  num_batches: 3200000
+  batch_size: 120
   window_size: null
   stride: null
   shuffle: True
@@ -48,41 +48,12 @@ dataloader:
       params: {
         "percentile": 0.5
       }
-    - type: rms
-      channel: EEG
-      params: {}
-    - type: burst_rate
-      channel: EEG
-      params: {}
-    - type: theta_delta_ratio
-      channel: EEG
-      params: {}
-    - type: theta_beta_ratio
-      channel: EEG
-      params: {}
-    - type: beta_delta_ratio
-      channel: EEG
-      params: {}
-    - type: theta_gamma_pac
-      channel: EEG
-      params: {}
-    - type: fft_relative_band_power
-      channel: EEG
-      params:
-        bands:
-          - [0.5, 4]
-          - [6, 9]
-          - [15, 30]
-
     # EMG channel transforms
     - type: percentile_clipping
       channel: EMG
       params: {
         "percentile": 0.1
       }
-    - type: rms
-      channel: EMG
-      params: {}
 train_datasets:
   - type: synthetic
     id: experiments
@@ -95,7 +66,7 @@ model:
   init_strategy: random_uniform
   init_noisy: false
   params:
-    lags: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]    '
+    lags: [1, 2, 4, 8, 16, 32, 64]
     ridge: 0.1
     var_reg: 0.05
     sticky_coef: 0.1
@@ -104,5 +75,5 @@ verbose: True
 seed: 123
 results_dir: results/training/marhmm
 run_name: exp_marhmm_synth_raw
-runs: 5
+runs: 3
 validate_data: True

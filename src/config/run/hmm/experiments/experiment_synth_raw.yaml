@@ -1,9 +1,9 @@
 trainer:
-  epochs: 10000
-  learning_rate: 0.005
+  epochs: 50000
+  learning_rate: 0.001
   optimizer: adam
   grad_clip: null
-  validate_per_epoch: 1000
+  validate_per_epoch: 500
   early_stopping:
     enabled: false
     patience: 100
@@ -70,5 +70,5 @@ verbose: true
 seed: 123
 results_dir: results/training/hmm
 run_name: exp_hmm_synth_raw
-runs: 2
+runs: 3
 validate_data: True

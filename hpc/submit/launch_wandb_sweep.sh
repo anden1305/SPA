@@ -68,7 +68,7 @@ bsub -J "wandb_sweep_agent[1-${NUM_AGENTS}]" \
   -o "$OUTPUT_DIR/sweep_${SWEEP_ID}_job_%J_agent_%I.out" \
   -e "$OUTPUT_DIR/sweep_${SWEEP_ID}_job_%J_agent_%I.err" \
   -n 4 \
-  -R "rusage[mem=4GB]" \
+  -R "rusage[mem=8GB]" \
   -R "span[hosts=1]" \
   -W "$WALLTIME" \
   -gpu "num=1" \
@@ -91,8 +91,8 @@ echo "Submitted array job. Monitor with bjobs and check hpc/output/sweep_${SWEEP
 ### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/marhmm/marhmm_synth_features.yaml 9 1 03:00 gpuv100
 
 ###      raw
-### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/hmm/hmm_synth_raw.yaml 9 1
-### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/marhmm/marhmm_synth_raw.yaml 9 1
+### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/hmm/hmm_synth_raw.yaml 5 1
+### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/marhmm/marhmm_synth_raw.yaml 5 1
 
 
 ### MSSV
@@ -101,6 +101,6 @@ echo "Submitted array job. Monitor with bjobs and check hpc/output/sweep_${SWEEP
 ### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/marhmm/marhmm_mssv_features.yaml 9 1 12:00 gpua100
 
 ###    raw
-### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/hmm/hmm_mssv_raw.yaml 9 1
-### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/marhmm/marhmm_mssv_raw.yaml 9 1
+### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/hmm/hmm_mssv_raw.yaml 5 1
+### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/marhmm/marhmm_mssv_raw.yaml 5 1
 
