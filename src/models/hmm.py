@@ -272,6 +272,12 @@ class HMM(BaseModel):
         - kmeans_pca: search small PCA subspaces (3D among top 4 PCs) for best k-means clustering (by Calinski-Harabasz score).
         Data is optional (not needed for random*).
         """
+        if self.global_config.model.features:
+            mean_std = 0.5
+            self_transition_bias = 0.1
+            spread = 0.5
+            jitter_std = 0.5
+        
         strategy = self.global_config.model.init_strategy.lower()
         init_noisy = self.global_config.model.init_noisy
         if strategy == "kmeans_pca_noisy":

@@ -21,8 +21,8 @@ class DataLoaderCollection:
         self.global_config = copy.deepcopy(config)
         self.config = copy.deepcopy(self.global_config.dataloader)
         if for_validation:
-            self.global_config.dataloader.batch_size = 512 * 16
-            self.config.batch_size = 512 * 16
+            self.global_config.dataloader.batch_size = self.global_config.dataloader.validation_batch_size
+            self.config.batch_size = self.global_config.dataloader.validation_batch_size
         self.datasets = datasets
         # self.data_loaders = [DataLoader(dataset=ds, config=self.global_config, device=device) for ds in self.datasets]
         self.__build_data_loaders_in_parallel(device)

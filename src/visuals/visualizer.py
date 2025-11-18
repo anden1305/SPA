@@ -1129,6 +1129,21 @@ class Visualizer:
         if not (len(y) == len(init_arr) == len(trained_arr) == X.shape[0]):
             raise ValueError("Label lengths must match number of rows in x after flattening")
 
+        ## sample 1000 points from each class
+        sampled_indices = []
+        for cls in np.unique(y):
+            cls_indices = np.where(y == cls)[0]
+            if len(cls_indices) > 1000:
+                sampled = np.random.choice(cls_indices, size=1000, replace=False)
+            else:
+                sampled = cls_indices
+            sampled_indices.extend(sampled)
+        sampled_indices = np.array(sampled_indices)
+        X = X[sampled_indices]
+        init_arr = init_arr[sampled_indices]
+        trained_arr = trained_arr[sampled_indices]
+        y = y[sampled_indices]
+        
         # PCA via SVD (up to 4 comps)
         K = min(4, max(2, X.shape[1]))
         U, S, _ = np.linalg.svd(X - X.mean(0, keepdims=True), full_matrices=False)

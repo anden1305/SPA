@@ -60,6 +60,7 @@ class TransformsConfig(BaseModel):
 class DataLoaderConfig(BaseModel):
     num_batches: int = Field(..., ge=1, description="Number of batches per forward backward.")
     batch_size: int | None = Field(..., ge=1, description="Number of windows. If None, use full dataset.")
+    validation_batch_size: int | None = Field(..., ge=1, description="Batch size for validation. If None, use full dataset.")
     window_size: int | None = Field(..., ge=1, description="Size of each data window in timesteps.")
     stride: int | None = Field(..., ge=1, description="Stride between windows in timesteps.")
     transforms: list[TransformsConfig] = Field(default_factory=list)
@@ -79,6 +80,7 @@ class ModelConfig(BaseModel):
     covariance_type: str = Field(..., pattern="^(diag|full)$", description="Covariance structure: 'diag' (diagonal), 'full' (Cholesky-factorized with softplus).")
     init_strategy: str = Field(..., pattern="^(random_uniform|random_dirichlet|random_separated|kmeans|kmeans_pca|kmeans_pca_noisy)$", description="Initialization strategy for the model.")
     init_noisy: bool = Field(...)  # Adds Gaussian noise to initialization; noise levels hardcoded below
+    features : bool = Field(..., description="Whether the model is to be used on raw or feature data.")
     params: dict[str, Any] = Field(..., description="Model-specific parameters.")
     # MAR-HMM params (via params dict - these ARE configurable):
     #   - ridge: L2 penalty on regression coefficients (default 0.0)

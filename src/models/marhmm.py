@@ -286,7 +286,7 @@ class MARHMM(BaseModel):
 
 	def reset(self):
 		self.__initialize_weights()
-
+	
 	@torch.no_grad()
 	def __initialize_weights(
 		self,
@@ -316,6 +316,13 @@ class MARHMM(BaseModel):
 		- spread=2.0: separation between states for random_separated while keeping features in reasonable range.
 		Adjust per dataset scale if features are pre-normalized or heavily scaled.
 		"""
+
+		if self.global_config.model.features:
+			coeff_std = 0.4
+			var_init = 0.2
+			jitter_std_separated = 0.5
+			spread = 0.5
+
 		strategy = getattr(self.global_config.model, 'init_strategy', 'default').lower()
 		init_noisy = getattr(self.global_config.model, 'init_noisy', False)
 		

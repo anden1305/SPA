@@ -98,13 +98,6 @@ class Orchestrator:
         self.trainer = Trainer(data_loader=self.train_loader, model=self.model, config=self.global_config, validator=self.validator)
         self.visualizer = Visualizer(data_loader=self.val_loader, config=self.global_config, validator=self.validator)
 
-        # self.dataset = self.__get_dataset()
-        # self.data_loader = DataLoader(dataset=self.dataset, config=self.global_config, device=self.device)
-        # self.model = self.__get_model(self.device)
-        # self.validator = Validator(data_loader=self.data_loader, model=self.model, config=self.global_config)
-        # self.trainer = Trainer(data_loader=self.data_loader, model=self.model, config=self.global_config, validator=self.validator)
-        # self.visualizer = Visualizer(data_loader=self.data_loader, config=self.global_config, validator=self.validator)
-
     def __prepare(self):
         time_str = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         self.global_config.run_name = f"{self.global_config.run_name} [{time_str}]"
@@ -151,13 +144,11 @@ class Orchestrator:
     def __get_model(self, device: torch.device):
         match self.global_config.model.type:
             case "hmm":
-                model = HMM(data_loader=self.train_loader, config=self.global_config, device=device)
+                return HMM(data_loader=self.train_loader, config=self.global_config, device=device)
             case "marhmm":
-                model = MARHMM(data_loader=self.train_loader, config=self.global_config, device=device)
+                return MARHMM(data_loader=self.train_loader, config=self.global_config, device=device)
             case _:
                 raise ValueError(f"Unknown model type: {self.global_config.model.type}")
-        compiled_model = torch.compile(model, fullgraph=False, dynamic=True)
-        return compiled_model
     
     def __initial_print(self):
         print("\n" + "=" * 60)

@@ -117,13 +117,14 @@ class Validator:
         if self.config.state_distinctness and has_features:
             distinctness = compute_state_distinctness(x, y)
             self.data_validations.update(distinctness)
-        if self.config.summary_statistics and has_features:
+        if self.config.summary_statistics:
             self.data_validations.update(compute_summary_statistics(x, y, self.data_loader))
-            self.data_validations.update(compute_feature_statistics(x, y, self.data_loader, has_features))
-            # Also compute feature-feature correlations (overall and per state)
-            self.data_validations.update({
-                "feature_correlations": self.__calculate_feature_correlations(x, y, has_features)
-            })
+            if has_features:
+                self.data_validations.update(compute_feature_statistics(x, y, self.data_loader, has_features))
+                # Also compute feature-feature correlations (overall and per state)
+                self.data_validations.update({
+                    "feature_correlations": self.__calculate_feature_correlations(x, y, has_features)
+                })
         if has_features:
             separability = self.__calculate_feature_separability(x, y)
             if separability:
