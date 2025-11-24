@@ -1,43 +1,42 @@
 trainer:
-  epochs: 30000
+  epochs: 10000
   learning_rate: 0.0001
   optimizer: adam
   grad_clip: null
   validate_per_epoch: 500
   early_stopping:
-    enabled: false
-    patience: 250
-    min_delta: 0.0001
+    enabled: false   
+    patience: 100
+    min_delta: 0.001
   scheduler:
     enabled: true
     type: exponential
-    step_size: 10
+    step_size: null
     gamma: 0.999972
 validator:
-  accuracy: True
   nmi: True
+  accuracy: True
   cross_nmi: True
+  learning_rate: True
   state_distinctness: True
   summary_statistics: True
-  learning_rate: True
 visualizer:
   losses: True
+  learning_rate: True
   pca_tripanel: True
   confusion_matrix: True
   state_distinctness: True
   summary_statistics: True
-  learning_rate: True
   historic_values: True
 dataloader:
-  num_batches: 8192
-  validation_batch_size: 32
-  batch_size: 32
+  num_batches: 2048
+  batch_size: 128
+  validation_batch_size: 512
   window_size: 512
   stride: 512
   shuffle: True
   normalize: True
   transforms:
-
     # EEG channel transforms
     - type: band_pass_filter
       channel: EEG
@@ -82,29 +81,31 @@ dataloader:
     - type: rms
       channel: EMG
       params: {}
-
 train_datasets:
   - type: mssv
     id: sub-041
     run: 1
     remove_artifact: True
-
 val_datasets:
   - type: mssv
     id: sub-041
     run: 1
     remove_artifact: True
-
 model:
-  type: hmm
+  type: marhmm
+  features: True
+  covariance_type: full
   init_strategy: random_uniform
   init_noisy: false
-  features: true
-  covariance_type: full
-  params: {}
-verbose: true
-seed: 123
-results_dir: results/training/hmm
-run_name: preloader_test
+  params:
+    lags: [1, 2, 4, 8]
+    ridge: 0.1
+    var_reg: 0.05
+    sticky_coef: 0.1
+    sticky_kappa: 0.9
+verbose: True
+seed: 124
+results_dir: results/training/marhmm
+run_name: exp_marhmm_synth_features
 runs: 1
 validate_data: True

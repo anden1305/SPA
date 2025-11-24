@@ -44,8 +44,8 @@ model:
   init_strategy: random_uniform
   init_noisy: false
   params:
-    lags: [1, 2, 4]  # Fewer lags to reduce computation
-    ridge: 0.001  # Reduced ridge regularization
+    lags: [1, 2, 4]
+    ridge: 0.001
     var_reg: 0.001  # Add variance regularization
 verbose: true
 seed: 123

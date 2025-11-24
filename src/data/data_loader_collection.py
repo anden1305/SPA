@@ -1,5 +1,6 @@
 
 import copy
+import re
 import numpy as np
 import torch
 from src.config.config import GlobalConfig
@@ -30,28 +31,43 @@ class DataLoaderCollection:
         self.device = device
         self.shuffle = self.config.shuffle
         self.random_seed = self.global_config.seed
-        self.x, self.y = self.prepare_data()
+        self.subject_map = self.get_subject_map()
+        self.x, self.y, self.sub_ids = self.prepare_data()
         self.batches_per_next = self.config.num_batches
-    
-    def prepare_data(self) -> tuple[torch.Tensor, torch.Tensor]:
+        
+    def prepare_data(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         x = []
         y = []
+        sub_ids = []
         for dl in self.data_loaders:
             x_dl, y_dl = dl.get_data()
             x.append(x_dl)
             y.append(y_dl)
+            
+            # Create sub_ids array matching x_dl shape (except feature dim)
+            sub_id = self.subject_map[dl.dataset.get_id()]
+            # x_dl shape: (Batch, Time, Feature) -> sub_ids shape: (Batch, Time, 1)
+            sub_id_arr = np.full((x_dl.shape[0], x_dl.shape[1]), sub_id, dtype=np.int64)
+            sub_ids.append(sub_id_arr)
+            
         x_all = np.concatenate(x, axis=0)
         y_all = np.concatenate(y, axis=0)
+        sub_ids_all = np.concatenate(sub_ids, axis=0)
+        
         # save as torch
         x_all = torch.from_numpy(x_all)
         y_all = torch.from_numpy(y_all)
+        sub_ids_all = torch.from_numpy(sub_ids_all)
+        
         # move to device and pin memory if cuda
         if self.device.type == "cuda":
             x_all = x_all.pin_memory()
             y_all = y_all.pin_memory()
+            sub_ids_all = sub_ids_all.pin_memory()
             x_all = x_all.to(self.device, non_blocking=True)
             y_all = y_all.to(self.device, non_blocking=True)
-        return x_all, y_all
+            sub_ids_all = sub_ids_all.to(self.device, non_blocking=True)
+        return x_all, y_all, sub_ids_all
     
     def __build_data_loaders_in_parallel(self, device: torch.device):
         with ThreadPoolExecutor(max_workers=20) as ex:
@@ -68,7 +84,7 @@ class DataLoaderCollection:
         assert len(feature_dims) == 1, "All data loaders must have the same feature dimension."
         self.feature_dim = feature_dims.pop()
         self.state_names = self.datasets[0].get_state_names()
-    
+     
     def get_transforms(self) -> list[BaseTransform]:
         return self.data_loaders[0].transforms
     
@@ -85,10 +101,19 @@ class DataLoaderCollection:
         return self.data_loaders[0].get_feature_names()
 
     def get_all_data(self):
-        return self.x, self.y
+        return self.x, self.y, self.sub_ids
     
     def has_features_enabled(self):
         return self.data_loaders[0].has_features_enabled()
+    
+    def get_num_subjects(self) -> int:
+        return 92
+    
+    def get_subject_map(self) -> list[int]:
+        # Returns list mapping subject ID to index
+        subject_ids = set([ds.get_id() for ds in self.datasets])
+        subject_to_id = {subject_id: int(re.search(r'\d+', subject_id).group()) for subject_id in subject_ids}
+        return subject_to_id
     
     def __iter__(self) -> "DataLoaderCollection":
         # Reset cursor and (optionally) shuffle order for a new pass
@@ -122,7 +147,7 @@ class DataLoaderCollection:
         end = min(start + int(self.batches_per_next), self._num_batches)
         idx = self._order[start:end]
         self._cursor = end
-        return self.x[idx], self.y[idx]
+        return self.x[idx], self.y[idx], self.sub_ids[idx]
     
     def __str__(self) -> str:
         return (f"DataLoaderCollection(\n"

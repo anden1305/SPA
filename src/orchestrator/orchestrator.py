@@ -16,6 +16,8 @@ from src.data.synthetic_dataset import SyntheticDataset
 from src.models.base_model import BaseModel
 from src.models.hmm import HMM
 from src.models.marhmm import MARHMM
+from src.models.cvae_mar_hmm import CVAEMARHMM
+from src.models.vae import ConditionalVAE
 from src.orchestrator.train_details import TrainDetails
 from src.training.trainer import Trainer
 from src.validation.validator import Validator
@@ -62,6 +64,12 @@ class Orchestrator:
                 self.__print_end()
             validations = self.validator.validate_runs(train_details=self.train_details)
             self.visualizer.visualize_runs(train_details=self.train_details, validations=validations)
+    
+    def train_cvae(self):
+        self.trainer.train()
+        self.validator.validate_cvae()
+        train_details = self.__collect_training_details()
+        self.visualizer.visualize_cvae(train_details=train_details)
     
     ### private methods ###
     
@@ -147,6 +155,10 @@ class Orchestrator:
                 return HMM(data_loader=self.train_loader, config=self.global_config, device=device)
             case "marhmm":
                 return MARHMM(data_loader=self.train_loader, config=self.global_config, device=device)
+            case "cvae_marhmm":
+                return CVAEMARHMM(data_loader=self.train_loader, config=self.global_config, device=device)
+            case "cvae":
+                return ConditionalVAE(data_loader=self.train_loader, config=self.global_config, device=device)
             case _:
                 raise ValueError(f"Unknown model type: {self.global_config.model.type}")
     

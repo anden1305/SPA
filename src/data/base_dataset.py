@@ -76,6 +76,9 @@ class BaseDataset(ABC):
     
     def get_sampling_rate(self):
         return int(self.config['sampling_rate'])
+    
+    def get_id(self):
+        return self.id
 
     ###### ABSTRACT METHODS ######
 

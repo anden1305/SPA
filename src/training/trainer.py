@@ -71,9 +71,9 @@ class Trainer:
         self.__init_training()
         for epoch in range(self.config.epochs):
             self.current_epoch = epoch
-            for x, _ in self.data_loader:
+            for x, _, sub_ids in self.data_loader:
                 self.optimizer.zero_grad()
-                loss = self.model.forward(x)
+                loss = self.model.forward(x, sub_ids)
                 reg_loss = self.model.regularization_loss()
                 loss = loss + reg_loss
                 loss.backward()

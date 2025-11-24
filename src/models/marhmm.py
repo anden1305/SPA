@@ -26,8 +26,11 @@ class MARHMM(BaseModel):
 	def __init__(self,
 			 	 data_loader: DataLoaderCollection,
 				 config: GlobalConfig,
-				 device: torch.device) -> None:
+				 device: torch.device,
+     			 overwrite_obs_dim: int = None) -> None:
 		super().__init__(data_loader, config, device)
+		if overwrite_obs_dim is not None:
+			self.num_features = overwrite_obs_dim
 		self.__initialize_parameters()
 		self.__initialize_weights()
 		self.to(self.device)

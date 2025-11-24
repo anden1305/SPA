@@ -54,7 +54,7 @@ class Visualizer:
     def visualize(self, train_details: TrainDetails):
         path = train_details.get_path() / "plots"
         path.mkdir(parents=True, exist_ok=True)
-        x, y = self.data_loader.get_all_data()
+        x, y, _ = self.data_loader.get_all_data()
         if self.global_config.model.type == 'marhmm':
             x = x[:, self.global_config.model.params['lags'][-1]:]
             y = y[:, self.global_config.model.params['lags'][-1]:]
@@ -86,11 +86,13 @@ class Visualizer:
         
         if validations.get("nmi"):
             self.__plot_reliability(nmis, cross_nmis, final_losses, path=path)
-        
-
+    
+    def visualize_cvae(self, train_details):
+        path = Path(self.global_config.results_dir) / self.global_config.run_name / "plots"
+        path.mkdir(parents=True, exist_ok=True)
+        self.__plot_feature_statistics(path=path)
     
     ####### HELPER METHODS #######
-    
     
     def __plot_feature_statistics(self, path: Path):
         """Visualise per-state feature statistics supplied by the validator."""
@@ -199,6 +201,8 @@ class Visualizer:
             feature_axis = np.arange(1, max_features + 1)
             # feature_labels = [f"Feature {i}" for i in feature_axis]
             feature_labels = self.data_loader.get_feature_names()
+            if not len(feature_labels) == max_features:
+                feature_labels = [f"Feature {i}" for i in feature_axis]
 
             # Line plot with optional std shading
             fig, ax = plt.subplots(figsize=(12, 6))

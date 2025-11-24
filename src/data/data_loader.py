@@ -320,8 +320,8 @@ class DataLoader(Iterator):
             
             # concatenate postprocessed features along last axis
             if len(group_x_features) > 0:
-                self.has_features = True
                 group_x = np.concatenate(group_x_features, axis=2)
+                self.has_features = True
                 # for labels, ensure consistency across postprocessing transforms
                 first_y = group_y_features[0]
                 for other_y in group_y_features[1:]:
@@ -358,6 +358,8 @@ class DataLoader(Iterator):
 
         # concatenate along last axis (features / channels)
         x_out = np.concatenate(processed_groups, axis=2)
+        if x_out.shape[2] > 50:
+            self.has_features = False
         return x_out, processed_y
     
     def has_posttransforms(self) -> bool:

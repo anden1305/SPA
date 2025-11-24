@@ -11,6 +11,7 @@ from src.helpers.metrics_aggregation import summarize_metrics
 from src.helpers.nmi import calculate_nmi
 from src.helpers.summary_statistics import compute_summary_statistics
 from src.models.base_model import BaseModel
+from src.models.cvae_mar_hmm import CVAEMARHMM
 from src.orchestrator.train_details import TrainDetails
 from src.helpers.state_distinctness import compute_state_distinctness
 
@@ -37,9 +38,9 @@ class Validator:
 
         self.validations[epoch] = {}
         self.model.prepare_for_inference()
-        xt, yt = self.data_loader.get_all_data()
+        xt, yt, sub_ids = self.data_loader.get_all_data()
         with torch.no_grad():
-            predst = self.model.predict(xt)
+            predst = self.model.predict(xt, sub_ids)
             
             # Handle MARHMM burn-in
             if hasattr(self.model, 'max_lag') and self.model.max_lag > 0:
@@ -66,9 +67,9 @@ class Validator:
         """Validate model at a specific epoch during training."""          
         self.validations[epoch] = {}
         self.model.prepare_for_inference()
-        xt, yt = self.data_loader.get_all_data()
+        xt, yt, sub_ids = self.data_loader.get_all_data()
         with torch.no_grad():
-            predst = self.model.predict(xt)
+            predst = self.model.predict(xt, sub_ids)
             
             # Handle MARHMM burn-in
             if hasattr(self.model, 'max_lag') and self.model.max_lag > 0:
@@ -91,6 +92,7 @@ class Validator:
             if self.config.learning_rate:
                 self.validations[epoch]["learning_rate"] = optimizer.param_groups[0]['lr']
             self.predictions[epoch] = preds.tolist()
+        self.model.prepare_for_training()
             
         # Save historic values for this epoch
         for name, p in self.model.named_parameters():
@@ -122,7 +124,7 @@ class Validator:
         return validations
 
     def validate_data(self):
-        x, y = self.data_loader.get_all_data()
+        x, y, _ = self.data_loader.get_all_data()
         has_features = self.data_loader.has_features_enabled()
         self.data_validations = {}
         out_path = f"{self.global_config.results_dir}/{self.global_config.run_name}/data_validations.json"
@@ -143,6 +145,14 @@ class Validator:
                 self.data_validations["feature_separability"] = separability
         with open(out_path, "w") as f:
             json.dump(self.data_validations, f, indent=2)
+
+    def validate_cvae(self):
+        assert type(self.model) == CVAEMARHMM, "Model must be of type CVAEMARHMM to validate CVAE latent representations."
+        x, y, sub_ids = self.data_loader.get_all_data()
+        self.model.prepare_for_inference()
+        with torch.no_grad():
+            x_latent = self.model.get_latent_representation(x, sub_ids)
+        self.data_validations.update(compute_feature_statistics(x_latent, y, self.data_loader, True))
 
     ####### HELPER METHODS #######
 
@@ -339,7 +349,6 @@ class Validator:
         return self.validations
     
     def get_historic_values(self) -> dict[str, list]:
-        assert self.historic_values, "No historic values recorded. Ensure training has been run and historic tracking is enabled in the config .yaml."
         return self.historic_values
 
     def get_data_validations(self) -> dict[str, Any]:
