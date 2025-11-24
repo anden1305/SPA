@@ -4,7 +4,7 @@ metric:
   goal: minimize
 parameters:
   trainer.learning_rate:
-    values: [0.01, 0.005, 0.001, 0.0001, 0.00001]
+    values: [0.001, 0.0005, 0.0001, 0.00005, 0.00001]
   model.init_strategy:
-    values: [random_separated]
+    values: [random_uniform, random_separated, kmeans_pca_noisy]
 base_config: src/config/run/hmm/experiments/experiment_synth_raw.yaml
