@@ -38,9 +38,15 @@ class Validator:
         self.validations[epoch] = {}
         self.model.prepare_for_inference()
         xt, yt = self.data_loader.get_all_data()
-        y = yt.detach().cpu().numpy().flatten()
         with torch.no_grad():
             predst = self.model.predict(xt)
+            
+            # Handle MARHMM burn-in
+            if hasattr(self.model, 'max_lag') and self.model.max_lag > 0:
+                predst = predst[:, self.model.max_lag:]
+                yt = yt[:, self.model.max_lag:]
+            
+            y = yt.detach().cpu().numpy().flatten()
             preds = predst.detach().cpu().numpy().flatten()
             if self.config.nmi:
                 nmi = calculate_nmi(preds, y)
@@ -61,9 +67,15 @@ class Validator:
         self.validations[epoch] = {}
         self.model.prepare_for_inference()
         xt, yt = self.data_loader.get_all_data()
-        y = yt.detach().cpu().numpy().flatten()
         with torch.no_grad():
             predst = self.model.predict(xt)
+            
+            # Handle MARHMM burn-in
+            if hasattr(self.model, 'max_lag') and self.model.max_lag > 0:
+                predst = predst[:, self.model.max_lag:]
+                yt = yt[:, self.model.max_lag:]
+            
+            y = yt.detach().cpu().numpy().flatten()
             preds = predst.detach().cpu().numpy().flatten()
             if self.config.nmi:
                 nmi = calculate_nmi(preds, y)

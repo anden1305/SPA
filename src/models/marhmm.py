@@ -81,7 +81,8 @@ class MARHMM(BaseModel):
 		log_A = torch.log_softmax(self.transition_logits, dim=-1)
 		
 		log_emiss = self.__emission_log_prob(x_std)
-		logp = self.__forward_algorithm(log_emiss, log_pi, log_A)
+		# Start recursion after max_lag to avoid zero-padded artifacts
+		logp = self.__forward_algorithm(log_emiss, log_pi, log_A, start_t=self.max_lag)
 		return self.negative_log_likelihood(x_std, logp)
 
 	def negative_log_likelihood(self, x: Tensor, logp: Tensor) -> Tensor:
@@ -94,8 +95,12 @@ class MARHMM(BaseModel):
 		B = x.shape[0]
 		T = x.shape[1]
 		D = x.shape[2]
+		
+		# Effective time steps
+		T_eff = max(T - self.max_lag, 1)
+		
 		logp = logp / B
-		logp = logp / T
+		logp = logp / T_eff
 		logp = logp / D
 		nll = -logp
 		return nll.mean()
@@ -157,7 +162,7 @@ class MARHMM(BaseModel):
 			lp[:, : self.max_lag, :] = 0.0
 		return lp
 
-	def __forward_algorithm(self, log_emiss: Tensor, log_pi: Tensor, log_A: Tensor) -> Tensor:
+	def __forward_algorithm(self, log_emiss: Tensor, log_pi: Tensor, log_A: Tensor, start_t: int = 0) -> Tensor:
 		"""Run forward algorithm.
 
 		Parameters
@@ -165,14 +170,16 @@ class MARHMM(BaseModel):
 		log_emiss : (B,T,S)
 		log_pi : (S,)
 		log_A : (S,S)
+		start_t : int
+			Time step to start the recursion (0-indexed).
 		Returns
 		-------
 		log_likelihood : (B,)
 		"""
 		B, T, S = log_emiss.shape
-		# alpha_0
-		alpha = log_pi.unsqueeze(0) + log_emiss[:, 0, :]  # (B,S)
-		for t in range(1, T):
+		# alpha_start_t
+		alpha = log_pi.unsqueeze(0) + log_emiss[:, start_t, :]  # (B,S)
+		for t in range(start_t + 1, T):
 			# (B,S,S): previous alpha_j + log_A_{j->i}
 			prev = alpha.unsqueeze(2) + log_A.unsqueeze(0)
 			alpha = log_emiss[:, t, :] + torch.logsumexp(prev, dim=1)
@@ -261,9 +268,12 @@ class MARHMM(BaseModel):
 		log_emiss = self.__emission_log_prob(x)  # (B,T,S)
 		
 		backptr = x.new_zeros((B, T, self.num_states), dtype=torch.long)
-		delta = log_pi.unsqueeze(0) + log_emiss[:, 0, :]  # (B,S)
 		
-		for t in range(1, T):
+		# Start at max_lag
+		start_t = self.max_lag
+		delta = log_pi.unsqueeze(0) + log_emiss[:, start_t, :]  # (B,S)
+		
+		for t in range(start_t + 1, T):
 			scores = delta.unsqueeze(2) + log_A.unsqueeze(0)
 			delta, idx = torch.max(scores, dim=1)
 			delta = delta + log_emiss[:, t, :]
@@ -273,7 +283,7 @@ class MARHMM(BaseModel):
 		path = x.new_zeros((B, T), dtype=torch.long)
 		path[:, -1] = last
 		
-		for t in range(T - 2, -1, -1):
+		for t in range(T - 2, start_t - 1, -1):
 			path[:, t] = backptr[torch.arange(B), t + 1, path[:, t + 1]]
 		
 		return path

@@ -55,6 +55,9 @@ class Visualizer:
         path = train_details.get_path() / "plots"
         path.mkdir(parents=True, exist_ok=True)
         x, y = self.data_loader.get_all_data()
+        if self.global_config.model.type == 'marhmm':
+            x = x[:, self.global_config.model.params['lags'][-1]:]
+            y = y[:, self.global_config.model.params['lags'][-1]:]
         x = x.detach().cpu().numpy()
         y = y.detach().cpu().numpy().flatten()
         if self.config.losses:
