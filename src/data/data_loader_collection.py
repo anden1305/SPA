@@ -78,13 +78,17 @@ class DataLoaderCollection:
     
     def __validate_data(self):
         num_states = set([ds.get_num_states() for ds in self.datasets])
-        assert len(num_states) == 1, "All datasets must have the same number of states."
-        self.num_states = num_states.pop()
+        # assert len(num_states) == 1, "All datasets must have the same number of states."
+        self.num_states = max(num_states)
+        # self.num_states = num_states.pop()
         feature_dims = set([dl.get_feature_dim() for dl in self.data_loaders])
         assert len(feature_dims) == 1, "All data loaders must have the same feature dimension."
         self.feature_dim = feature_dims.pop()
-        self.state_names = self.datasets[0].get_state_names()
-     
+        state_names = [ds.get_state_names() for ds in self.datasets]
+        state_names.sort(key=lambda x: len(x), reverse=True)
+        self.state_names = state_names[0]
+        # self.state_names = self.datasets[0].get_state_names()
+    
     def get_transforms(self) -> list[BaseTransform]:
         return self.data_loaders[0].transforms
     
@@ -94,6 +98,9 @@ class DataLoaderCollection:
     def get_feature_dim(self) -> int:
         return self.feature_dim
     
+    def get_channels(self) -> int:
+        return self.x.shape[-1]
+    
     def get_state_names(self) -> list[str]:
         return self.state_names
 
@@ -101,18 +108,19 @@ class DataLoaderCollection:
         return self.data_loaders[0].get_feature_names()
 
     def get_all_data(self):
-        return self.x, self.y, self.sub_ids
+        y = self.y
+        if len(self.y.shape) == 3:
+            y = self.y[:, :, 0]
+        return self.x, y, self.sub_ids
     
     def has_features_enabled(self):
         return self.data_loaders[0].has_features_enabled()
     
     def get_num_subjects(self) -> int:
-        return 92
+        return self.datasets[0].get_num_subjects()
     
     def get_subject_map(self) -> list[int]:
-        # Returns list mapping subject ID to index
-        subject_ids = set([ds.get_id() for ds in self.datasets])
-        subject_to_id = {subject_id: int(re.search(r'\d+', subject_id).group()) for subject_id in subject_ids}
+        subject_to_id = {ds.get_id(): ds.get_subject() for ds in self.datasets}
         return subject_to_id
     
     def __iter__(self) -> "DataLoaderCollection":

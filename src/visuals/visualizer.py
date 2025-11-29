@@ -1,5 +1,6 @@
 from typing import Any, Optional, Sequence
 from pathlib import Path
+from src.models.cvae_mar_hmm import CVAEMARHMM
 from torch import Tensor
 import numpy as np
 import seaborn as sns
@@ -87,10 +88,17 @@ class Visualizer:
         if validations.get("nmi"):
             self.__plot_reliability(nmis, cross_nmis, final_losses, path=path)
     
-    def visualize_cvae(self, train_details):
+    def visualize_cvae(self, model: CVAEMARHMM, train_details):
         path = Path(self.global_config.results_dir) / self.global_config.run_name / "plots"
         path.mkdir(parents=True, exist_ok=True)
+        x, y, sub_ids = self.data_loader.get_all_data()
+        y = y.flatten().cpu().numpy()
+        model.prepare_for_inference()
+        with torch.no_grad():
+            x_latent = model.get_latent_representation(x, sub_ids).cpu().numpy()
         self.__plot_feature_statistics(path=path)
+        self.__plot_state_distinctness(path=path)
+        self.__plot_pca_tripanel(train_details, x=x_latent, y=y, overwrite_path=path)
     
     ####### HELPER METHODS #######
     
@@ -1117,8 +1125,11 @@ class Visualizer:
             if loss_values:
                 print(f"Min Loss at epoch {min_loss_epoch}: {min_loss:.6g}")
 
-    def __plot_pca_tripanel(self, train_details: TrainDetails, x: Tensor, y: Tensor):
+    def __plot_pca_tripanel(self, train_details: TrainDetails, x: Tensor, y: Tensor, overwrite_path: str = None):
         """Save tri-panel PCA plots comparing HMM-init, HMM-trained, and True labels."""
+        
+        if len(y.shape) == 3:
+            y = y[:, :, 0]
         
         init_arr = train_details.get_initial_predictions()
         trained_arr = train_details.get_trained_predictions()
@@ -1134,14 +1145,15 @@ class Visualizer:
             print(f"Warning: Could not align labels for PCA tripanel due to: {e}")
         
         if not (len(y) == len(init_arr) == len(trained_arr) == X.shape[0]):
+            print(f"Lengths: y={len(y)}, init={len(init_arr)}, trained={len(trained_arr)}, X_rows={X.shape[0]}")
             raise ValueError("Label lengths must match number of rows in x after flattening")
 
-        ## sample 1000 points from each class
+        ## sample 2500 points from each class
         sampled_indices = []
         for cls in np.unique(y):
             cls_indices = np.where(y == cls)[0]
-            if len(cls_indices) > 1000:
-                sampled = np.random.choice(cls_indices, size=1000, replace=False)
+            if len(cls_indices) > 2500:
+                sampled = np.random.choice(cls_indices, size=2500, replace=False)
             else:
                 sampled = cls_indices
             sampled_indices.extend(sampled)
@@ -1195,7 +1207,7 @@ class Visualizer:
                 
             axes[0].set_ylabel(f"PC{b+1}")
             fig.tight_layout()
-            out_path = train_details.get_path() / "plots" / f"hmm_tripanel_pc{a+1}_pc{b+1}.png"
+            out_path = Path(overwrite_path) / f"hmm_tripanel_pc{a+1}_pc{b+1}.png" if overwrite_path else train_details.get_path() / "plots" / f"hmm_tripanel_pc{a+1}_pc{b+1}.png"
             fig.savefig(out_path.as_posix(), dpi=160)
             plt.close(fig)
             saved.append(out_path.as_posix())   

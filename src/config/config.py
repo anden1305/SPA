@@ -62,6 +62,7 @@ class DataLoaderConfig(BaseModel):
     batch_size: int | None = Field(..., ge=1, description="Number of windows. If None, use full dataset.")
     validation_batch_size: int | None = Field(..., ge=1, description="Batch size for validation. If None, use full dataset.")
     window_size: int | None = Field(..., ge=1, description="Size of each data window in timesteps.")
+    sequence_length: int | None = Field(..., ge=1, description="Length of each data sequence in timesteps for CVAE models.")
     stride: int | None = Field(..., ge=1, description="Stride between windows in timesteps.")
     transforms: list[TransformsConfig] = Field(default_factory=list)
     shuffle: bool = Field(..., description="Whether to shuffle data each epoch.")

@@ -69,7 +69,15 @@ class Orchestrator:
         self.trainer.train()
         self.validator.validate_cvae()
         train_details = self.__collect_training_details()
-        self.visualizer.visualize_cvae(train_details=train_details)
+        self.visualizer.visualize_cvae(model=self.model, train_details=train_details)
+        # self.model.training_pipeline = 'marhmm'
+        # self.global_config.trainer.epochs = 30000
+        # self.global_config.trainer.learning_rate = 0.00005
+        # self.trainer.reset()
+        # self.trainer.train()
+        # train_details = self.__collect_training_details()
+        # self.visualizer.visualize(train_details=train_details)
+        # self.visualizer.visualize_cvae(model=self.model, train_details=train_details)
     
     ### private methods ###
     

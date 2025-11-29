@@ -40,5 +40,11 @@ class SyntheticDataset(BaseDataset):
         config['stage_names'] = synthetic_config['stage_names']
         return config
     
+    def get_num_subjects(self):
+        return 1
+    
+    def get_subject(self):
+        return 0
+    
     def __str__(self):
         return f"Synthetic(id={self.config['name']})"

@@ -30,16 +30,37 @@ class CVAEMARHMM(BaseModel):
         self.to(self.device)
     
     def forward(self, x: torch.Tensor, subject_ids: torch.Tensor) -> torch.Tensor:
+        is_reshaped = False
+        if len(x.shape) == 4:
+            B, T, S, C = x.shape
+            x = x.view(B * T, C, S)
+            subject_ids = subject_ids.view(B * T, -1)[:,0]
+            is_reshaped = True
         x_recon, mu, logvar, _ = self.cvae.forward(x, subject_ids)
         cvae_loss = self.cvae.calculate_loss(x, x_recon, mu, logvar)
+        if is_reshaped:
+            mu = mu.view(B, T, -1)
         if self.training_pipeline == 'cvae':
             return cvae_loss
         marhmm_loss = self.marhmm(mu)
         if self.training_pipeline == 'marhmm':
-            return marhmm_loss  
+            return marhmm_loss
         if self.training_pipeline == 'end_to_end':
             return marhmm_loss + cvae_loss
         raise ValueError(f"Unsupported training mode: {self.training_pipeline}")
+    
+    def predict(self, x: torch.Tensor, subject_ids: torch.Tensor) -> torch.Tensor:
+        is_reshaped = False
+        if len(x.shape) == 4:
+            B, T, S, C = x.shape
+            x = x.view(B * T, C, S)
+            subject_ids = subject_ids.view(B * T, -1)[:,0]
+            is_reshaped = True
+        mu = self.cvae.encode_to_latent(x, subject_ids)
+        if is_reshaped:
+            mu = mu.view(B, T, -1)
+        out = self.marhmm.predict(mu)
+        return out
     
     def prepare_for_training(self):
         self.train()
@@ -57,18 +78,22 @@ class CVAEMARHMM(BaseModel):
         for param in self.parameters():
             param.requires_grad = False
     
-    def predict(self, x: torch.Tensor, subject_ids: torch.Tensor) -> torch.Tensor:
-        mu = self.cvae.encode_to_latent(x, subject_ids)
-        out = self.marhmm.predict(mu)
-        return out
-        
     def reset(self):
         self.marhmm.reset()
         self.cvae.reset()
         self.prepare_for_training()
     
     def get_latent_representation(self, x: torch.Tensor, subject_ids: torch.Tensor) -> torch.Tensor:
+        is_reshaped = False
+        if len(x.shape) == 4:
+            B, T, S, C = x.shape
+            x = x.view(B * T, C, S)
+            subject_ids = subject_ids.view(B * T, -1)[:,0]
+            is_reshaped = True
         mu = self.cvae.encode_to_latent(x, subject_ids)
+        # if is_reshaped:
+        #     mu = mu.view(B, T, -1)
+        print("CVAEMARHMM LATENT output shape:", mu.shape)
         return mu
     
     def regularization_loss(self) -> torch.Tensor:
@@ -76,7 +101,7 @@ class CVAEMARHMM(BaseModel):
         marhmm_reg = self.marhmm.regularization_loss()
         if self.training_pipeline == 'cvae':
             return cvae_reg
-        if self.training == 'marhmm':
+        if self.training_pipeline == 'marhmm':
             return marhmm_reg
         if self.training_pipeline == 'end_to_end':
             return cvae_reg + marhmm_reg

@@ -79,6 +79,9 @@ class BaseDataset(ABC):
     
     def get_id(self):
         return self.id
+    
+    def get_state_names(self):
+        return self.config.get('stage_names', None)
 
     ###### ABSTRACT METHODS ######
 
@@ -99,5 +102,10 @@ class BaseDataset(ABC):
         """Returns a string representation of the dataset."""
         raise NotImplementedError('This method has to be implemented.')
     
-    def get_state_names(self):
-        return self.config.get('stage_names', None)
+    @abstractmethod
+    def get_num_subjects(self):
+        raise NotImplementedError('This method has to be implemented.')
+    
+    @abstractmethod
+    def get_subject(self):
+        raise NotImplementedError('This method has to be implemented.')

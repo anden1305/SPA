@@ -2,6 +2,8 @@
 from typing import Iterator
 
 import numpy as np
+from src.preprocessing.windows import Windows
+from src.preprocessing.notch_filter import NotchFilter
 from src.data.base_dataset import BaseDataset
 from src.config.config import GlobalConfig, TransformsConfig
 from src.preprocessing.beta_delta_pac import BetaDeltaPAC
@@ -75,6 +77,23 @@ class DataLoader(Iterator):
         # reshape data so that each batch is a continuous segment of the original data
         x = x.reshape((num_full_batches, batch_size*x.shape[1], x.shape[2]))
         y = y.reshape((num_full_batches, y.shape[0] // num_full_batches))
+        
+        # add sequence length dimension if specified
+        if self.config.sequence_length is not None:
+            seq_len = self.config.sequence_length
+            B, T_flat, C = x.shape
+            num_seqs = T_flat // seq_len
+            if num_seqs == 0:
+                raise ValueError(f"Total time dimension {T_flat} is smaller than sequence_length {seq_len}.")
+            usable_T = num_seqs * seq_len
+            # trim to a multiple of seq_len so we can reshape cleanly
+            x = x[:, :usable_T, :]
+            y = y[:, :usable_T]
+            # x: (B, usable_T, C) -> (B, num_seqs, seq_len, C)
+            x = x.reshape(B, num_seqs, seq_len, C)
+            # y: (B, usable_T) -> (B, num_seqs, seq_len)
+            y = y.reshape(B, num_seqs, seq_len)
+        
         # make data contiguous in memory
         x = np.ascontiguousarray(x)
         y = np.ascontiguousarray(y)
@@ -255,6 +274,14 @@ class DataLoader(Iterator):
                     self.transforms[channel].append(PercentileClipping(config=config))
                 case "band_pass_filter":
                     self.transforms[channel].append(BandPassFilter(config=config, sampling_rate=self.dataset.get_sampling_rate()))
+                case "notch_filter":
+                    self.transforms[channel].append(NotchFilter(config=config, sampling_rate=self.dataset.get_sampling_rate()))
+                case "windows":
+                    self.transforms[channel].append(Windows(
+                        window_size=self.config.window_size,
+                        stride=self.config.stride,
+                        sampling_rate=self.dataset.get_sampling_rate()
+                    ))
                 case _:
                     raise ValueError(f"Unknown transform: {config.type}.")
     

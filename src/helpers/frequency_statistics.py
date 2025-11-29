@@ -9,7 +9,8 @@ def compute_feature_statistics(x: torch.Tensor, y: torch.Tensor, data_loader: Da
     if not has_features:
         print('Skipping feature statistics calculation due to high dimensionality.')
         return {}
-
+    if len(y.shape) == 3:
+        y = y[:, :, 0]
     x_flat = x.reshape(-1, x.shape[-1])
     y_flat = y.reshape(-1)
     states = torch.unique(y_flat)

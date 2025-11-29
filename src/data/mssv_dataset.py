@@ -1,4 +1,5 @@
 
+import re
 from src.config.config import DatasetConfig, GlobalConfig
 from src.data.base_dataset import BaseDataset
 import yaml
@@ -78,6 +79,12 @@ class MSSVDataset(BaseDataset):
         config['run'] = self.run
         config['channels'] = [signal[:3] for signal in signals]
         return config
-        
+    
+    def get_num_subjects(self):
+        return 92
+    
+    def get_subject(self):
+        return int(re.search(r'\d+', self.get_id()).group()) - 1
+    
     def __str__(self):
         return f"MSSV(id={self.config['name']}, run={self.run})"
