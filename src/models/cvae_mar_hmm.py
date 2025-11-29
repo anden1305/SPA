@@ -33,7 +33,7 @@ class CVAEMARHMM(BaseModel):
         is_reshaped = False
         if len(x.shape) == 4:
             B, T, S, C = x.shape
-            x = x.view(B * T, C, S)
+            x = x.view(B * T, S, C).permute(0, 2, 1)
             subject_ids = subject_ids.view(B * T, -1)[:,0]
             is_reshaped = True
         x_recon, mu, logvar, _ = self.cvae.forward(x, subject_ids)
@@ -53,7 +53,7 @@ class CVAEMARHMM(BaseModel):
         is_reshaped = False
         if len(x.shape) == 4:
             B, T, S, C = x.shape
-            x = x.view(B * T, C, S)
+            x = x.view(B * T, S, C).permute(0, 2, 1)
             subject_ids = subject_ids.view(B * T, -1)[:,0]
             is_reshaped = True
         mu = self.cvae.encode_to_latent(x, subject_ids)
@@ -87,7 +87,7 @@ class CVAEMARHMM(BaseModel):
         is_reshaped = False
         if len(x.shape) == 4:
             B, T, S, C = x.shape
-            x = x.view(B * T, C, S)
+            x = x.view(B * T, S, C).permute(0, 2, 1)
             subject_ids = subject_ids.view(B * T, -1)[:,0]
             is_reshaped = True
         mu = self.cvae.encode_to_latent(x, subject_ids)
