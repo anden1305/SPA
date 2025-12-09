@@ -36,6 +36,7 @@ dataloader:
   stride: 512
   shuffle: True
   normalize: True
+  use_legacy: False
   transforms:
     # EEG channel transforms
     - type: fft_log_power
@@ -43,92 +44,92 @@ dataloader:
       params: {}
 
     # EMG channel transforms
-    - type: rms
+    - type: fft_log_power
       channel: EMG
       params: {}
 
 train_datasets:
-  - type: mssv
-    id: sub-038
-    run: 1
-    remove_artifact: True
-  - type: mssv
-    id: sub-038
-    run: 2
-    remove_artifact: True
-  - type: mssv
-    id: sub-039
-    run: 1
-    remove_artifact: True
-  - type: mssv
-    id: sub-039
-    run: 2
-    remove_artifact: True
-  - type: mssv
-    id: sub-039
-    run: 3
-    remove_artifact: True
-  - type: mssv
-    id: sub-041
-    run: 1
-    remove_artifact: True
+  # - type: mssv
+  #   id: sub-038
+  #   run: 1
+  #   remove_artifact: True
+  # - type: mssv
+  #   id: sub-038
+  #   run: 2
+  #   remove_artifact: True
+  # - type: mssv
+  #   id: sub-039
+  #   run: 1
+  #   remove_artifact: True
+  # - type: mssv
+  #   id: sub-039
+  #   run: 2
+  #   remove_artifact: True
+  # - type: mssv
+  #   id: sub-039
+  #   run: 3
+  #   remove_artifact: True
   - type: mssv
     id: sub-041
-    run: 2
-    remove_artifact: True
-  - type: mssv
-    id: sub-041
-    run: 3
-    remove_artifact: True
-  - type: mssv
-    id: sub-043
     run: 1
     remove_artifact: True
-  - type: mssv
-    id: sub-048
-    run: 1
-    remove_artifact: True
+  # - type: mssv
+  #   id: sub-041
+  #   run: 2
+  #   remove_artifact: True
+  # - type: mssv
+  #   id: sub-041
+  #   run: 3
+  #   remove_artifact: True
+  # - type: mssv
+  #   id: sub-043
+  #   run: 1
+  #   remove_artifact: True
+  # - type: mssv
+  #   id: sub-048
+  #   run: 1
+  #   remove_artifact: True
 val_datasets:
-  - type: mssv
-    id: sub-038
-    run: 1
-    remove_artifact: True
-  - type: mssv
-    id: sub-038
-    run: 2
-    remove_artifact: True
-  - type: mssv
-    id: sub-039
-    run: 1
-    remove_artifact: True
-  - type: mssv
-    id: sub-039
-    run: 2
-    remove_artifact: True
-  - type: mssv
-    id: sub-039
-    run: 3
-    remove_artifact: True
-  - type: mssv
-    id: sub-041
-    run: 1
-    remove_artifact: True
+  # - type: mssv
+  #   id: sub-038
+  #   run: 1
+  #   remove_artifact: True
+  # - type: mssv
+  #   id: sub-038
+  #   run: 2
+  #   remove_artifact: True
+  # - type: mssv
+  #   id: sub-039
+  #   run: 1
+  #   remove_artifact: True
+  # - type: mssv
+  #   id: sub-039
+  #   run: 2
+  #   remove_artifact: True
+  # - type: mssv
+  #   id: sub-039
+  #   run: 3
+  #   remove_artifact: True
   - type: mssv
     id: sub-041
-    run: 2
-    remove_artifact: True
-  - type: mssv
-    id: sub-041
-    run: 3
-    remove_artifact: True
-  - type: mssv
-    id: sub-043
     run: 1
     remove_artifact: True
-  - type: mssv
-    id: sub-048
-    run: 1
-    remove_artifact: True
+  # - type: mssv
+  #   id: sub-041
+  #   run: 2
+  #   remove_artifact: True
+  # - type: mssv
+  #   id: sub-041
+  #   run: 3
+  #   remove_artifact: True
+  # - type: mssv
+  #   id: sub-043
+  #   run: 1
+  #   remove_artifact: True
+  # - type: mssv
+  #   id: sub-048
+  #   run: 1
+  #   remove_artifact: True
 model:
   type: cvae_marhmm
   covariance_type: full

@@ -66,6 +66,7 @@ class DataLoaderConfig(BaseModel):
     transforms: list[TransformsConfig] = Field(default_factory=list)
     shuffle: bool = Field(..., description="Whether to shuffle data each epoch.")
     normalize: bool = Field(..., description="Whether to normalize data using mean and std.")
+    use_legacy: bool = Field(True, description="Whether to use legacy data loading behavior.")
     # No hardcoded constants - all data loading behavior is configurable
 
 class DatasetConfig(BaseModel):

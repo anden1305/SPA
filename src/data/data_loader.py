@@ -14,6 +14,7 @@ from src.preprocessing.theta_delta_pac import ThetaDeltaPAC
 from src.preprocessing.theta_gamma_pac import ThetaGammaPAC
 from src.preprocessing.duty_cycle import DutyCycle
 from src.preprocessing.helpers.base_transform import BaseTransform
+from src.preprocessing.vae_preprocessing import VAEPreprocessing
 import torch
 from src.preprocessing.fft_band_power import FFTBandPower
 from src.preprocessing.fft_log_power import FFTLogPower
@@ -44,14 +45,33 @@ class DataLoader(Iterator):
         self.seed = self.global_config.seed
         self.shuffle = self.config.shuffle
         self.normalize = self.config.normalize
-        self.__init_transforms(transform_configs=self.config.transforms)
         self.device = device
         self.verbose = self.global_config.verbose
         self._epoch = 0
         self.has_features: bool = False
-        self.__process_data()
+        
+        # legacy behavior
+        self.use_legacy = self.config.use_legacy
+        if self.use_legacy:
+            self.__init_transforms(transform_configs=self.config.transforms)
+            self.__process_data_legacy()
+        else:
+            self.process_data()
     
-    def __process_data(self):
+    def process_data(self):
+        x, y = self.dataset[:] # X (C, T), y (T,)
+        print('Shapes before VAE preprocessing:', x.shape, y.shape)
+        vae_preprocessing = VAEPreprocessing(
+            self.global_config,
+            window_size=self.config.window_size,
+            stride=self.config.stride,
+            sampling_rate=self.dataset.get_sampling_rate()
+        )
+        x, y = vae_preprocessing(x, y)
+        print('Shapes after VAE preprocessing:', x.shape, y.shape)
+        raise NotImplementedError("Non-legacy data loading is not yet implemented.")
+    
+    def __process_data_legacy(self):
         # get data
         x, y = self.dataset[:]
         x, y = self.__apply_transforms(x, y)
