@@ -1,6 +1,6 @@
 
 from typing import Iterator
-
+import torch
 import numpy as np
 from src.data.base_dataset import BaseDataset
 from src.config.config import GlobalConfig, TransformsConfig
@@ -15,7 +15,6 @@ from src.preprocessing.theta_gamma_pac import ThetaGammaPAC
 from src.preprocessing.duty_cycle import DutyCycle
 from src.preprocessing.helpers.base_transform import BaseTransform
 from src.preprocessing.vae_preprocessing import VAEPreprocessing
-import torch
 from src.preprocessing.fft_band_power import FFTBandPower
 from src.preprocessing.fft_log_power import FFTLogPower
 from src.preprocessing.fft_power import FFTPower
@@ -59,17 +58,31 @@ class DataLoader(Iterator):
             self.process_data()
     
     def process_data(self):
+        # get data
         x, y = self.dataset[:] # X (C, T), y (T,)
-        print('Shapes before VAE preprocessing:', x.shape, y.shape)
+        
+        # check that config is correct
+        assert self.config.stride is not None, "stride must be set for non-legacy data loading."
+        assert self.config.window_size is not None, "window_size must be set for non-legacy data loading."
+        assert self.config.sequence_length is not None, "sequence_length must be set for non-legacy data loading."
+        
+        # create preprocessing object
         vae_preprocessing = VAEPreprocessing(
             self.global_config,
             window_size=self.config.window_size,
             stride=self.config.stride,
+            sequence_length=self.config.sequence_length,
             sampling_rate=self.dataset.get_sampling_rate()
         )
+        # save transforms
+        self.transforms = {'EEG': [vae_preprocessing], 'EMG': [vae_preprocessing]}
+        
+        # apply transforms
         x, y = vae_preprocessing(x, y)
-        print('Shapes after VAE preprocessing:', x.shape, y.shape)
-        raise NotImplementedError("Non-legacy data loading is not yet implemented.")
+        
+        # save & print data
+        self.data = (x, y)
+        self.__print_data_info()
     
     def __process_data_legacy(self):
         # get data

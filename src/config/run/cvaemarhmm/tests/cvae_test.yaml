@@ -34,6 +34,7 @@ dataloader:
   validation_batch_size: 128
   window_size: 512
   stride: 512
+  sequence_length: 16
   shuffle: True
   normalize: True
   use_legacy: False
