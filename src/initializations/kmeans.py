@@ -261,13 +261,16 @@ def recompute_covariance_from_ar(model: BaseModel, data: torch.Tensor, assign_bt
     L = len(Ls)
     DL = D * L
     device = param_device
-    dtype_z = data.dtype
+    dtype_z = model.coeffs.dtype
 
     if lag_stack is None:
         lag_stack = torch.zeros((B, T, DL), device=device, dtype=dtype_z)
         for j, lag in enumerate(Ls):
             if lag < T:
-                lag_stack[:, lag:, j * D:(j + 1) * D] = data[:, :-lag, :]
+                lag_stack[:, lag:, j * D:(j + 1) * D] = data[:, :-lag, :].to(dtype_z)
+    else:
+        lag_stack = lag_stack.to(device=device, dtype=dtype_z)
+
     if valid_mask is None:
         valid_mask = torch.ones((B, T), device=device, dtype=torch.bool)
         max_lag = int(getattr(model, 'max_lag', max(Ls)))

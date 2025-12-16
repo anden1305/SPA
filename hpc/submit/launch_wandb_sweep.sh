@@ -68,10 +68,10 @@ bsub -J "wandb_sweep_agent[1-${NUM_AGENTS}]" \
   -o "$OUTPUT_DIR/sweep_${SWEEP_ID}_job_%J_agent_%I.out" \
   -e "$OUTPUT_DIR/sweep_${SWEEP_ID}_job_%J_agent_%I.err" \
   -n 4 \
-  -R "rusage[mem=8GB]" \
+  -R "rusage[mem=6GB]" \
   -R "span[hosts=1]" \
   -W "$WALLTIME" \
-  -gpu "num=1" \
+  -gpu "num=1:mode=exclusive_process" \
   "bash -lc \"# Minimal, quiet init to avoid 'Modules Release ... Usage' banner
   source /etc/profile.d/modules.sh >/dev/null 2>&1 || true; \
   module --silent try-load cuda/12.8.1 >/dev/null 2>&1 || true; \
@@ -101,6 +101,6 @@ echo "Submitted array job. Monitor with bjobs and check hpc/output/sweep_${SWEEP
 ### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/marhmm/marhmm_mssv_features.yaml 9 1 12:00 gpua100
 
 ###    raw
-### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/hmm/hmm_mssv_raw.yaml 5 1
-### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/marhmm/marhmm_mssv_raw.yaml 5 1
+### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/hmm/hmm_mssv_raw.yaml 15 1 24:00 gpua100
+### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/marhmm/marhmm_mssv_raw.yaml 15 1 24:00 gpua100
 

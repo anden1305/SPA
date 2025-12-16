@@ -1,7 +1,7 @@
 import torch
 from src.models.base_model import BaseModel
 from src.helpers.calinski_harabasz import calinski_harabasz_score
-from src.initializations.kmeans import run_kmeans, set_covariance_from_assignments, set_transition_params, estimate_statewise_ar_coeffs
+from src.initializations.kmeans import run_kmeans, set_covariance_from_assignments, set_transition_params, estimate_statewise_ar_coeffs, init_kmeans
 
 @torch.no_grad()
 def init_kmeans_pca(model: BaseModel, data: torch.Tensor, kmeans_iters: int, estimate_transitions: bool) -> None:
@@ -9,6 +9,8 @@ def init_kmeans_pca(model: BaseModel, data: torch.Tensor, kmeans_iters: int, est
 
     Searches 3D subspaces among top 4 PCs, runs k-means, picks best by Calinski-Harabasz score.
     Estimates transition parameters from temporal assignments if requested.
+
+    Falls back to regular k-means init if features are less than 3D.
     """
     B, T, D = data.shape
     S = model.num_states
@@ -24,7 +26,9 @@ def init_kmeans_pca(model: BaseModel, data: torch.Tensor, kmeans_iters: int, est
     
     num_components = min(4, V.size(1))
     if num_components < 3:
-        raise ValueError(f"Need at least 3 principal components; got {V.size(1)}.")
+        init_kmeans(model, data, kmeans_iters, estimate_transitions)
+        return
+        #raise ValueError(f"Need at least 3 principal components; got {V.size(1)}.")
     
     candidates = [[i, j, k] for i in range(num_components) 
                   for j in range(i + 1, num_components) 
