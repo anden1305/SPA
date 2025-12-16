@@ -30,8 +30,8 @@ visualizer:
   historic_values: True
 dataloader:
   num_batches: 3200000
-  batch_size: 120
-  validation_batch_size: 4096
+  batch_size: 2
+  validation_batch_size: 1024
   window_size: null
   stride: null
   shuffle: True

@@ -284,3 +284,15 @@ If you'd like, I can:
 
 *File created in repository:* `HPC_SUBMIT_GUIDE.md`
 
+
+
+
+# MAKE A SWEEP ID - example
+python3 -m src.training.wandb_sweep_runner src/config/sweep/marhmm/marhmm_mar_proof.yaml --create-only
+
+returns the SWEEP ID, e.g. "k064frrl"
+
+# SUBMIT THE SWEEP
+python3 -m src.training.wandb_sweep_runner src/config/sweep/marhmm/marhmm_mar_proof.yaml --agent-only --sweep-id YOUR_SWEEP_ID --trials-per-agent 1
+
+
