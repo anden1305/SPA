@@ -214,3 +214,7 @@ results/
 wandb/
 
 hpc/output/
+src/config/run/hmm/tests/mar_data/
+src/config/run/marhmm/tests/mar_data/
+src/config/synthetic_data/mar_data/
+
