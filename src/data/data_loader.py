@@ -72,10 +72,12 @@ class DataLoader(Iterator):
             window_size=self.config.window_size,
             stride=self.config.stride,
             sequence_length=self.config.sequence_length,
+            normalize=self.normalize,
             sampling_rate=self.dataset.get_sampling_rate()
         )
         # save transforms
         self.transforms = {'EEG': [vae_preprocessing], 'EMG': [vae_preprocessing]}
+        self.feature_names = []
         
         # apply transforms
         x, y = vae_preprocessing(x, y)

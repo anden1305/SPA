@@ -1,6 +1,6 @@
 trainer:
-  epochs: 35000
-  learning_rate: 0.000001
+  epochs: 150
+  learning_rate: 0.0001
   optimizer: adam
   grad_clip: null
   validate_per_epoch: 1000
@@ -12,7 +12,7 @@ trainer:
     enabled: false
     type: exponential
     step_size: Null
-    gamma: 0.9993078707
+    gamma: 0.99
 validator:
   nmi: True
   accuracy: True
@@ -29,125 +29,201 @@ visualizer:
   summary_statistics: True
   historic_values: True
 dataloader:
-  num_batches: 3200000
+  num_batches: 512
   batch_size: 32
   validation_batch_size: 128
   window_size: 512
   stride: 512
-  sequence_length: 16
+  sequence_length: 1
   shuffle: True
   normalize: True
   use_legacy: False
-  transforms:
-    # EEG channel transforms
-    - type: fft_log_power
-      channel: EEG
-      params: {}
-
-    # EMG channel transforms
-    - type: fft_log_power
-      channel: EMG
-      params: {}
+  transforms: []
 
 train_datasets:
-  # - type: mssv
-  #   id: sub-038
-  #   run: 1
-  #   remove_artifact: True
-  # - type: mssv
-  #   id: sub-038
-  #   run: 2
-  #   remove_artifact: True
-  # - type: mssv
-  #   id: sub-039
-  #   run: 1
-  #   remove_artifact: True
-  # - type: mssv
-  #   id: sub-039
-  #   run: 2
-  #   remove_artifact: True
-  # - type: mssv
-  #   id: sub-039
-  #   run: 3
-  #   remove_artifact: True
+  - type: mssv
+    id: sub-038
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-038
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-039
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-039
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-039
+    run: 3
+    remove_artifact: True
   - type: mssv
     id: sub-041
     run: 1
     remove_artifact: True
-  # - type: mssv
-  #   id: sub-041
-  #   run: 2
-  #   remove_artifact: True
-  # - type: mssv
-  #   id: sub-041
-  #   run: 3
-  #   remove_artifact: True
-  # - type: mssv
-  #   id: sub-043
-  #   run: 1
-  #   remove_artifact: True
-  # - type: mssv
-  #   id: sub-048
-  #   run: 1
-  #   remove_artifact: True
+  - type: mssv
+    id: sub-041
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-041
+    run: 3
+    remove_artifact: True
+  - type: mssv
+    id: sub-043
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-048
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-048
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-048
+    run: 3
+    remove_artifact: True
+  - type: mssv
+    id: sub-054
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-054
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-056
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-059
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-060
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-069
+    run: 1
+    remove_artifact: True
+
 val_datasets:
-  # - type: mssv
-  #   id: sub-038
-  #   run: 1
-  #   remove_artifact: True
-  # - type: mssv
-  #   id: sub-038
-  #   run: 2
-  #   remove_artifact: True
-  # - type: mssv
-  #   id: sub-039
-  #   run: 1
-  #   remove_artifact: True
-  # - type: mssv
-  #   id: sub-039
-  #   run: 2
-  #   remove_artifact: True
-  # - type: mssv
-  #   id: sub-039
-  #   run: 3
-  #   remove_artifact: True
+  - type: mssv
+    id: sub-038
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-038
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-039
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-039
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-039
+    run: 3
+    remove_artifact: True
   - type: mssv
     id: sub-041
     run: 1
     remove_artifact: True
-  # - type: mssv
-  #   id: sub-041
-  #   run: 2
-  #   remove_artifact: True
-  # - type: mssv
-  #   id: sub-041
-  #   run: 3
-  #   remove_artifact: True
-  # - type: mssv
-  #   id: sub-043
-  #   run: 1
-  #   remove_artifact: True
-  # - type: mssv
-  #   id: sub-048
-  #   run: 1
-  #   remove_artifact: True
+  - type: mssv
+    id: sub-041
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-041
+    run: 3
+    remove_artifact: True
+  - type: mssv
+    id: sub-043
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-048
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-048
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-048
+    run: 3
+    remove_artifact: True
+  - type: mssv
+    id: sub-054
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-054
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-056
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-059
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-060
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-069
+    run: 1
+    remove_artifact: True
+
+
 model:
   type: cvae_marhmm
   covariance_type: full
   init_strategy: random_uniform
-  init_noisy: false
+  init_noisy: true
   features: false
   params:
+    
+    # MARHMM parameters
     lags: [1, 2, 4]
     ridge: 0.1
     var_reg: 0.05
     sticky_coef: 0.1
     sticky_kappa: 0.9
+    
+    # CVAE parameters
+    # weights
     latent_dim: 8
-    hidden_dims: [32, 16]
+    enc_hidden_dims: [256, 128]
+    dec_hidden_dims: [64]
+    conv_channels: [48, 64, 128]
+    kernel_sizes:  [7, 5, 3]
+    strides:       [2, 2, 2]
+    paddings:      [3, 2, 1]
     emb_dim: 4
+    # piror
+    prior: warm_gmm
+    use_rms: False
+    min_beta: 0.05
+    max_beta: 0.2
+    beta_warmup_epochs: 100
+    no_beta_epochs: 0
+
 verbose: True
-seed: 123
+seed: 124
 results_dir: results/training/cvaemarhmm
 run_name: cvae_pretraining_test
 runs: 1

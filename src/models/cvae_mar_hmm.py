@@ -29,9 +29,9 @@ class CVAEMARHMM(BaseModel):
         )
         self.to(self.device)
     
-    def forward(self, x: torch.Tensor, subject_ids: torch.Tensor) -> torch.Tensor:
-        x_recon, mu, logvar, _ = self.cvae.forward(x, subject_ids)
-        cvae_loss = self.cvae.calculate_loss(x, x_recon, mu, logvar)
+    def forward(self, x: torch.Tensor, subject_ids: torch.Tensor, epoch: int) -> torch.Tensor:
+        x_recon, mu, logvar, z = self.cvae.forward(x, subject_ids)
+        cvae_loss = self.cvae.calculate_loss(x, x_recon, mu, logvar, z, epoch)
         if self.training_pipeline == 'cvae':
             return cvae_loss
         marhmm_loss = self.marhmm(mu)
@@ -71,12 +71,12 @@ class CVAEMARHMM(BaseModel):
         mu = self.cvae.encode_to_latent(x, subject_ids)
         return mu
     
-    def regularization_loss(self) -> torch.Tensor:
-        cvae_reg = self.cvae.regularization_loss()
-        marhmm_reg = self.marhmm.regularization_loss()
+    def regularization_loss(self, epoch: int) -> torch.Tensor:
+        cvae_reg = self.cvae.regularization_loss(epoch)
         if self.training_pipeline == 'cvae':
             return cvae_reg
-        if self.training == 'marhmm':
+        marhmm_reg = self.marhmm.regularization_loss()
+        if self.training_pipeline == 'marhmm':
             return marhmm_reg
         if self.training_pipeline == 'end_to_end':
             return cvae_reg + marhmm_reg
@@ -85,6 +85,6 @@ class CVAEMARHMM(BaseModel):
     def __str__(self) -> str:
         return (
 			f"CVAEMARHMM(states={self.num_states}, features={self.num_features}, "
-            f"latent_dim={self.cvae.latent_dim}, hidden_dims={self.cvae.hidden_dims}, "
+            f"latent_dim={self.cvae.latent_dim}, hidden_dims={self.cvae.enc_hidden_dims}, "
             f"emb_dim={self.cvae.emb_dim})"
 		)

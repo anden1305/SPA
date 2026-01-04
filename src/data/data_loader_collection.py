@@ -32,6 +32,7 @@ class DataLoaderCollection:
         self.shuffle = self.config.shuffle
         self.random_seed = self.global_config.seed
         self.subject_map = self.get_subject_map()
+        self.pre_load_to_device = True
         self.x, self.y, self.sub_ids = self.prepare_data()
         self.batches_per_next = self.config.num_batches
         
@@ -49,7 +50,7 @@ class DataLoaderCollection:
             # x_dl shape: (Batch, Time, Feature) -> sub_ids shape: (Batch, Time, 1)
             sub_id_arr = np.full((x_dl.shape[0], x_dl.shape[1]), sub_id, dtype=np.int64)
             sub_ids.append(sub_id_arr)
-            
+        
         x_all = np.concatenate(x, axis=0)
         y_all = np.concatenate(y, axis=0)
         sub_ids_all = np.concatenate(sub_ids, axis=0)
@@ -60,7 +61,7 @@ class DataLoaderCollection:
         sub_ids_all = torch.from_numpy(sub_ids_all)
         
         # move to device and pin memory if cuda
-        if self.device.type == "cuda":
+        if self.device.type == "cuda" and self.pre_load_to_device:
             x_all = x_all.pin_memory()
             y_all = y_all.pin_memory()
             sub_ids_all = sub_ids_all.pin_memory()
@@ -94,6 +95,13 @@ class DataLoaderCollection:
     def get_feature_dim(self) -> int:
         return self.feature_dim
     
+    def get_vae_dims(self) -> tuple[int, int, int]:
+        data_dim = self.data_loaders[0].data[0].shape
+        channels = data_dim[-2]
+        features = data_dim[-1]
+        sequence_length = data_dim[-3]
+        return channels, features, sequence_length, self.num_states
+    
     def get_state_names(self) -> list[str]:
         return self.state_names
 
@@ -101,6 +109,8 @@ class DataLoaderCollection:
         return self.data_loaders[0].get_feature_names()
 
     def get_all_data(self):
+        if self.device.type == "cuda" and not self.pre_load_to_device:
+            return self.x.to(self.device, non_blocking=True), self.y.to(self.device, non_blocking=True), self.sub_ids.to(self.device, non_blocking=True)
         return self.x, self.y, self.sub_ids
     
     def has_features_enabled(self):
@@ -147,6 +157,10 @@ class DataLoaderCollection:
         end = min(start + int(self.batches_per_next), self._num_batches)
         idx = self._order[start:end]
         self._cursor = end
+        if self.device.type == "cuda" and not self.pre_load_to_device:
+            return (self.x[idx].to(self.device, non_blocking=True),
+                    self.y[idx].to(self.device, non_blocking=True),
+                    self.sub_ids[idx].to(self.device, non_blocking=True))
         return self.x[idx], self.y[idx], self.sub_ids[idx]
     
     def __str__(self) -> str:

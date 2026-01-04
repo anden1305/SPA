@@ -102,11 +102,11 @@ class MARHMM(BaseModel):
 		# Effective time steps
 		T_eff = max(T - self.max_lag, 1)
 		
-		logp = logp / B
+		# logp = logp / B
 		logp = logp / T_eff
-		logp = logp / D
+		# logp = logp / D
 		nll = -logp
-		return nll.mean()
+		return nll.mean() * 0.01
 
 	def __emission_log_prob(self, x: Tensor) -> Tensor:  
 		B, T, D = x.shape
@@ -251,13 +251,13 @@ class MARHMM(BaseModel):
 			A_prior[idx, idx] = kappa
 			kl = A * (torch.log(torch.clamp(A, min=1e-12)) - torch.log(torch.clamp(A_prior, min=1e-12)))
 			reg = reg + sticky_coef * kl.sum()
-		return reg
+		return reg * 0.0001
 
 	@torch.no_grad()
 	def predict(self, x: Tensor) -> Tensor:
 		"""Viterbi decoding for most likely state sequence."""
 		return self.__decode_viterbi(x)
-
+	
 	@torch.no_grad()
 	def __decode_viterbi(self, x: Tensor) -> Tensor:
 		"""Most likely state sequence (Viterbi path).

@@ -1,10 +1,9 @@
 
 import numpy as np
-
+from scipy import signal
 from src.config.config import TransformsConfig
-from src.data.base_dataset import BaseDataset
 from src.preprocessing.helpers.base_transform import BaseTransform
-from src.preprocessing.helpers.fft import FFT
+from scipy.signal import butter, sosfiltfilt
 
 
 class VAEPreprocessing(BaseTransform):
@@ -12,17 +11,27 @@ class VAEPreprocessing(BaseTransform):
 
     Abstract class for all preprocessing methods that is needed for this codebase.
     """
-
+    
+    _BANDPASS_HZ = {
+        0: (0.5, 30.0),
+        1: (0.5, 30.0),
+        2: (10.0, 63.0),
+    }
+    _BANDPASS_ORDER = 4
+    
     def __init__(self, 
                  config: TransformsConfig, 
                  window_size: int, 
                  stride: int, 
                  sequence_length: int,
+                 normalize: bool,
                  sampling_rate: int):
         self.window_size: int = window_size
         self.stride: int = stride
         self.sequence_length: int = sequence_length
-        self.sampling_rate = sampling_rate
+        self.normalize: bool = normalize
+        self.sampling_rate: int = sampling_rate
+        self._bandpass_sos = self.__build_bandpass_sos()
         super().__init__(config, stage="postprocessing")
     
     def validate_config(self, _: TransformsConfig):
@@ -32,6 +41,16 @@ class VAEPreprocessing(BaseTransform):
     
     def __perform_fft(self, x: np.ndarray) -> np.ndarray:
         return np.fft.rfft(x, axis=-1)
+    
+    def __perform_stft(self, x: np.ndarray) -> np.ndarray:
+        """Compute the Short-Time Fourier Transform (STFT) of the input signal."""
+        _, _, Zxx = signal.stft(x, fs=self.sampling_rate, window='hann', nperseg=self.window_size, noverlap=self.window_size - self.stride, axis=-1, padded=False, boundary=None)
+        print(f"STFT raw shape: {Zxx.shape}")
+        return Zxx
+    
+    def __perform_hanning_window(self, x: np.ndarray) -> np.ndarray:
+        w = np.hanning(self.window_size).astype(np.float32)
+        return x * w[None, None, :]
 
     def __complex_to_real_features(self, Xc: np.ndarray) -> np.ndarray:
         """Convert complex spectrum to a real-valued representation.
@@ -58,7 +77,7 @@ class VAEPreprocessing(BaseTransform):
         (n, C, window_size), where n = floor((T - window_size) / stride) + 1.
         """
         C, T = x.shape
-
+        
         if self.window_size <= 0:
             raise ValueError("window_size must be a positive integer.")
         if self.stride <= 0:
@@ -99,7 +118,7 @@ class VAEPreprocessing(BaseTransform):
 
         return np.apply_along_axis(vote, 1, y_windows)
     
-    def __apply_seuence_length(self, x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    def __apply_sequence_length(self, x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Reshape input into sequences of length `sequence_length`."""        
         n_windows, C, features = x.shape
         n_sequences = n_windows // self.sequence_length
@@ -107,13 +126,82 @@ class VAEPreprocessing(BaseTransform):
         y = y[:n_sequences * self.sequence_length].reshape(n_sequences, self.sequence_length)
         return x, y
     
+    def __normalize(self, x: np.ndarray, TYPE: str) -> np.ndarray:
+        if TYPE == "pre-norm":
+            mean = np.mean(x, axis=(1), keepdims=True)
+            std = np.std(x, axis=(1), keepdims=True) +  1e-8
+        if TYPE == "raw":
+            mean = np.mean(x, axis=(0,1,3), keepdims=True)
+            std = np.std(x, axis=(0,1,3), keepdims=True) + 1e-8
+            # return x
+        elif TYPE == "fft":
+            mean = np.mean(x, axis=(0, 1), keepdims=True)
+            std = np.std(x, axis=(0, 1), keepdims=True) + 1e-8
+        elif TYPE == "stft":
+            mean = np.mean(x, axis=(0, 1, 3), keepdims=True)
+            std = np.std(x, axis=(0, 1, 3), keepdims=True) + 1e-8
+        return (x - mean) / std
+    
+    def __build_bandpass_sos(self) -> dict[int, np.ndarray]:
+        nyq = 0.5 * float(self.sampling_rate)
+        sos_by_c = {}
+
+        for c, (low_hz, high_hz) in self._BANDPASS_HZ.items():
+            if low_hz <= 0 or high_hz <= 0 or low_hz >= high_hz:
+                raise ValueError(f"Invalid band for channel {c}: {(low_hz, high_hz)}")
+
+            low = low_hz / nyq
+            high = high_hz / nyq
+            if high >= 1.0:
+                raise ValueError(
+                    f"high_hz={high_hz} for channel {c} must be < Nyquist ({nyq} Hz)"
+                )
+
+            sos_by_c[c] = butter(
+                N=self._BANDPASS_ORDER,
+                Wn=[low, high],
+                btype="bandpass",
+                output="sos",
+            )
+        return sos_by_c
+    
+    def __bandpass_filter_continuous(self, x: np.ndarray) -> np.ndarray:
+        """
+        x: (C, T) float array
+        Returns filtered x with same shape.
+        """
+        if not self._bandpass_sos:
+            return x
+
+        x_f = x.astype(np.float32, copy=True)
+        C, _ = x_f.shape
+
+        for c in range(C):
+            sos = self._bandpass_sos.get(c, None)
+            x_f[c] = sosfiltfilt(sos, x_f[c], axis=-1)
+
+        return x_f
+    
     def __call__(self, x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        x, y = self.__reshape_input(x, y)
-        Xc = self.__perform_fft(x=x)
-        X = self.__complex_to_real_features(Xc)
-        Y = self.__downsample_by_majority_voting(y_windows=y)
-        X, Y = self.__apply_seuence_length(X, Y)
-        return X, Y
+        TYPE = "fft"
+        x = self.__bandpass_filter_continuous(x)
+        if TYPE == "fft":
+            # if self.normalize:
+            #     x = self.__normalize(x, TYPE="pre-norm")
+            x, y = self.__reshape_input(x, y)
+            x = self.__perform_hanning_window(x=x)
+            x = self.__perform_fft(x=x)
+            x = self.__complex_to_real_features(x)
+        elif TYPE == "stft":
+            x = self.__perform_stft(x=x)
+            x = self.__complex_to_real_features(x)
+        elif TYPE == "raw":
+            x, y = self.__reshape_input(x, y)
+        y = self.__downsample_by_majority_voting(y_windows=y)
+        x, y = self.__apply_sequence_length(x, y)
+        if self.normalize:
+            x = self.__normalize(x, TYPE=TYPE)
+        return x, y
     
     def get_short_name(self):
         return "VAEPreprocessing"

@@ -66,10 +66,26 @@ class Orchestrator:
             self.visualizer.visualize_runs(train_details=self.train_details, validations=validations)
     
     def train_cvae(self):
+        # CVAE training
         self.trainer.train()
         self.validator.validate_cvae()
-        train_details = self.__collect_training_details()
-        self.visualizer.visualize_cvae(train_details=train_details)
+        try:
+            train_details = self.__collect_training_details()
+        except Exception as e:
+            print(f"Error collecting training details: {e}")
+            train_details = None
+        self.visualizer.visualize_cvae(model=self.model, train_details=train_details)
+        # MAR-HMM training
+        # self.model.training_pipeline = 'marhmm'
+        # self.global_config.trainer.epochs = 10000
+        # self.global_config.trainer.validate_per_epoch = 10
+        # self.global_config.trainer.learning_rate = 0.00005
+        # self.global_config.dataloader.num_batches = 2048
+        # self.global_config.dataloader.sequence_length = 32
+        # self.__prepare_run(ignore_model=True)
+        # self.trainer.train()
+        # train_details = self.__collect_training_details()
+        # self.visualizer.visualize(train_details=train_details)
     
     ### private methods ###
     
@@ -96,15 +112,16 @@ class Orchestrator:
     def __set_config(self):
         self.global_config = GlobalConfig.from_yaml(self.config_path)
     
-    def __prepare_run(self):
+    def __prepare_run(self, ignore_model: bool = False):
         self.train_datasets = self.get_train_datasets()
         self.val_datasets = self.get_val_datasets()
         self.train_loader = DataLoaderCollection(datasets=self.train_datasets, config=self.global_config, device=self.device)
         self.val_loader = DataLoaderCollection(datasets=self.val_datasets, config=self.global_config, for_validation=True, device=self.device)
-        self.model = self.__get_model(self.device)
+        if not ignore_model:
+            self.model = self.__get_model(self.device)
         self.validator = Validator(data_loader=self.val_loader, model=self.model, config=self.global_config)
         self.trainer = Trainer(data_loader=self.train_loader, model=self.model, config=self.global_config, validator=self.validator)
-        self.visualizer = Visualizer(data_loader=self.val_loader, config=self.global_config, validator=self.validator)
+        self.visualizer = Visualizer(data_loader=self.val_loader, config=self.global_config, model=self.model, validator=self.validator)
 
     def __prepare(self):
         time_str = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")

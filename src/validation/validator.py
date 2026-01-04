@@ -145,7 +145,7 @@ class Validator:
                 self.data_validations["feature_separability"] = separability
         with open(out_path, "w") as f:
             json.dump(self.data_validations, f, indent=2)
-
+    
     def validate_cvae(self):
         assert type(self.model) == CVAEMARHMM, "Model must be of type CVAEMARHMM to validate CVAE latent representations."
         x, y, sub_ids = self.data_loader.get_all_data()
@@ -153,6 +153,8 @@ class Validator:
         with torch.no_grad():
             x_latent = self.model.get_latent_representation(x, sub_ids)
         self.data_validations.update(compute_feature_statistics(x_latent, y, self.data_loader, True))
+        distinctness = compute_state_distinctness(x_latent, y)
+        self.data_validations.update(distinctness)
 
     ####### HELPER METHODS #######
 
