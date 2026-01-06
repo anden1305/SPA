@@ -182,15 +182,29 @@ class VAEPreprocessing(BaseTransform):
 
         return x_f
     
+    def __cut_down_signal(self, x: np.ndarray) -> np.ndarray:
+        """Cut down FFT signal to retain frequencies up to 45 Hz."""
+        freq_resolution = self.sampling_rate / self.window_size
+        max_freq_eeg = 30.0  # Hz
+        max_index_eeg = int(np.floor(max_freq_eeg / freq_resolution)) + 1  # +1 to include max_freq
+        min_freq_emg = 30.0
+        max_freq_emg = 60.0
+        max_index_emg = int(np.floor(max_freq_emg / freq_resolution)) + 1
+        min_index_emg = int(np.floor(min_freq_emg / freq_resolution))
+        eeg = x[:, :2, :max_index_eeg]
+        emg = x[:, 2:, min_index_emg:max_index_emg]
+        return np.concatenate((eeg, emg), axis=1)
+    
     def __call__(self, x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         TYPE = "fft"
         x = self.__bandpass_filter_continuous(x)
         if TYPE == "fft":
-            # if self.normalize:
-            #     x = self.__normalize(x, TYPE="pre-norm")
+            if self.normalize:
+                x = self.__normalize(x, TYPE="pre-norm")
             x, y = self.__reshape_input(x, y)
-            x = self.__perform_hanning_window(x=x)
+            # x = self.__perform_hanning_window(x=x)
             x = self.__perform_fft(x=x)
+            # x = self.__cut_down_signal(x=x)
             x = self.__complex_to_real_features(x)
         elif TYPE == "stft":
             x = self.__perform_stft(x=x)

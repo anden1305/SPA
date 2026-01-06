@@ -77,7 +77,8 @@ class ConditionalVAE(nn.Module):
                 enc_layers.append(nn.Conv1d(in_ch, out_ch, kernel_size=k, stride=s, padding=p, groups=self.C))
             else:
                 enc_layers.append(nn.Conv1d(in_ch, out_ch, kernel_size=k, stride=s, padding=p))
-            # enc_layers.append(nn.ReLU())
+            # enc_layers.append(nn.Conv1d(in_ch, out_ch, kernel_size=k, stride=s, padding=p))
+            
             enc_layers.append(nn.GroupNorm(num_groups=8, num_channels=out_ch))  # choose groups that divide out_ch
             enc_layers.append(nn.LeakyReLU(0.1))
             in_ch = out_ch
@@ -95,7 +96,7 @@ class ConditionalVAE(nn.Module):
 
         # ----- Encoder MLP -----
         mlp = []
-        prev = self.flat_dim + (3 if self.use_rms else 0) # +3 for RMS features if use_rms is True
+        prev = self.flat_dim + (3 if self.use_rms else 0) + self.emb_dim # +3 for RMS features if use_rms is True
         for h in self.enc_hidden_dims:
             mlp += [nn.Linear(prev, h), nn.ReLU()]
             prev = h
@@ -148,6 +149,7 @@ class ConditionalVAE(nn.Module):
                 dec_layers.append(nn.LeakyReLU(0.1))
             else:
                 dec_layers.append(nn.ConvTranspose1d(in_ch, out_ch, kernel_size=k, stride=s, padding=p, output_padding=out_pad, groups=self.C))
+                # dec_layers.append(nn.ConvTranspose1d(in_ch, out_ch, kernel_size=k, stride=s, padding=p, output_padding=out_pad))
 
             # update for next layer
             L_in = target_L
@@ -158,8 +160,9 @@ class ConditionalVAE(nn.Module):
         # GMM prior parameters (unchanged)
         if self.prior == "gmm":
             self.prior_logits = torch.zeros(self.num_states, device=self.device)
-            means = [-0.5, 0.0, 0.5]
-            self.prior_means = torch.tensor([[means[i] for _ in range(self.latent_dim)] for i in range(self.num_states)], device=self.device)
+            means = [0.0, 0.0, 0.0]
+            # self.prior_means = torch.tensor([[means[i] for _ in range(self.latent_dim)] for i in range(self.num_states)], device=self.device)
+            self.prior_means = nn.Parameter(torch.randn(self.num_states, self.latent_dim) * 0.1)
             self.prior_logvars = torch.zeros(self.num_states, self.latent_dim, device=self.device)
         
         if self.prior == "warm_gmm":
@@ -180,7 +183,7 @@ class ConditionalVAE(nn.Module):
 
     # ---------- Core subroutines ----------
 
-    def encode(self, x):
+    def encode(self, x, subject_ids):
         """
         x: (B, S, C, F)
         subject_ids: (B,) or (B, S)
@@ -188,12 +191,24 @@ class ConditionalVAE(nn.Module):
         """
         B, S, C, F = x.shape
         
+        if subject_ids.dim() == 1:
+            subject_ids_expanded = subject_ids.repeat_interleave(S)
+        elif subject_ids.dim() == 2:
+             subject_ids_expanded = subject_ids.view(-1)
+        else:
+            subject_ids_expanded = subject_ids
+        
+        emb = self.subject_emb(subject_ids_expanded)
+        
         # Flatten batch and sequence for independent processing
         x_flat = x.view(B * S, C, F)
         
         # CNN
         h_conv = self.encoder_cnn(x_flat) # (B*S, last_ch, last_len)
         h_flat = h_conv.view(B * S, -1)
+        
+        # Add subject embedding
+        h_flat = torch.cat([h_flat, emb], dim=-1)
         
         if self.use_rms:
             # Calculate RMS for each channel
@@ -267,7 +282,7 @@ class ConditionalVAE(nn.Module):
             logvar:  (B, S, L)
             z:       (B, S, L)
         """
-        mu, logvar = self.encode(x)
+        mu, logvar = self.encode(x, subject_ids)
         z = self.reparameterize(mu, logvar)
         x_recon = self.decode(z, subject_ids)
         return x_recon, mu, logvar, z
@@ -277,7 +292,10 @@ class ConditionalVAE(nn.Module):
         Compute VAE loss: reconstruction + KL divergence.
         """
         # Reconstruction loss (MSE)
-        recon_loss = F.mse_loss(x_recon, x, reduction='mean')
+        # recon_loss = F.mse_loss(x_recon, x, reduction='mean')
+        recon_loss = F.mse_loss(
+            x_recon, x, reduction='none'
+        ).sum(dim=(-1, -2)).mean()
         # Regularization loss
         if self.prior == "gmm":
             self.reg_loss = self.gmm_prior(logvar, mu, z)
@@ -315,11 +333,11 @@ class ConditionalVAE(nn.Module):
         self.eval()
 
         # Get all data and encode to latent means
-        x, _, _ = self.data_loader.get_all_data()
+        x, _, subject_ids = self.data_loader.get_all_data()
         x = x.to(self.device)
 
         with torch.no_grad():
-            mu, _ = self.encode(x)                 # (B, S, D)
+            mu, _ = self.encode(x, subject_ids=subject_ids)                 # (B, S, D)
             Z = mu.reshape(-1, mu.size(-1))        # (N, D)
 
         # Optional subsample
@@ -365,8 +383,6 @@ class ConditionalVAE(nn.Module):
 
         self.train(was_training)
         return centroids, logvars, logits
-
-            
     
     def gmm_prior(self, logvar: torch.Tensor, mu: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
         """
@@ -380,7 +396,7 @@ class ConditionalVAE(nn.Module):
         kl = (log_qzx - log_pz)
         free_nats_total = 0.5 * self.latent_dim
         kl_fb = torch.clamp(kl, min=free_nats_total).mean()
-        return kl_fb
+        return kl_fb * 0.1
     
     def __log_normal_diag(self, z, mu, logvar):
         """
@@ -394,7 +410,7 @@ class ConditionalVAE(nn.Module):
             + logvar.sum(dim=-1)
             + ((z - mu) ** 2 / logvar.exp()).sum(dim=-1)
         )
-        
+    
     def __log_gmm_prior(self, z):
         """
         z: (..., D)
@@ -439,19 +455,19 @@ class ConditionalVAE(nn.Module):
         log_pz = log_pz_flat.view(batch_shape)
         return log_pz
 
-    
     def standard_prior(self, logvar: torch.Tensor, mu: torch.Tensor) -> torch.Tensor:
         kld = -0.5 * (1 + logvar - mu.pow(2) - logvar.exp())
-        free_nats_per_dim = 0.5
-        kld_fb = torch.clamp(kld - free_nats_per_dim, min=0.0).sum(dim=-1).mean()
-        return kld_fb
+        # free_nats_per_dim = 0.5
+        # kld_fb = torch.clamp(kld - free_nats_per_dim, min=0.0).sum(dim=-1).mean()
+        # return kld_fb
+        return kld.sum(dim=-1).mean()
     
     # Optional: helper for deterministic latent features (for HMM)
     def encode_to_latent(self, x, subject_ids):
         """
         Return deterministic latent representation (mu) for downstream HMM.
         """
-        mu, logvar = self.encode(x)
+        mu, logvar = self.encode(x, subject_ids)
         return mu
     
     def regularization_loss(self, epoch) -> torch.Tensor:

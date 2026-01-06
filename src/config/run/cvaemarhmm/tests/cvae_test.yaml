@@ -1,6 +1,6 @@
 trainer:
-  epochs: 150
-  learning_rate: 0.0001
+  epochs: 500
+  learning_rate: 0.0000005
   optimizer: adam
   grad_clip: null
   validate_per_epoch: 1000
@@ -206,20 +206,29 @@ model:
     
     # CVAE parameters
     # weights
+    # latent_dim: 16
+    # enc_hidden_dims: [256, 128]
+    # dec_hidden_dims: [64]
+    # conv_channels: [48, 64, 128]
+    # kernel_sizes:  [7, 5, 3]
+    # strides:       [2, 2, 2]
+    # paddings:      [3, 2, 1]
+    # emb_dim: 4
     latent_dim: 8
-    enc_hidden_dims: [256, 128]
-    dec_hidden_dims: [64]
-    conv_channels: [48, 64, 128]
+    enc_hidden_dims: [64, 32]
+    dec_hidden_dims: [32, 64]
+    conv_channels: [24, 32, 64]
     kernel_sizes:  [7, 5, 3]
     strides:       [2, 2, 2]
     paddings:      [3, 2, 1]
-    emb_dim: 4
-    # piror
-    prior: warm_gmm
-    use_rms: False
-    min_beta: 0.05
-    max_beta: 0.2
-    beta_warmup_epochs: 100
+    emb_dim: 16
+    use_rms: True
+    # prior
+    prior: standard
+    min_beta: 1
+    max_beta: 20
+    beta_warmup_epochs: 25
+    gmm_warmup_epochs: 0
     no_beta_epochs: 0
 
 verbose: True
