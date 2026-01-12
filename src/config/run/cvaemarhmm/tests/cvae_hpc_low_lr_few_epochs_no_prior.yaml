@@ -1,6 +1,6 @@
 trainer:
-  epochs: 10
-  learning_rate: 0.001
+  epochs: 100
+  learning_rate: 0.00001
   optimizer: adam
   grad_clip: 0.5
   validate_per_epoch: 10000
@@ -224,17 +224,17 @@ model:
     emb_dim: 8
     use_rms: False
     # prior
-    prior: warm_gmm
-    min_beta: 0.0001
-    max_beta: 0.1
+    prior: standard
+    min_beta: 0.0
+    max_beta: 0.0
     beta_warmup_epochs: 50
     beta_slowdown_epochs: 0
-    gmm_warmup_epochs: 150
-    no_beta_epochs: 50
+    gmm_warmup_epochs: 10
+    no_beta_epochs: 0
 
 verbose: True
 seed: 123
 results_dir: results/training/cvaemarhmm
-run_name: cvae_pretraining_test
+run_name: cvae_low_lr_few_epochs_no_prior
 runs: 1
 validate_data: True

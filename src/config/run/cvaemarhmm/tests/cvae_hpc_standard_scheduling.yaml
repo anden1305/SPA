@@ -1,18 +1,18 @@
 trainer:
-  epochs: 10
-  learning_rate: 0.001
+  epochs: 4000
+  learning_rate: 0.0001
   optimizer: adam
-  grad_clip: 0.5
+  grad_clip: null
   validate_per_epoch: 10000
   early_stopping:
     enabled: false
     patience: 100
     min_delta: 0.001
   scheduler:
-    enabled: false
+    enabled: true
     type: exponential
     step_size: Null
-    gamma: 0.99
+    gamma: 0.9994245
 validator:
   nmi: True
   accuracy: True
@@ -224,7 +224,7 @@ model:
     emb_dim: 8
     use_rms: False
     # prior
-    prior: warm_gmm
+    prior: standard
     min_beta: 0.0001
     max_beta: 0.1
     beta_warmup_epochs: 50
@@ -235,6 +235,6 @@ model:
 verbose: True
 seed: 123
 results_dir: results/training/cvaemarhmm
-run_name: cvae_pretraining_test
+run_name: cvae_standard_scheduling
 runs: 1
 validate_data: True

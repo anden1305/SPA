@@ -31,14 +31,15 @@ class CVAEMARHMM(BaseModel):
     
     def forward(self, x: torch.Tensor, subject_ids: torch.Tensor, epoch: int) -> torch.Tensor:
         x_recon, mu, logvar, z = self.cvae.forward(x, subject_ids)
-        cvae_loss = self.cvae.calculate_loss(x, x_recon, mu, logvar, z, epoch)
+        cvae_loss, cvae_reg_loss = self.cvae.calculate_loss(x, x_recon, mu, logvar, z, epoch)
         if self.training_pipeline == 'cvae':
-            return cvae_loss
+            return cvae_loss, cvae_reg_loss
         marhmm_loss = self.marhmm(mu)
+        marhmm_reg_loss = self.marhmm.regularization_loss()
         if self.training_pipeline == 'marhmm':
-            return marhmm_loss  
+            return marhmm_loss, marhmm_reg_loss
         if self.training_pipeline == 'end_to_end':
-            return marhmm_loss + cvae_loss
+            return marhmm_loss + cvae_loss, marhmm_reg_loss + cvae_reg_loss
         raise ValueError(f"Unsupported training mode: {self.training_pipeline}")
     
     def prepare_for_training(self):

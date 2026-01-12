@@ -12,10 +12,15 @@ class VAEPreprocessing(BaseTransform):
     Abstract class for all preprocessing methods that is needed for this codebase.
     """
     
+    # _BANDPASS_HZ = {
+    #     0: (0.5, 30.0),
+    #     1: (0.5, 30.0),
+    #     2: (10.0, 63.0),
+    # }
     _BANDPASS_HZ = {
         0: (0.5, 30.0),
         1: (0.5, 30.0),
-        2: (10.0, 63.0),
+        2: (None,None),
     }
     _BANDPASS_ORDER = 4
     
@@ -31,7 +36,7 @@ class VAEPreprocessing(BaseTransform):
         self.sequence_length: int = sequence_length
         self.normalize: bool = normalize
         self.sampling_rate: int = sampling_rate
-        self._bandpass_sos = self.__build_bandpass_sos()
+        # self._bandpass_sos = self.__build_bandpass_sos()
         super().__init__(config, stage="postprocessing")
     
     def validate_config(self, _: TransformsConfig):
@@ -195,16 +200,39 @@ class VAEPreprocessing(BaseTransform):
         emg = x[:, 2:, min_index_emg:max_index_emg]
         return np.concatenate((eeg, emg), axis=1)
     
+    def percentile_clip_channels(
+        self,
+        x: np.ndarray,
+        lower_percentile: float = 0.5,
+        upper_percentile: float = 99.5,
+        axis: int = -1,
+    ) -> np.ndarray:
+        lower = np.percentile(x, lower_percentile, axis=axis, keepdims=True)
+        upper = np.percentile(x, upper_percentile, axis=axis, keepdims=True)
+        return np.clip(x, lower, upper)
+    
+    def band_pass_filter_fft(self, x: np.ndarray) -> np.ndarray:
+        for c in range(x.shape[1]):
+            low, high = self._BANDPASS_HZ.get(c, (None, None))
+            if low is not None and high is not None:
+                low_fft = int(np.floor(low * self.window_size / self.sampling_rate))
+                high_fft = int(np.ceil(high * self.window_size / self.sampling_rate))
+                x[:, c, :low_fft] = 0
+                x[:, c, high_fft:] = 0
+        return x
+            
+    
     def __call__(self, x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         TYPE = "fft"
-        x = self.__bandpass_filter_continuous(x)
+        x = self.percentile_clip_channels(x)
+        # x = self.__bandpass_filter_continuous(x)
         if TYPE == "fft":
             if self.normalize:
                 x = self.__normalize(x, TYPE="pre-norm")
             x, y = self.__reshape_input(x, y)
             # x = self.__perform_hanning_window(x=x)
             x = self.__perform_fft(x=x)
-            # x = self.__cut_down_signal(x=x)
+            x = self.band_pass_filter_fft(x)
             x = self.__complex_to_real_features(x)
         elif TYPE == "stft":
             x = self.__perform_stft(x=x)

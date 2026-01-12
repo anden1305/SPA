@@ -1,6 +1,6 @@
 trainer:
-  epochs: 10
-  learning_rate: 0.001
+  epochs: 100
+  learning_rate: 0.0003
   optimizer: adam
   grad_clip: 0.5
   validate_per_epoch: 10000
@@ -30,7 +30,7 @@ visualizer:
   historic_values: True
 dataloader:
   num_batches: 64
-  batch_size: 32
+  batch_size: 128
   validation_batch_size: 128
   window_size: 512
   stride: 512
@@ -214,7 +214,7 @@ model:
     # strides:       [2, 2]
     # paddings:      [2, 1]
     # emb_dim: 4
-    latent_dim: 8
+    latent_dim: 16
     enc_hidden_dims: [256]
     dec_hidden_dims: [256]
     conv_channels: [32, 64, 128, 128]
@@ -224,17 +224,17 @@ model:
     emb_dim: 8
     use_rms: False
     # prior
-    prior: warm_gmm
+    prior: gmm
     min_beta: 0.0001
     max_beta: 0.1
     beta_warmup_epochs: 50
     beta_slowdown_epochs: 0
-    gmm_warmup_epochs: 150
+    gmm_warmup_epochs: 0
     no_beta_epochs: 50
 
 verbose: True
 seed: 123
 results_dir: results/training/cvaemarhmm
-run_name: cvae_pretraining_test
+run_name: cvae_low_lr_few_epochs_gmm_prior
 runs: 1
 validate_data: True

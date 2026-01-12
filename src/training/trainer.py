@@ -73,8 +73,7 @@ class Trainer:
             self.current_epoch = epoch
             for x, _, sub_ids in self.data_loader:
                 self.optimizer.zero_grad()
-                loss = self.model.forward(x, sub_ids, epoch)
-                reg_loss = self.model.regularization_loss(self.current_epoch)
+                loss, reg_loss = self.model.forward(x, sub_ids, epoch)
                 loss = loss + reg_loss
                 loss.backward()
                 if self.config.grad_clip is not None:

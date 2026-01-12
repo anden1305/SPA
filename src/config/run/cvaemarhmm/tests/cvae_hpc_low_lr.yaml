@@ -1,6 +1,6 @@
 trainer:
-  epochs: 10
-  learning_rate: 0.001
+  epochs: 4000
+  learning_rate: 0.00001
   optimizer: adam
   grad_clip: 0.5
   validate_per_epoch: 10000
@@ -235,6 +235,6 @@ model:
 verbose: True
 seed: 123
 results_dir: results/training/cvaemarhmm
-run_name: cvae_pretraining_test
+run_name: cvae_low_lr
 runs: 1
 validate_data: True

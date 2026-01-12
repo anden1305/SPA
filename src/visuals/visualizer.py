@@ -1161,8 +1161,8 @@ class Visualizer:
         sampled_indices = []
         for cls in np.unique(y):
             cls_indices = np.where(y == cls)[0]
-            if len(cls_indices) > 2500:
-                sampled = np.random.choice(cls_indices, size=2500, replace=False)
+            if len(cls_indices) > 1000:
+                sampled = np.random.choice(cls_indices, size=1000, replace=False)
             else:
                 sampled = cls_indices
             sampled_indices.extend(sampled)

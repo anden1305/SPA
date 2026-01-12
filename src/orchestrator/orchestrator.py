@@ -23,6 +23,8 @@ from src.training.trainer import Trainer
 from src.validation.validator import Validator
 from src.helpers.profiling import write_cprofile_outputs
 from src.visuals.visualizer import Visualizer
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 class Orchestrator:
@@ -64,28 +66,101 @@ class Orchestrator:
                 self.__print_end()
             validations = self.validator.validate_runs(train_details=self.train_details)
             self.visualizer.visualize_runs(train_details=self.train_details, validations=validations)
+            
+
+    def validate_vae_data(self):
+        x, y, sub_ids = self.train_loader.get_all_data()
+
+        stage_1 = x[y == 0]
+        stage_2 = x[y == 1]
+        stage_3 = x[y == 2]  # <-- keep your stages consistent; change to y==2 if needed
+        # If you actually meant 3 stages: use `stage_3 = x[y == 2]`
+
+        print("Subject IDs:", sub_ids)
+
+        n_channels = x.shape[1]
+        n_features = x.shape[-1]
+        feature_idx = np.arange(n_features)
+
+        def mean_std_per_feature(stage_tensor: torch.Tensor, channel: int):
+            if stage_tensor is None or stage_tensor.numel() == 0:
+                return None, None
+            # shapes: (n_features,), (n_features,)
+            mean = stage_tensor[:, channel, :].mean(dim=0).detach().cpu().numpy()
+            std = stage_tensor[:, channel, :].std(dim=0, unbiased=False).detach().cpu().numpy()
+            return mean, std
+
+        for channel in range(3):
+            m1, s1 = mean_std_per_feature(stage_1, channel)
+            m2, s2 = mean_std_per_feature(stage_2, channel)
+            m3, s3 = mean_std_per_feature(stage_3, channel)
+
+            plt.figure(figsize=(12, 4))
+
+            if m1 is not None:
+                l1, = plt.plot(feature_idx, m1, label="Stage 1 (y=0)")
+                plt.fill_between(feature_idx, m1 - s1, m1 + s1, alpha=0.15)
+
+            if m2 is not None:
+                l2, = plt.plot(feature_idx, m2, label="Stage 2 (y=1)")
+                plt.fill_between(feature_idx, m2 - s2, m2 + s2, alpha=0.15)
+
+            if m3 is not None:
+                l3, = plt.plot(feature_idx, m3, label="Stage 3 (y=2)")
+                plt.fill_between(feature_idx, m3 - s3, m3 + s3, alpha=0.15)
+
+            plt.title(f"Channel {channel}: Mean ± Std per feature")
+            plt.xlabel("Feature index")
+            plt.ylabel("Value")
+            plt.grid(True, alpha=0.3)
+            plt.legend()
+            plt.tight_layout()
+            plt.savefig('channel_{}_mean_std.png'.format(channel))
+            plt.close()
+    
+    def validate_vae_data_magnitude(self):
+        dataloaders: list[DataLoader] = self.train_loader.data_loaders
+        for dataloader in dataloaders:
+            name = str(dataloader.dataset)
+            x, y = dataloader.get_all_data()
+            # print min max for each channel in x
+            n_channels = x.shape[2]
+            for channel in range(n_channels):
+                channel_data = x[:, :, channel].detach().cpu().numpy()
+                min_val = np.min(channel_data)
+                max_val = np.max(channel_data)
+                mean_val = np.mean(channel_data)
+                std_val = np.std(channel_data)
+                print(f"Dataset: {name}, Channel: {channel}, Min: {min_val}, Max: {max_val}, Mean: {mean_val}, Std: {std_val}")
+
+            
     
     def train_cvae(self):
         # CVAE training
-        self.trainer.train()
-        self.validator.validate_cvae()
-        try:
-            train_details = self.__collect_training_details()
-        except Exception as e:
-            print(f"Error collecting training details: {e}")
-            train_details = None
-        self.visualizer.visualize_cvae(model=self.model, train_details=train_details)
-        # MAR-HMM training
-        # self.model.training_pipeline = 'marhmm'
-        # self.global_config.trainer.epochs = 10000
-        # self.global_config.trainer.validate_per_epoch = 10
-        # self.global_config.trainer.learning_rate = 0.00005
-        # self.global_config.dataloader.num_batches = 2048
-        # self.global_config.dataloader.sequence_length = 32
-        # self.__prepare_run(ignore_model=True)
+        # self.validate_vae_data()
+        # self.validate_vae_data_magnitude()
+        self.model.load_state_dict(torch.load("results/training/cvaemarhmm/cvae_low_lr_few_epochs_gmm_prior_2 [20260112-092434]/cvae_final_model.pth"))
+        # self.model.training_pipeline = 'cvae'
         # self.trainer.train()
-        # train_details = self.__collect_training_details()
-        # self.visualizer.visualize(train_details=train_details)
+        # self.validator.validate_cvae()
+        # try:
+        #     train_details = self.__collect_training_details()
+        # except Exception as e:
+        #     print(f"Error collecting training details: {e}")
+        #     train_details = None
+        # self.visualizer.visualize_cvae(model=self.model, train_details=train_details)
+        # torch.save(self.model.state_dict(), f"{self.global_config.results_dir}/{self.global_config.run_name}/cvae_final_model.pth")
+        # # MAR-HMM training
+        self.model.training_pipeline = 'marhmm'
+        self.global_config.trainer.epochs = 100
+        self.global_config.trainer.validate_per_epoch = 10
+        self.global_config.trainer.learning_rate = 0.00005
+        self.global_config.dataloader.num_batches = 2048
+        self.global_config.dataloader.sequence_length = 32
+        self.__prepare_run(ignore_model=True)
+        self.trainer.train()
+        train_details = self.__collect_training_details()
+        self.visualizer.visualize(train_details=train_details)
     
     ### private methods ###
     

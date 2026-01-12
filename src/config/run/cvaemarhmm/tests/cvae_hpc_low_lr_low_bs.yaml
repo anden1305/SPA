@@ -1,6 +1,6 @@
 trainer:
-  epochs: 10
-  learning_rate: 0.001
+  epochs: 2000
+  learning_rate: 0.00001
   optimizer: adam
   grad_clip: 0.5
   validate_per_epoch: 10000
@@ -30,7 +30,7 @@ visualizer:
   historic_values: True
 dataloader:
   num_batches: 64
-  batch_size: 32
+  batch_size: 8
   validation_batch_size: 128
   window_size: 512
   stride: 512
@@ -235,6 +235,6 @@ model:
 verbose: True
 seed: 123
 results_dir: results/training/cvaemarhmm
-run_name: cvae_pretraining_test
+run_name: cvae_low_lr_low_bs
 runs: 1
 validate_data: True

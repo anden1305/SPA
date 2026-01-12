@@ -34,24 +34,22 @@ class ConditionalVAE(nn.Module):
         self.F = F
         self.num_states = num_states
         
-        # Convolutional config
-        self.conv_channels = params.get("conv_channels", None)
-        self.kernel_sizes = params.get("kernel_sizes", None)
-        self.strides      = params.get("strides", None)
-        self.paddings     = params.get("paddings", None)
-        
-        # Latent dimensions
         self.latent_dim = params.get("latent_dim", None)
         self.enc_hidden_dims = params.get("enc_hidden_dims", None) # MLP hidden layers
         self.dec_hidden_dims = params.get("dec_hidden_dims", None) # MLP hidden layers
         self.emb_dim = params.get("emb_dim", None)
+        
+        # # Convolutional config
+        self.conv_channels = params.get("conv_channels", None)
+        self.kernel_sizes = params.get("kernel_sizes", None)
+        self.strides      = params.get("strides", None)
+        self.paddings     = params.get("paddings", None)
         
         # Beta
         self.min_beta = params.get("min_beta", None)
         self.max_beta = params.get("max_beta", None)
         self.beta = self.min_beta
         self.beta_warmup_epochs = params.get("beta_warmup_epochs", None)
-        self.beta_slowdown_epochs = params.get("beta_slowdown_epochs", None)
         self.no_beta_epochs = params.get("no_beta_epochs", None)
         
         # Prior
@@ -59,15 +57,16 @@ class ConditionalVAE(nn.Module):
         self.gmm_warmup_epochs = params.get("gmm_warmup_epochs", 50) # only for "warm_gmm"
         self.gmm_warmup_initialized = False
         
+        # RMS skip connection
+        self.use_rms = params.get("use_rms", False)
+            
         # Set torch random seed for reproducibility
         seed = self.global_config.seed
         torch.manual_seed(seed)
 
     def __initialize_weights(self):
-        
-        # ----- Subject Embedding -----
         self.subject_emb = nn.Embedding(self.n_subjects, self.emb_dim)
-        
+
         # ----- Encoder CNN -----
         enc_layers = []
         in_ch = self.C
@@ -75,11 +74,11 @@ class ConditionalVAE(nn.Module):
         self._lens = [L]  # store lengths through encoder (for decoder)
         for i, (out_ch, k, s, p) in enumerate(zip(self.conv_channels, self.kernel_sizes, self.strides, self.paddings)):
             enc_layers.append(nn.Conv1d(in_ch, out_ch, kernel_size=k, stride=s, padding=p))
-            enc_layers.append(nn.LeakyReLU(0.2))
+            enc_layers.append(nn.ReLU())
             in_ch = out_ch
             L = self._conv1d_out_len(L, k, s, p)
             self._lens.append(L)
-        
+
         self.encoder_cnn = nn.Sequential(*enc_layers)
 
         # Flat dim via dummy pass (still fine)
@@ -91,9 +90,9 @@ class ConditionalVAE(nn.Module):
 
         # ----- Encoder MLP -----
         mlp = []
-        prev = self.flat_dim + self.emb_dim
+        prev = self.flat_dim + (3 if self.use_rms else 0) + self.emb_dim # +3 for RMS features if use_rms is True
         for h in self.enc_hidden_dims:
-            mlp += [nn.Linear(prev, h), nn.LeakyReLU(0.2)]
+            mlp += [nn.Linear(prev, h), nn.ReLU()]
             prev = h
         self.encoder_mlp = nn.Sequential(*mlp)
 
@@ -104,12 +103,11 @@ class ConditionalVAE(nn.Module):
         mlp = []
         prev = self.latent_dim + self.emb_dim
         for h in self.dec_hidden_dims:
-            mlp += [nn.Linear(prev, h), nn.LeakyReLU(0.2)]
+            mlp += [nn.Linear(prev, h), nn.ReLU()]
             prev = h
         mlp.append(nn.Linear(prev, self.flat_dim))
         self.decoder_mlp = nn.Sequential(*mlp)
-        
-        
+
         # ----- Decoder CNN (Transpose) -----
         dec_layers = []
         # reverse per-layer params
@@ -138,43 +136,37 @@ class ConditionalVAE(nn.Module):
             out_ch = self.C if i == len(rev_channels) - 1 else rev_channels[i + 1]
             dec_layers.append(nn.ConvTranspose1d(in_ch, out_ch, kernel_size=k, stride=s, padding=p, output_padding=out_pad))
             if not (i == len(rev_channels) - 1):
-                dec_layers.append(nn.LeakyReLU(0.2))
+                dec_layers.append(nn.ReLU())
+            # update for next layer
             L_in = target_L
             in_ch = out_ch
+        
         self.decoder_cnn = nn.Sequential(*dec_layers)
         
-        
         # GMM prior parameters (unchanged)
-        if self.prior in ("gmm","warm_gmm"):
+        if self.prior == "gmm":
             self.prior_logits = nn.Parameter(torch.zeros(self.num_states, device=self.device))
             self.prior_means = nn.Parameter(torch.randn(self.num_states, self.latent_dim))
             self.prior_logvars = nn.Parameter(torch.zeros(self.num_states, self.latent_dim, device=self.device))
+        
+        if self.prior == "warm_gmm":
+            self.prior_logits = nn.Parameter(torch.zeros(self.num_states))
+            self.prior_means = nn.Parameter(torch.randn(self.num_states, self.latent_dim) * 0.1)
+            self.prior_logvars = nn.Parameter(torch.zeros(self.num_states, self.latent_dim))
 
         self.to(self.device)
+        
+        
+    def _conv1d_out_len(self, L, k, s, p, d=1):
+        # PyTorch Conv1d output length
+        return (L + 2*p - d*(k-1) - 1) // s + 1
+    
 
     def reset(self):
         self.__initialize_weights()
-        
-    def _conv1d_out_len(self, L, k, s, p, d=1):
-        return (L + 2*p - d*(k-1) - 1) // s + 1
 
     # ---------- Core subroutines ----------
-    
-    def get_subject_embedding(self, subject_ids):
-        """
-        subject_ids: (B,) or (B, S)
-        returns: emb with shape (B*S, emb_dim)
-        """
-        B_S = subject_ids.numel()
-        if subject_ids.dim() == 1:
-            subject_ids_expanded = subject_ids.repeat_interleave(self.S)
-        elif subject_ids.dim() == 2:
-             subject_ids_expanded = subject_ids.view(-1)
-        else:
-            subject_ids_expanded = subject_ids
-        emb = self.subject_emb(subject_ids_expanded)
-        return emb
-    
+
     def encode(self, x, subject_ids):
         """
         x: (B, S, C, F)
@@ -183,11 +175,17 @@ class ConditionalVAE(nn.Module):
         """
         B, S, C, F = x.shape
         
-        # Get subject embeddings
-        emb = self.get_subject_embedding(subject_ids)
+        if subject_ids.dim() == 1:
+            subject_ids_expanded = subject_ids.repeat_interleave(S)
+        elif subject_ids.dim() == 2:
+             subject_ids_expanded = subject_ids.view(-1)
+        else:
+            subject_ids_expanded = subject_ids
+        
+        emb = self.subject_emb(subject_ids_expanded)
         
         # Flatten batch and sequence for independent processing
-        x_flat = x.view(B * S, C, F) # (B*S, C, F)
+        x_flat = x.view(B * S, C, F)
         
         # CNN
         h_conv = self.encoder_cnn(x_flat) # (B*S, last_ch, last_len)
@@ -195,6 +193,12 @@ class ConditionalVAE(nn.Module):
         
         # Add subject embedding
         h_flat = torch.cat([h_flat, emb], dim=-1)
+        
+        if self.use_rms:
+            # Calculate RMS for each channel
+            rms_flat = torch.sqrt(torch.mean(x_flat ** 2, dim=-1, keepdim=True)).view(B * S, 3)
+            # Add RMS as additional feature
+            h_flat = torch.cat([h_flat, rms_flat], dim=-1)  # now shape (B*S, C, F+1)
         
         # MLP
         h = self.encoder_mlp(h_flat)
@@ -222,11 +226,17 @@ class ConditionalVAE(nn.Module):
         returns: x_recon with shape (B, S, C, F)
         """
         B, S, L = z.shape
-        
-        # Get subject embeddings
-        emb = self.get_subject_embedding(subject_ids)
-        
         z_flat = z.view(B * S, L)
+        
+        if subject_ids.dim() == 1:
+            subject_ids_expanded = subject_ids.repeat_interleave(S)
+        elif subject_ids.dim() == 2:
+             subject_ids_expanded = subject_ids.view(-1)
+        else:
+            subject_ids_expanded = subject_ids
+        
+        emb = self.subject_emb(subject_ids_expanded)
+        
         h_in = torch.cat([z_flat, emb], dim=-1)
         
         # MLP
@@ -267,15 +277,17 @@ class ConditionalVAE(nn.Module):
         """
         # Reconstruction loss (MSE)
         recon_loss = F.mse_loss(x_recon, x, reduction='mean')
+        # recon_loss = F.mse_loss(
+        #     x_recon, x, reduction='none'
+        # ).sum(dim=(-1, -2)).mean()
         # Regularization loss
         if self.prior == "gmm":
-            reg_loss = self.gmm_prior(logvar, mu, z)
+            self.reg_loss = self.gmm_prior(logvar, mu, z)
         elif self.prior == "standard":
-            reg_loss = self.standard_prior(logvar, mu)
+            self.reg_loss = self.standard_prior(logvar, mu)
         elif self.prior == "warm_gmm":
-            reg_loss = self.warm_gmm_prior(logvar, mu, z, epoch)
-        reg_loss = self.regularization_loss(reg_loss, epoch)
-        return recon_loss, reg_loss
+            self.reg_loss = self.warm_gmm_prior(logvar, mu, z, epoch)
+        return recon_loss
     
     def warm_gmm_prior(self, logvar: torch.Tensor, mu: torch.Tensor, z: torch.Tensor, epoch: int) -> torch.Tensor:
         if epoch < self.gmm_warmup_epochs:
@@ -345,64 +357,88 @@ class ConditionalVAE(nn.Module):
                 logvars[k] = var.log()
             else:
                 logvars[k] = torch.zeros(Z.size(-1), device=self.device, dtype=Z.dtype)
+                
+        # overwrite logvars with reasonable value
+        logvars = torch.full((self.num_states, Z.size(-1)), math.log(0.5**2), device=self.device, dtype=Z.dtype)
 
         self.train(was_training)
         return centroids, logvars, logits
     
-    
     def gmm_prior(self, logvar: torch.Tensor, mu: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
-        # Flatten batch and sequence dimensions: (B*S, L)
-        z = z.view(-1, self.latent_dim)
-        mu = mu.view(-1, self.latent_dim)
-        logvar = logvar.view(-1, self.latent_dim)
+        """
+        Monte Carlo KL(q(z|x) || p(z)) with GMM prior.
+        mu, logvar : (..., D)
+        """
         
-        # 1. log q(z|x) ~ log N(z | mu, exp(logvar))
-        # Constant term -0.5*L*log(2pi) cancels out in KL, but keeping for completeness
-        # Sum over latent dimension L
-        log_q_z_x = -0.5 * (math.log(2 * math.pi) + logvar + (z - mu).pow(2) / logvar.exp()).sum(dim=1)
-        
-        # 2. log p(z) ~ log sum_k pi_k N(z | mu_k, exp(logvar_k))
-        # Prior parameters
-        prior_means = self.prior_means       # (K, L)
-        prior_logvars = self.prior_logvars   # (K, L)
-        prior_logits = self.prior_logits     # (K,)
-        
-        # Expand z to (N, 1, L) and prior to (1, K, L) where N = B*S
-        z_ex = z.unsqueeze(1)
-        means_ex = prior_means.unsqueeze(0)
-        logvars_ex = prior_logvars.unsqueeze(0)
-        
-        # Calculate log component probabilities: (N, K)
-        log_prob_components = -0.5 * (
-            math.log(2 * math.pi) + 
-            logvars_ex + 
-            (z_ex - means_ex).pow(2) / logvars_ex.exp()
-        ).sum(dim=2)
-        
-        # Add mixture weights (log_softmax of logits)
-        log_mix_weights = F.log_softmax(prior_logits, dim=0).unsqueeze(0) # (1, K)
-        
-        # LogSumExp to get log p(z): (N,)
-        log_p_z = torch.logsumexp(log_prob_components + log_mix_weights, dim=1)
-        
-        # KL Divergence: E_q [ log q(z|x) - log p(z) ]
-        # kl = (log_q_z_x - log_p_z).mean() # TODO: Changed from below
-        
-        # return kl # TODO: Changed from below
-        
-        free_nats_per_dim = 0.02
-        free_nats_total = free_nats_per_dim * self.latent_dim
+        log_qzx = self.__log_normal_diag(z, mu, logvar) # (...,)
+        log_pz = self.__log_gmm_prior(z)                # (...,)
 
-        kl_per = (log_q_z_x - log_p_z)          # (N,)
-        kl_fb  = torch.clamp(kl_per, min=free_nats_total).mean()
-        return kl_fb
-        
+        kl = (log_qzx - log_pz)
+        free_nats_total = 0.5 * self.latent_dim
+        kl_fb = torch.clamp(kl, min=free_nats_total).mean()
+        return kl_fb * 0.1
     
+    def __log_normal_diag(self, z, mu, logvar):
+        """
+        z, mu, logvar: (..., D)
+        Returns log N(z | mu, diag(exp(logvar)))  => (...,)
+        """
+        D = z.size(-1)
+        const = D * math.log(2 * math.pi)
+        return -0.5 * (
+            const
+            + logvar.sum(dim=-1)
+            + ((z - mu) ** 2 / logvar.exp()).sum(dim=-1)
+        )
+    
+    def __log_gmm_prior(self, z):
+        """
+        z: (..., D)
+        prior_means: (K, D)
+        prior_logvars: (K, D)
+        prior_logits: (K,)
+        Returns log p(z) where p is GMM => (...,)
+        """
+        # Batch shape (could be (B,), (B, T), etc.), and latent dim
+        batch_shape = z.shape[:-1]      # e.g. (B, T)
+        D = z.shape[-1]                 # latent_dim
+        K = self.num_states
+
+        # Flatten batch dimensions so z_flat: (N, D)
+        N = z.numel() // D
+        z_flat = z.reshape(N, D)        # (N, D)
+
+        # Prior params: (K, D)
+        mu = self.prior_means.view(1, K, D)        # (1, K, D)
+        logvar = self.prior_logvars.view(1, K, D)  # (1, K, D)
+
+        # z -> (N, 1, D)
+        z_expand = z_flat.unsqueeze(1)             # (N, 1, D)
+
+        const = D * math.log(2 * math.pi)
+
+        # log N(z | mu_k, Sigma_k) for each component -> (N, K)
+        log_prob_per_comp = -0.5 * (
+            const
+            + logvar.sum(dim=-1)                                  # (1, K)
+            + ((z_expand - mu) ** 2 / logvar.exp()).sum(dim=-1)   # (N, K)
+        )
+
+        # mixture weights
+        log_pi = F.log_softmax(self.prior_logits, dim=0)  # (K,)
+        log_pi = log_pi.unsqueeze(0)                      # (1, K)
+
+        # log p(z) = logsum_k pi_k N(z | mu_k, Sigma_k)
+        log_pz_flat = torch.logsumexp(log_pi + log_prob_per_comp, dim=1)  # (N,)
+
+        # Reshape back to original batch shape (...,)
+        log_pz = log_pz_flat.view(batch_shape)
+        return log_pz
+
     def standard_prior(self, logvar: torch.Tensor, mu: torch.Tensor) -> torch.Tensor:
         kld = -0.5 * (1 + logvar - mu.pow(2) - logvar.exp())
-        free_nats_per_dim = 0.02
-        # kld_fb = torch.clamp(kld- free_nats_per_dim, min=0).sum(dim=-1).mean()
-        kld_fb = torch.clamp(kld, min=free_nats_per_dim).sum(dim=-1).mean()
+        free_nats_per_dim = 0.5
+        kld_fb = torch.clamp(kld - free_nats_per_dim, min=0.0).sum(dim=-1).mean()
         return kld_fb
     
     # Optional: helper for deterministic latent features (for HMM)
@@ -410,18 +446,13 @@ class ConditionalVAE(nn.Module):
         """
         Return deterministic latent representation (mu) for downstream HMM.
         """
-        mu, _ = self.encode(x, subject_ids)
+        mu, logvar = self.encode(x, subject_ids)
         return mu
     
-    def regularization_loss(self, reg_loss, epoch) -> torch.Tensor:
-        if self.max_beta == 0.0:
+    def regularization_loss(self, epoch) -> torch.Tensor:
+        if self.no_beta_epochs and epoch <= self.no_beta_epochs:
             return torch.tensor(0.0, device=self.device)
-        elif self.no_beta_epochs and epoch <= self.no_beta_epochs:
-            return torch.tensor(0.0, device=self.device)
-        elif epoch <= self.beta_warmup_epochs:
-            self.beta = min(self.max_beta, self.min_beta + (self.max_beta - self.min_beta) * epoch / (self.beta_warmup_epochs-self.no_beta_epochs)) if self.beta_warmup_epochs else self.max_beta
-        elif self.beta_slowdown_epochs and epoch > self.beta_warmup_epochs:
-            excess_epochs = epoch - self.beta_warmup_epochs
-            self.beta = max(self.min_beta, self.max_beta - (self.max_beta - self.min_beta) * excess_epochs / self.beta_slowdown_epochs)
-        reg = self.beta * reg_loss
+        self.beta = min(self.max_beta, self.min_beta + (self.max_beta - self.min_beta) * epoch / (self.beta_warmup_epochs-self.no_beta_epochs)) if self.beta_warmup_epochs else self.max_beta
+        reg = self.beta * self.reg_loss
         return reg
+        # return self.kld_loss * beta

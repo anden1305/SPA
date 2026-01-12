@@ -34,12 +34,6 @@ class ConditionalVAE(nn.Module):
         self.F = F
         self.num_states = num_states
         
-        # Convolutional config
-        self.conv_channels = params.get("conv_channels", None)
-        self.kernel_sizes = params.get("kernel_sizes", None)
-        self.strides      = params.get("strides", None)
-        self.paddings     = params.get("paddings", None)
-        
         # Latent dimensions
         self.latent_dim = params.get("latent_dim", None)
         self.enc_hidden_dims = params.get("enc_hidden_dims", None) # MLP hidden layers
@@ -51,7 +45,6 @@ class ConditionalVAE(nn.Module):
         self.max_beta = params.get("max_beta", None)
         self.beta = self.min_beta
         self.beta_warmup_epochs = params.get("beta_warmup_epochs", None)
-        self.beta_slowdown_epochs = params.get("beta_slowdown_epochs", None)
         self.no_beta_epochs = params.get("no_beta_epochs", None)
         
         # Prior
@@ -75,11 +68,11 @@ class ConditionalVAE(nn.Module):
         self._lens = [L]  # store lengths through encoder (for decoder)
         for i, (out_ch, k, s, p) in enumerate(zip(self.conv_channels, self.kernel_sizes, self.strides, self.paddings)):
             enc_layers.append(nn.Conv1d(in_ch, out_ch, kernel_size=k, stride=s, padding=p))
-            enc_layers.append(nn.LeakyReLU(0.2))
+            enc_layers.append(nn.ReLU())
             in_ch = out_ch
             L = self._conv1d_out_len(L, k, s, p)
             self._lens.append(L)
-        
+
         self.encoder_cnn = nn.Sequential(*enc_layers)
 
         # Flat dim via dummy pass (still fine)
@@ -91,9 +84,9 @@ class ConditionalVAE(nn.Module):
 
         # ----- Encoder MLP -----
         mlp = []
-        prev = self.flat_dim + self.emb_dim
+        prev = self.C * self.F + self.emb_dim
         for h in self.enc_hidden_dims:
-            mlp += [nn.Linear(prev, h), nn.LeakyReLU(0.2)]
+            mlp += [nn.Linear(prev, h), nn.ReLU()]
             prev = h
         self.encoder_mlp = nn.Sequential(*mlp)
 
@@ -104,45 +97,10 @@ class ConditionalVAE(nn.Module):
         mlp = []
         prev = self.latent_dim + self.emb_dim
         for h in self.dec_hidden_dims:
-            mlp += [nn.Linear(prev, h), nn.LeakyReLU(0.2)]
+            mlp += [nn.Linear(prev, h), nn.ReLU()]
             prev = h
-        mlp.append(nn.Linear(prev, self.flat_dim))
+        mlp.append(nn.Linear(prev, self.C * self.F))
         self.decoder_mlp = nn.Sequential(*mlp)
-        
-        
-        # ----- Decoder CNN (Transpose) -----
-        dec_layers = []
-        # reverse per-layer params
-        rev_channels = list(reversed(self.conv_channels))
-        rev_k = list(reversed(self.kernel_sizes))
-        rev_s = list(reversed(self.strides))
-        rev_p = list(reversed(self.paddings))
-        
-        # Start from last encoder output length
-        L_in = self._lens[-1]
-        in_ch = rev_channels[0]
-
-        for i in range(len(rev_channels)):
-            # target length is the length BEFORE the corresponding encoder conv
-            target_L = self._lens[-2 - i]  # lens: [L0, L1, ..., Ln]
-
-            k, s, p = rev_k[i], rev_s[i], rev_p[i]
-            base = (L_in - 1) * s - 2 * p + k
-            out_pad = target_L - base
-            if not (0 <= out_pad < s):
-                raise ValueError(
-                    f"Cannot match target length in deconv layer {i}: "
-                    f"target={target_L}, base={base}, stride={s} -> output_padding={out_pad}"
-                )
-
-            out_ch = self.C if i == len(rev_channels) - 1 else rev_channels[i + 1]
-            dec_layers.append(nn.ConvTranspose1d(in_ch, out_ch, kernel_size=k, stride=s, padding=p, output_padding=out_pad))
-            if not (i == len(rev_channels) - 1):
-                dec_layers.append(nn.LeakyReLU(0.2))
-            L_in = target_L
-            in_ch = out_ch
-        self.decoder_cnn = nn.Sequential(*dec_layers)
-        
         
         # GMM prior parameters (unchanged)
         if self.prior in ("gmm","warm_gmm"):
@@ -154,9 +112,6 @@ class ConditionalVAE(nn.Module):
 
     def reset(self):
         self.__initialize_weights()
-        
-    def _conv1d_out_len(self, L, k, s, p, d=1):
-        return (L + 2*p - d*(k-1) - 1) // s + 1
 
     # ---------- Core subroutines ----------
     
@@ -187,14 +142,10 @@ class ConditionalVAE(nn.Module):
         emb = self.get_subject_embedding(subject_ids)
         
         # Flatten batch and sequence for independent processing
-        x_flat = x.view(B * S, C, F) # (B*S, C, F)
-        
-        # CNN
-        h_conv = self.encoder_cnn(x_flat) # (B*S, last_ch, last_len)
-        h_flat = h_conv.view(B * S, -1)
+        x_flat = x.view(B * S, -1) # (B*S, C*F)
         
         # Add subject embedding
-        h_flat = torch.cat([h_flat, emb], dim=-1)
+        h_flat = torch.cat([x_flat, emb], dim=-1)
         
         # MLP
         h = self.encoder_mlp(h_flat)
@@ -232,14 +183,8 @@ class ConditionalVAE(nn.Module):
         # MLP
         h_flat = self.decoder_mlp(h_in)
         
-        # Reshape for CNN
-        h_conv_in = h_flat.view(B * S, *self.conv_out_shape)
-        
-        # CNN Transpose
-        x_recon_flat = self.decoder_cnn(h_conv_in)
-        
         # Reshape back
-        x_recon = x_recon_flat.view(B, S, self.C, self.F)
+        x_recon = h_flat.view(B, S, self.C, self.F)
         
         return x_recon
     
@@ -269,19 +214,22 @@ class ConditionalVAE(nn.Module):
         recon_loss = F.mse_loss(x_recon, x, reduction='mean')
         # Regularization loss
         if self.prior == "gmm":
-            reg_loss = self.gmm_prior(logvar, mu, z)
+            self.reg_loss = self.gmm_prior(logvar, mu, z)
         elif self.prior == "standard":
-            reg_loss = self.standard_prior(logvar, mu)
+            self.reg_loss = self.standard_prior(logvar, mu)
         elif self.prior == "warm_gmm":
-            reg_loss = self.warm_gmm_prior(logvar, mu, z, epoch)
-        reg_loss = self.regularization_loss(reg_loss, epoch)
-        return recon_loss, reg_loss
+            self.reg_loss = self.warm_gmm_prior(logvar, mu, z, epoch)
+        return recon_loss
     
     def warm_gmm_prior(self, logvar: torch.Tensor, mu: torch.Tensor, z: torch.Tensor, epoch: int) -> torch.Tensor:
         if epoch < self.gmm_warmup_epochs:
             return self.standard_prior(logvar, mu)
         elif not self.gmm_warmup_initialized:
             means, logvars, logits = self.__get_kmeans_centroids()
+            print(f"Initialized GMM prior with KMeans at epoch {epoch}")
+            print(f"  Means: {means}")
+            print(f"  Logvars: {logvars}")
+            print(f"  Logits: {logits}")
             with torch.no_grad():
                 self.prior_means.copy_(means)
                 self.prior_logvars.copy_(logvars)
@@ -386,23 +334,14 @@ class ConditionalVAE(nn.Module):
         log_p_z = torch.logsumexp(log_prob_components + log_mix_weights, dim=1)
         
         # KL Divergence: E_q [ log q(z|x) - log p(z) ]
-        # kl = (log_q_z_x - log_p_z).mean() # TODO: Changed from below
+        kl = (log_q_z_x - log_p_z).mean()
         
-        # return kl # TODO: Changed from below
-        
-        free_nats_per_dim = 0.02
-        free_nats_total = free_nats_per_dim * self.latent_dim
+        return kl
 
-        kl_per = (log_q_z_x - log_p_z)          # (N,)
-        kl_fb  = torch.clamp(kl_per, min=free_nats_total).mean()
-        return kl_fb
-        
-    
     def standard_prior(self, logvar: torch.Tensor, mu: torch.Tensor) -> torch.Tensor:
         kld = -0.5 * (1 + logvar - mu.pow(2) - logvar.exp())
-        free_nats_per_dim = 0.02
-        # kld_fb = torch.clamp(kld- free_nats_per_dim, min=0).sum(dim=-1).mean()
-        kld_fb = torch.clamp(kld, min=free_nats_per_dim).sum(dim=-1).mean()
+        free_nats_per_dim = 0.5
+        kld_fb = torch.clamp(kld - free_nats_per_dim, min=0.0).sum(dim=-1).mean()
         return kld_fb
     
     # Optional: helper for deterministic latent features (for HMM)
@@ -413,15 +352,9 @@ class ConditionalVAE(nn.Module):
         mu, _ = self.encode(x, subject_ids)
         return mu
     
-    def regularization_loss(self, reg_loss, epoch) -> torch.Tensor:
-        if self.max_beta == 0.0:
+    def regularization_loss(self, epoch) -> torch.Tensor:
+        if self.no_beta_epochs and epoch <= self.no_beta_epochs:
             return torch.tensor(0.0, device=self.device)
-        elif self.no_beta_epochs and epoch <= self.no_beta_epochs:
-            return torch.tensor(0.0, device=self.device)
-        elif epoch <= self.beta_warmup_epochs:
-            self.beta = min(self.max_beta, self.min_beta + (self.max_beta - self.min_beta) * epoch / (self.beta_warmup_epochs-self.no_beta_epochs)) if self.beta_warmup_epochs else self.max_beta
-        elif self.beta_slowdown_epochs and epoch > self.beta_warmup_epochs:
-            excess_epochs = epoch - self.beta_warmup_epochs
-            self.beta = max(self.min_beta, self.max_beta - (self.max_beta - self.min_beta) * excess_epochs / self.beta_slowdown_epochs)
-        reg = self.beta * reg_loss
+        self.beta = min(self.max_beta, self.min_beta + (self.max_beta - self.min_beta) * epoch / (self.beta_warmup_epochs-self.no_beta_epochs)) if self.beta_warmup_epochs else self.max_beta
+        reg = self.beta * self.reg_loss
         return reg
