@@ -1,3 +1,4 @@
+from src.models.cvae_mar_hmm import CVAEMARHMM
 from src.data.data_loader_collection import DataLoaderCollection
 from src.models.base_model import BaseModel
 from src.validation.validator import Validator
@@ -86,7 +87,10 @@ class Trainer:
             self.losses[epoch] = sum(self.epoch_losses) / len(self.epoch_losses)
             self.regularization_losses[epoch] = sum(self.epoch_regularization_losses) / len(self.epoch_regularization_losses)
             if self.config.validate_per_epoch > 0 and (epoch + 1) % self.config.validate_per_epoch == 0:
-                self.validator.validate_epoch(epoch, self.optimizer)
+                if isinstance(self.model, CVAEMARHMM) and self.model.training_pipeline == 'cvae':
+                    self.validator.validate_cvae_epoch(epoch)
+                else:
+                    self.validator.validate_epoch(epoch, self.optimizer)
             lr = self.optimizer.param_groups[0].get('lr')
             val = self.validator.validations.get(epoch, {})
             logger.log_epoch(

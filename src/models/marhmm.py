@@ -27,10 +27,12 @@ class MARHMM(BaseModel):
 			 	 data_loader: DataLoaderCollection,
 				 config: GlobalConfig,
 				 device: torch.device,
-     			 overwrite_obs_dim: int = None) -> None:
+     			 overwrite_obs_dim: int = None,
+         		 get_latent_features = None) -> None:
 		super().__init__(data_loader, config, device)
 		if overwrite_obs_dim is not None:
 			self.num_features = overwrite_obs_dim
+		self.get_latent_features = get_latent_features
 		self.__initialize_parameters()
 		self.__initialize_weights()
 		self.to(self.device)
@@ -345,9 +347,16 @@ class MARHMM(BaseModel):
 			init_noisy = True
 
 		data = None
+		print(f"Initializing MARHMM with strategy: {strategy}, init_noisy: {init_noisy}")
 		if strategy in {"kmeans", "kmeans_pca"}:
-			data, _ = self.data_loader.get_all_data()
-			data = self.__validate_input(data)
+			if self.get_latent_features is not None:
+				x, y, sub_ids = self.data_loader.get_all_data()
+				data = self.get_latent_features(x, sub_ids)
+				data = data.reshape(-1, data.shape[-1])
+				data = self.__validate_input(data)
+			else:
+				data, _, _ = self.data_loader.get_all_data()
+				data = self.__validate_input(data)
 
 		if strategy == "random_uniform":
 			init_random_uniform(self, coeff_std=coeff_std, jitter_std=jitter_std, var_init=var_init)

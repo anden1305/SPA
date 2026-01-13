@@ -76,7 +76,20 @@ class DatasetConfig(BaseModel):
     run: int | None = Field(default=None, ge=1)
     remove_artifact: bool = Field(False, description="Whether to remove artifacts from the dataset.")
     # No hardcoded constants - dataset selection is fully configurable
-
+    
+class CVAE(BaseModel):
+    normalize_global: bool = Field(..., description="Whether to normalize globally.")
+    pre_normalize: bool = Field(..., description="Whether to apply pre-normalization.")
+    post_normalize: bool = Field(..., description="Whether to apply post-normalization.")
+    percentile_clip_channels: bool = Field(..., description="Whether to apply percentile clipping to channels.")
+    perform_hanning_window: bool = Field(..., description="Whether to apply a Hanning window.")
+    band_pass_filter_fft: bool = Field(..., description="Whether to apply band-pass filtering in the FFT domain.")
+    band_pass_freqs: list[list] | None = Field(default=None, description="List of [low, high] frequency pairs for band-pass filtering per channel.")
+    band_pass_filter_type: str | None = Field(default=None, pattern="^(frequency_domain|time_domain)$", description="Type of band-pass filter to apply.")
+    traning_pipeline: str = Field(..., pattern="^(cvae|marhmm|cvae_then_marhmm)$", description="Training pipeline to use.")
+    model_checkpoint_path: str | None = Field(default=None, description="Path to a pre-trained CVAE model checkpoint.")
+    reinit_marhmm: bool = Field(..., description="Whether to reinitialize MAR-HMM after CVAE training.")
+    
 class ModelConfig(BaseModel):
     type: str = Field(..., pattern="^(hmm|marhmm|cvae_marhmm)$", description="Type of model, e.g., 'hmm'.")
     covariance_type: str = Field(..., pattern="^(diag|full)$", description="Covariance structure: 'diag' (diagonal), 'full' (Cholesky-factorized with softplus).")
@@ -142,6 +155,7 @@ class GlobalConfig(BaseModel):
     runs: int = Field(..., ge=1, description="Number of runs to execute.")
     validate_data: bool = Field(..., description="Whether to perform data validation before training.")
     wandb: WandbConfig | None = Field(default_factory=WandbConfig, description="Weights & Biases settings.")
+    cvae: CVAE = Field(default_factory=CVAE)
     # No hardcoded constants at global level - all experiment settings are configurable
 
     @classmethod

@@ -1,7 +1,7 @@
 
 import numpy as np
 from scipy import signal
-from src.config.config import TransformsConfig
+from src.config.config import GlobalConfig, TransformsConfig
 from src.preprocessing.helpers.base_transform import BaseTransform
 from scipy.signal import butter, sosfiltfilt
 
@@ -25,7 +25,7 @@ class VAEPreprocessing(BaseTransform):
     _BANDPASS_ORDER = 4
     
     def __init__(self, 
-                 config: TransformsConfig, 
+                 config: GlobalConfig, 
                  window_size: int, 
                  stride: int, 
                  sequence_length: int,
@@ -38,6 +38,11 @@ class VAEPreprocessing(BaseTransform):
         self.sampling_rate: int = sampling_rate
         # self._bandpass_sos = self.__build_bandpass_sos()
         super().__init__(config, stage="postprocessing")
+        self.global_config: GlobalConfig = config
+        if self.global_config.cvae.band_pass_freqs is not None:
+            self._BANDPASS_HZ = {c: tuple(freqs) for c, freqs in enumerate(self.global_config.cvae.band_pass_freqs)}
+        if self.global_config.cvae.band_pass_filter_type == "time_domain":
+            self._bandpass_sos = self.__build_bandpass_sos()
     
     def validate_config(self, _: TransformsConfig):
         assert type(self.window_size) == int and self.window_size > 0, "window_size must be a positive integer."
@@ -135,7 +140,7 @@ class VAEPreprocessing(BaseTransform):
         if TYPE == "pre-norm":
             mean = np.mean(x, axis=(1), keepdims=True)
             std = np.std(x, axis=(1), keepdims=True) +  1e-8
-        if TYPE == "raw":
+        elif TYPE == "raw":
             mean = np.mean(x, axis=(0,1,3), keepdims=True)
             std = np.std(x, axis=(0,1,3), keepdims=True) + 1e-8
             # return x
@@ -214,35 +219,56 @@ class VAEPreprocessing(BaseTransform):
     def band_pass_filter_fft(self, x: np.ndarray) -> np.ndarray:
         for c in range(x.shape[1]):
             low, high = self._BANDPASS_HZ.get(c, (None, None))
-            if low is not None and high is not None:
+            if low is not None:
                 low_fft = int(np.floor(low * self.window_size / self.sampling_rate))
-                high_fft = int(np.ceil(high * self.window_size / self.sampling_rate))
                 x[:, c, :low_fft] = 0
+            if high is not None:
+                high_fft = int(np.ceil(high * self.window_size / self.sampling_rate))
                 x[:, c, high_fft:] = 0
         return x
             
     
+    # def __call__(self, x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    #     TYPE = "fft"
+    #     x = self.percentile_clip_channels(x)
+    #     # x = self.__bandpass_filter_continuous(x)
+    #     if TYPE == "fft":
+    #         if self.normalize:
+    #             x = self.__normalize(x, TYPE="pre-norm")
+    #         x, y = self.__reshape_input(x, y)
+    #         # x = self.__perform_hanning_window(x=x)
+    #         x = self.__perform_fft(x=x)
+    #         x = self.band_pass_filter_fft(x)
+    #         x = self.__complex_to_real_features(x)
+    #     elif TYPE == "stft":
+    #         x = self.__perform_stft(x=x)
+    #         x = self.__complex_to_real_features(x)
+    #     elif TYPE == "raw":
+    #         x, y = self.__reshape_input(x, y)
+    #     y = self.__downsample_by_majority_voting(y_windows=y)
+    #     x, y = self.__apply_sequence_length(x, y)
+    #     if self.normalize:
+    #         x = self.__normalize(x, TYPE=TYPE)
+    #     return x, y
+    
     def __call__(self, x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        TYPE = "fft"
-        x = self.percentile_clip_channels(x)
-        # x = self.__bandpass_filter_continuous(x)
-        if TYPE == "fft":
-            if self.normalize:
-                x = self.__normalize(x, TYPE="pre-norm")
-            x, y = self.__reshape_input(x, y)
-            # x = self.__perform_hanning_window(x=x)
-            x = self.__perform_fft(x=x)
+        if self.global_config.cvae.percentile_clip_channels:
+            x = self.percentile_clip_channels(x)
+        if self.global_config.cvae.band_pass_filter_fft and self.global_config.cvae.band_pass_filter_type == "time_domain":
+            x = self.__bandpass_filter_continuous(x)
+        if self.global_config.cvae.pre_normalize:
+            x = self.__normalize(x, TYPE="pre-norm")
+        x, y = self.__reshape_input(x, y)
+        if self.global_config.cvae.perform_hanning_window:
+            x = self.__perform_hanning_window(x=x)
+        x = self.__perform_fft(x=x)
+        if self.global_config.cvae.band_pass_filter_fft and self.global_config.cvae.band_pass_filter_type == "frequency_domain":
             x = self.band_pass_filter_fft(x)
-            x = self.__complex_to_real_features(x)
-        elif TYPE == "stft":
-            x = self.__perform_stft(x=x)
-            x = self.__complex_to_real_features(x)
-        elif TYPE == "raw":
-            x, y = self.__reshape_input(x, y)
+        x = self.__complex_to_real_features(x)
         y = self.__downsample_by_majority_voting(y_windows=y)
         x, y = self.__apply_sequence_length(x, y)
-        if self.normalize:
-            x = self.__normalize(x, TYPE=TYPE)
+        if self.global_config.cvae.post_normalize:
+            x = self.__normalize(x, TYPE="fft")
         return x, y
     
     def get_short_name(self):

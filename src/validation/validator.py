@@ -107,6 +107,8 @@ class Validator:
             acc_str = f"{acc_val:.4f}" if isinstance(acc_val, (int, float)) else str(acc_val)
             print(f"Epoch {epoch + 1} - NMI: {nmi_str}, Accuracy: {acc_str}")
     
+    
+    
     def validate_runs(self, train_details: list[TrainDetails]):
         validations = {}
         if self.config.nmi:
@@ -155,8 +157,37 @@ class Validator:
         self.data_validations.update(compute_feature_statistics(x_latent, y, self.data_loader, True))
         distinctness = compute_state_distinctness(x_latent, y)
         self.data_validations.update(distinctness)
-
+    
+    def validate_cvae_epoch(self, epoch: int):
+        self.validations[epoch] = {}
+        assert type(self.model) == CVAEMARHMM, "Model must be of type CVAEMARHMM to validate CVAE latent representations."
+        x, y, sub_ids = self.data_loader.get_all_data()
+        self.model.prepare_for_inference()
+        with torch.no_grad():
+            x_latent = self.model.get_latent_representation(x, sub_ids)
+            x_latent = x_latent.reshape(-1, x_latent.shape[-1])
+        n_clusters = len(torch.unique(y))
+        nmi = self.__calculate_kmeans_nmi(x_latent, y, n_clusters)
+        self.validations[epoch]['cvae_latent_kmeans_nmi'] = nmi
+        print(f"CVAE Latent KMeans NMI: {nmi:.4f}")
+        self.model.prepare_for_training()
+    
     ####### HELPER METHODS #######
+    
+    def __calculate_kmeans_nmi(self, x_latent: torch.Tensor, labels: torch.Tensor, n_clusters: int):
+        """Calculate KMeans clustering nmi on latent representations."""
+        from sklearn.cluster import KMeans
+        from sklearn.metrics import silhouette_score
+        try:
+            x_np = x_latent.detach().cpu().numpy()
+        except AttributeError:
+            x_np = np.asarray(x_latent)
+        kmeans = KMeans(n_clusters=n_clusters, n_init=10, random_state=42)
+        cluster_labels = kmeans.fit_predict(x_np)
+        # compute nmi
+        nmi = calculate_nmi(cluster_labels, labels.detach().cpu().numpy().flatten())
+        return nmi
+        
 
     def __calculate_cross_nmi(self, train_details: list[TrainDetails]):
         cross_nmis: dict[int, float] = {}

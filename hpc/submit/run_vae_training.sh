@@ -13,4 +13,4 @@
 module load cuda/12.8.1
 source .venv/bin/activate
 mkdir -p output
-python3 main.py -m train_vae -c src/config/run/cvaemarhmm/tests/cvae_hpc_low_lr_gmm_prior_16_dim.yaml
+python3 main.py -m train_vae -c src/config/run/cvaemarhmm/final/cvae_final_hmm.yaml

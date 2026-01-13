@@ -137,30 +137,37 @@ class Orchestrator:
     
     def train_cvae(self):
         # CVAE training
-        # self.validate_vae_data()
-        # self.validate_vae_data_magnitude()
-        self.model.load_state_dict(torch.load("results/training/cvaemarhmm/cvae_low_lr_few_epochs_gmm_prior_2 [20260112-092434]/cvae_final_model.pth"))
-        # self.model.training_pipeline = 'cvae'
-        # self.trainer.train()
-        # self.validator.validate_cvae()
-        # try:
-        #     train_details = self.__collect_training_details()
-        # except Exception as e:
-        #     print(f"Error collecting training details: {e}")
-        #     train_details = None
-        # self.visualizer.visualize_cvae(model=self.model, train_details=train_details)
-        # torch.save(self.model.state_dict(), f"{self.global_config.results_dir}/{self.global_config.run_name}/cvae_final_model.pth")
-        # # MAR-HMM training
-        self.model.training_pipeline = 'marhmm'
-        self.global_config.trainer.epochs = 100
-        self.global_config.trainer.validate_per_epoch = 10
-        self.global_config.trainer.learning_rate = 0.00005
-        self.global_config.dataloader.num_batches = 2048
-        self.global_config.dataloader.sequence_length = 32
-        self.__prepare_run(ignore_model=True)
-        self.trainer.train()
-        train_details = self.__collect_training_details()
-        self.visualizer.visualize(train_details=train_details)
+        if self.global_config.cvae.model_checkpoint_path is not None:
+            print(f"Loading CVAE model from checkpoint: {self.global_config.cvae.model_checkpoint_path}")
+            self.model.load_state_dict(torch.load(self.global_config.cvae.model_checkpoint_path))
+        
+        
+        if self.global_config.cvae.traning_pipeline in ['cvae_then_marhmm', 'cvae']:
+            self.model.training_pipeline = 'cvae'
+            self.trainer.train()
+            self.validator.validate_cvae()
+            try:
+                train_details = self.__collect_training_details()
+            except Exception as e:
+                print(f"Error collecting training details: {e}")
+                train_details = None
+            self.visualizer.visualize_cvae(model=self.model, train_details=train_details)
+            torch.save(self.model.state_dict(), f"{self.global_config.results_dir}/{self.global_config.run_name}/cvae_final_model.pth")
+        
+        if self.global_config.cvae.traning_pipeline in ['marhmm', 'cvae_then_marhmm']:
+            self.model.training_pipeline = 'marhmm'
+            self.global_config.trainer.epochs = 10
+            self.global_config.trainer.validate_per_epoch = 10
+            self.global_config.trainer.learning_rate = 0.00005
+            self.global_config.dataloader.num_batches = 2048
+            self.global_config.dataloader.sequence_length = 32
+            if self.global_config.cvae.reinit_marhmm:
+                self.model.reinitialize_marhmm()
+            self.__prepare_run(ignore_model=True)
+            self.trainer.train()
+            train_details = self.__collect_training_details()
+            self.visualizer.visualize(train_details=train_details)
+            torch.save(self.model.state_dict(), f"{self.global_config.results_dir}/{self.global_config.run_name}/cvaehmm_final_model.pth")
     
     ### private methods ###
     

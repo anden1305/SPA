@@ -1,9 +1,9 @@
 trainer:
-  epochs: 150
+  epochs: 50
   learning_rate: 0.0003
   optimizer: adam
   grad_clip: 0.5
-  validate_per_epoch: 10000
+  validate_per_epoch: 1
   early_stopping:
     enabled: false
     patience: 100
@@ -44,150 +44,149 @@ train_datasets:
   - type: mssv
     id: sub-038
     run: 1
-    remove_artifact: True
+    remove_artifact: False
   - type: mssv
     id: sub-038
     run: 2
-    remove_artifact: True
+    remove_artifact: False
   - type: mssv
     id: sub-039
     run: 1
-    remove_artifact: True
+    remove_artifact: False
   - type: mssv
     id: sub-039
     run: 2
-    remove_artifact: True
+    remove_artifact: False
   - type: mssv
     id: sub-039
     run: 3
-    remove_artifact: True
+    remove_artifact: False
   - type: mssv
     id: sub-041
     run: 1
-    remove_artifact: True
+    remove_artifact: False
   - type: mssv
     id: sub-041
     run: 2
-    remove_artifact: True
+    remove_artifact: False
   - type: mssv
     id: sub-041
     run: 3
-    remove_artifact: True
+    remove_artifact: False
   - type: mssv
     id: sub-043
     run: 1
-    remove_artifact: True
+    remove_artifact: False
   - type: mssv
     id: sub-048
     run: 1
-    remove_artifact: True
+    remove_artifact: False
   - type: mssv
     id: sub-048
     run: 2
-    remove_artifact: True
+    remove_artifact: False
   - type: mssv
     id: sub-048
     run: 3
-    remove_artifact: True
+    remove_artifact: False
   - type: mssv
     id: sub-054
     run: 1
-    remove_artifact: True
+    remove_artifact: False
   - type: mssv
     id: sub-054
     run: 2
-    remove_artifact: True
+    remove_artifact: False
   - type: mssv
     id: sub-056
     run: 1
-    remove_artifact: True
+    remove_artifact: False
   - type: mssv
     id: sub-059
     run: 1
-    remove_artifact: True
+    remove_artifact: False
   - type: mssv
     id: sub-060
     run: 1
-    remove_artifact: True
+    remove_artifact: False
   - type: mssv
     id: sub-069
     run: 1
-    remove_artifact: True
+    remove_artifact: False
 
 val_datasets:
   - type: mssv
     id: sub-038
     run: 1
-    remove_artifact: True
+    remove_artifact: False
   - type: mssv
     id: sub-038
     run: 2
-    remove_artifact: True
+    remove_artifact: False
   - type: mssv
     id: sub-039
     run: 1
-    remove_artifact: True
+    remove_artifact: False
   - type: mssv
     id: sub-039
     run: 2
-    remove_artifact: True
+    remove_artifact: False
   - type: mssv
     id: sub-039
     run: 3
-    remove_artifact: True
+    remove_artifact: False
   - type: mssv
     id: sub-041
     run: 1
-    remove_artifact: True
+    remove_artifact: False
   - type: mssv
     id: sub-041
     run: 2
-    remove_artifact: True
+    remove_artifact: False
   - type: mssv
     id: sub-041
     run: 3
-    remove_artifact: True
+    remove_artifact: False
   - type: mssv
     id: sub-043
     run: 1
-    remove_artifact: True
+    remove_artifact: False
   - type: mssv
     id: sub-048
     run: 1
-    remove_artifact: True
+    remove_artifact: False
   - type: mssv
     id: sub-048
     run: 2
-    remove_artifact: True
+    remove_artifact: False
   - type: mssv
     id: sub-048
     run: 3
-    remove_artifact: True
+    remove_artifact: False
   - type: mssv
     id: sub-054
     run: 1
-    remove_artifact: True
+    remove_artifact: False
   - type: mssv
     id: sub-054
     run: 2
-    remove_artifact: True
+    remove_artifact: False
   - type: mssv
     id: sub-056
     run: 1
-    remove_artifact: True
+    remove_artifact: False
   - type: mssv
     id: sub-059
     run: 1
-    remove_artifact: True
+    remove_artifact: False
   - type: mssv
     id: sub-060
     run: 1
-    remove_artifact: True
+    remove_artifact: False
   - type: mssv
     id: sub-069
     run: 1
-    remove_artifact: True
-
+    remove_artifact: False
 
 model:
   type: cvae_marhmm
@@ -206,35 +205,41 @@ model:
     
     # CVAE parameters
     # weights
-    # latent_dim: 16
-    # enc_hidden_dims: [256, 128]
-    # dec_hidden_dims: [64]
-    # conv_channels: [32, 64]
-    # kernel_sizes:  [5, 3]
-    # strides:       [2, 2]
-    # paddings:      [2, 1]
-    # emb_dim: 4
     latent_dim: 8
-    enc_hidden_dims: [256]
-    dec_hidden_dims: [256]
+    enc_hidden_dims: [256, 128]
+    dec_hidden_dims: [128, 256]
     conv_channels: [32, 64, 128, 128]
     kernel_sizes:  [7, 5, 5, 3]
     strides:       [2, 2, 2, 2]
     paddings:      [3, 2, 2, 1]
-    emb_dim: 8
+    emb_dim: 4
     use_rms: False
     # prior
-    prior: warm_gmm
-    min_beta: 0.0001
-    max_beta: 0.1
-    beta_warmup_epochs: 50
+    prior: gmm
+    min_beta: 0.01
+    max_beta: 1.0
+    beta_warmup_epochs: 0
     beta_slowdown_epochs: 0
-    gmm_warmup_epochs: 50
-    no_beta_epochs: 50
+    gmm_warmup_epochs: 0
+    free_nats_per_dim: 0.00
+    no_beta_epochs: 10
+    num_gmm_states: 4
+
+cvae:
+  normalize_global: False # FIXED
+  pre_normalize: False # FIXED
+  post_normalize: True # FIXED
+  percentile_clip_channels: False # FIXED
+  perform_hanning_window: False # FIXED
+  band_pass_filter_fft: True # FIXED
+  band_pass_freqs: [[null, 20.0], [null, 20.0], [5.0, 60.0]] # FIXED
+  band_pass_filter_type: frequency_domain # FIXED
+  traning_pipeline: cvae_then_marhmm
+  model_checkpoint_path: null
 
 verbose: True
 seed: 123
-results_dir: results/training/cvaemarhmm
-run_name: cvae_working_1
+results_dir: results/training/cvae
+run_name: cvae_exp_1
 runs: 1
 validate_data: True

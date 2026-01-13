@@ -58,6 +58,8 @@ class ConditionalVAE(nn.Module):
         self.prior = params.get("prior", "warm_gmm") # "standard", "gmm" or "warm_gmm"
         self.gmm_warmup_epochs = params.get("gmm_warmup_epochs", 50) # only for "warm_gmm"
         self.gmm_warmup_initialized = False
+        self.free_nats_per_dim = params.get("free_nats_per_dim", 0.02)
+        self.num_gmm_states = params.get("num_gmm_states", self.num_states)
         
         # Set torch random seed for reproducibility
         seed = self.global_config.seed
@@ -146,9 +148,9 @@ class ConditionalVAE(nn.Module):
         
         # GMM prior parameters (unchanged)
         if self.prior in ("gmm","warm_gmm"):
-            self.prior_logits = nn.Parameter(torch.zeros(self.num_states, device=self.device))
-            self.prior_means = nn.Parameter(torch.randn(self.num_states, self.latent_dim))
-            self.prior_logvars = nn.Parameter(torch.zeros(self.num_states, self.latent_dim, device=self.device))
+            self.prior_logits = nn.Parameter(torch.zeros(self.num_gmm_states, device=self.device))
+            self.prior_means = nn.Parameter(torch.randn(self.num_gmm_states, self.latent_dim))
+            self.prior_logvars = nn.Parameter(torch.zeros(self.num_gmm_states, self.latent_dim, device=self.device))
 
         self.to(self.device)
 
@@ -316,7 +318,7 @@ class ConditionalVAE(nn.Module):
         # Run sklearn KMeans on CPU numpy
         Z_np = Z.detach().cpu().numpy()
         km = KMeans(
-            n_clusters=self.num_states,
+            n_clusters=self.num_gmm_states,
             n_init="auto",
             random_state=self.global_config.seed,
         )
@@ -327,17 +329,17 @@ class ConditionalVAE(nn.Module):
         centroids = torch.tensor(centroids_np, device=self.device, dtype=Z.dtype)
 
         # Mixture weights -> logits
-        counts = np.bincount(labels, minlength=self.num_states).astype(np.float64)
+        counts = np.bincount(labels, minlength=self.num_gmm_states).astype(np.float64)
         probs = counts / (counts.sum() + 1e-12)
         logits = torch.tensor(np.log(probs + 1e-12), device=self.device, dtype=Z.dtype)
         
         # Per-cluster diagonal variances -> logvars
-        logvars = torch.zeros(self.num_states, Z.size(-1), device=self.device, dtype=Z.dtype)
+        logvars = torch.zeros(self.num_gmm_states, Z.size(-1), device=self.device, dtype=Z.dtype)
         labels_t = torch.tensor(labels, device=self.device)
         
         var_floor = 1e-2
 
-        for k in range(self.num_states):
+        for k in range(self.num_gmm_states):
             mask = labels_t == k
             if mask.any():
                 diff = Z[mask] - centroids[k]
@@ -390,17 +392,16 @@ class ConditionalVAE(nn.Module):
         
         # return kl # TODO: Changed from below
         
-        free_nats_per_dim = 0.02
+        free_nats_per_dim = self.free_nats_per_dim
         free_nats_total = free_nats_per_dim * self.latent_dim
 
         kl_per = (log_q_z_x - log_p_z)          # (N,)
         kl_fb  = torch.clamp(kl_per, min=free_nats_total).mean()
         return kl_fb
-        
     
     def standard_prior(self, logvar: torch.Tensor, mu: torch.Tensor) -> torch.Tensor:
         kld = -0.5 * (1 + logvar - mu.pow(2) - logvar.exp())
-        free_nats_per_dim = 0.02
+        free_nats_per_dim = self.free_nats_per_dim
         # kld_fb = torch.clamp(kld- free_nats_per_dim, min=0).sum(dim=-1).mean()
         kld_fb = torch.clamp(kld, min=free_nats_per_dim).sum(dim=-1).mean()
         return kld_fb

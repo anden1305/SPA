@@ -55,6 +55,12 @@ class DataLoaderCollection:
         y_all = np.concatenate(y, axis=0)
         sub_ids_all = np.concatenate(sub_ids, axis=0)
         
+        # normalize
+        if self.global_config.cvae.normalize_global:
+            mean = np.mean(x_all, axis=(0,1), keepdims=True)
+            std = np.std(x_all, axis=(0,1), keepdims=True) + 1e-8
+            x_all = (x_all - mean) / std
+        
         # save as torch
         x_all = torch.from_numpy(x_all)
         y_all = torch.from_numpy(y_all)
@@ -79,12 +85,14 @@ class DataLoaderCollection:
     
     def __validate_data(self):
         num_states = set([ds.get_num_states() for ds in self.datasets])
-        assert len(num_states) == 1, "All datasets must have the same number of states."
-        self.num_states = num_states.pop()
+        # assert len(num_states) == 1, "All datasets must have the same number of states."
+        # self.num_states = num_states.pop()
+        self.num_states = max(num_states)
         feature_dims = set([dl.get_feature_dim() for dl in self.data_loaders])
         assert len(feature_dims) == 1, "All data loaders must have the same feature dimension."
         self.feature_dim = feature_dims.pop()
         self.state_names = self.datasets[0].get_state_names()
+        assert len(self.state_names) == self.num_states, "Number of state names must match number of states."
      
     def get_transforms(self) -> list[BaseTransform]:
         return self.data_loaders[0].transforms

@@ -16,6 +16,9 @@ class CVAEMARHMM(BaseModel):
         super().__init__(data_loader, config, device)
         assert training_pipeline in ['end_to_end', 'marhmm', 'cvae'], "training must be 'end_to_end', 'marhmm' or 'cvae'"
         self.training_pipeline = training_pipeline
+        self.data_loader = data_loader
+        self.config = config
+        self.device = device
         self.cvae = ConditionalVAE(
             data_loader=data_loader,
             config=config,
@@ -25,7 +28,8 @@ class CVAEMARHMM(BaseModel):
             data_loader=data_loader,
             config=config,
             device=device,
-            overwrite_obs_dim=self.cvae.latent_dim
+            overwrite_obs_dim=self.cvae.latent_dim,
+            get_latent_features=self.get_latent_representation
         )
         self.to(self.device)
     
@@ -62,6 +66,16 @@ class CVAEMARHMM(BaseModel):
         mu = self.cvae.encode_to_latent(x, subject_ids)
         out = self.marhmm.predict(mu)
         return out
+    
+    def reinitialize_marhmm(self):
+        self.marhmm = MARHMM(
+            data_loader=self.data_loader,
+            config=self.config,
+            device=self.device,
+            overwrite_obs_dim=self.cvae.latent_dim,
+            get_latent_features=self.get_latent_representation
+        )
+        self.to(self.device)
         
     def reset(self):
         self.marhmm.reset()

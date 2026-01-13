@@ -1,5 +1,5 @@
 trainer:
-  epochs: 150
+  epochs: 100
   learning_rate: 0.0003
   optimizer: adam
   grad_clip: 0.5
@@ -224,17 +224,17 @@ model:
     emb_dim: 8
     use_rms: False
     # prior
-    prior: warm_gmm
+    prior: gmm
     min_beta: 0.0001
     max_beta: 0.1
     beta_warmup_epochs: 50
     beta_slowdown_epochs: 0
-    gmm_warmup_epochs: 50
+    gmm_warmup_epochs: 0
     no_beta_epochs: 50
 
 verbose: True
 seed: 123
-results_dir: results/training/cvaemarhmm
-run_name: cvae_working_1
+results_dir: results/training/cvae
+run_name: cvae_testing_2
 runs: 1
 validate_data: True
