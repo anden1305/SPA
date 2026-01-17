@@ -156,14 +156,20 @@ class Orchestrator:
         
         if self.global_config.cvae.traning_pipeline in ['marhmm', 'cvae_then_marhmm']:
             self.model.training_pipeline = 'marhmm'
-            self.global_config.trainer.epochs = 10
-            self.global_config.trainer.validate_per_epoch = 10
-            self.global_config.trainer.learning_rate = 0.00005
-            self.global_config.dataloader.num_batches = 2048
-            self.global_config.dataloader.sequence_length = 32
+            # self.global_config.trainer.epochs = 10000
+            # # self.global_config.trainer.validate_per_epoch = 1
+            # self.global_config.trainer.learning_rate = 0.003 # 1e-7
+            # self.global_config.dataloader.num_batches = 128 # 128
+            # self.global_config.dataloader.batch_size = 128 # 16
+            # self.global_config.dataloader.validation_batch_size = 128 # 2048 # 128
+            # self.global_config.dataloader.sequence_length = 128 # 2048 # 128
+            self.__prepare_run(ignore_model=True)
+            self.model.data_loader = self.train_loader
             if self.global_config.cvae.reinit_marhmm:
                 self.model.reinitialize_marhmm()
-            self.__prepare_run(ignore_model=True)
+                self.validator = Validator(data_loader=self.val_loader, model=self.model, config=self.global_config)
+                self.trainer = Trainer(data_loader=self.train_loader, model=self.model, config=self.global_config, validator=self.validator)
+                self.visualizer = Visualizer(data_loader=self.val_loader, config=self.global_config, model=self.model, validator=self.validator)
             self.trainer.train()
             train_details = self.__collect_training_details()
             self.visualizer.visualize(train_details=train_details)
