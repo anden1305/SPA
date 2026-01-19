@@ -54,6 +54,7 @@ def _apply_wandb_config(base_cfg: GlobalConfig, wb_cfg: Dict[str, Any]) -> Globa
         "model.init_strategy": str,
         "model.init_noisy": bool,
         "model.covariance_type": str,
+        "model.n_states": int,
     }
 
     # Work on a full dict snapshot to preserve all required fields

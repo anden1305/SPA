@@ -29,7 +29,11 @@ class BaseModel(nn.Module, ABC):
         super().__init__()
     
     def __extract_model_parameters(self):
-        self.num_states = self.data_loader.get_num_states()
+        # Use configured n_states if provided, otherwise infer from data
+        if self.config.n_states is not None:
+            self.num_states = self.config.n_states
+        else:
+            self.num_states = self.data_loader.get_num_states()
         self.num_features = self.data_loader.get_feature_dim()
 
     ### TRAINING ###
