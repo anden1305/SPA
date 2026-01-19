@@ -72,6 +72,12 @@ class Visualizer:
             self.__plot_historic_values(train_details)
         if self.config.learning_rate:
             self.__plot_learning_rate(train_details)
+        
+        # Create generalization/validation performance plot for single runs
+        try:
+            self.__plot_validation_performance_single(train_details, path)
+        except Exception as e:
+            print(f"Warning: Failed to create validation performance plot: {e}")
     
     def visualize_runs(self, train_details: list[TrainDetails], validations: dict[str, Any]):
         path = Path(self.global_config.results_dir) / self.global_config.run_name / "plots"
@@ -86,6 +92,19 @@ class Visualizer:
         
         if validations.get("nmi"):
             self.__plot_reliability(nmis, cross_nmis, final_losses, path=path)
+            # Additional detailed reliability plots (fail gracefully)
+            try:
+                self.__plot_reliability_detailed(nmis, cross_nmis, final_losses, path=path)
+            except Exception as e:
+                print(f"Warning: Failed to create detailed reliability plots: {e}")
+        
+        # Always create generalization plot (comparing first and last runs as proxy for train/test)
+        try:
+            self.__plot_generalization_auto(train_details, validations, path)
+        except Exception as e:
+            print(f"Warning: Failed to create generalization plot: {e}")
+
+    
         
 
     
@@ -1355,7 +1374,7 @@ class Visualizer:
                 ax[1].plot(diag_p); ax[1].set_title('Transition diag probs'); ax[1].set_xlabel('Epoch'); ax[1].set_ylabel('P(stay)')
                 _save(fig, 'transition_entropy_diag.png')
 
-            if mean_series is not None:
+            if mean_series is not None and len(mean_series) > 0:
                 means = np.stack([_to_np(s) for s in mean_series],0) # (E,S,D)
                 norms = np.linalg.norm(means, axis=2)
                 fig, ax = plt.subplots(figsize=(7,3.2))
@@ -1368,7 +1387,7 @@ class Visualizer:
                     hx.set_title(f'Means e{idx} (S x D)')
                     _save(fig, f'emission_mean_e{idx}.png')
 
-            if logvar_series is not None:
+            if logvar_series is not None and len(logvar_series) > 0:
                 logv = np.stack([_to_np(s) for s in logvar_series],0)
                 var = np.exp(logv)
                 flat = var.reshape(var.shape[0], -1)
@@ -1377,7 +1396,7 @@ class Visualizer:
                 ax.set_title('Emission variance quantiles'); ax.set_xlabel('Epoch'); ax.set_ylabel('Var')
                 _save(fig, 'emission_variance_quantiles.png')
 
-            if chol_series is not None:
+            if chol_series is not None and len(chol_series) > 0:
                 logdets = []
                 for raw in chol_series:
                     r = torch.as_tensor(raw)
@@ -1554,4 +1573,710 @@ class Visualizer:
         plt.savefig(path / "reliability_plot.png")
         plt.close()
 
+    def __plot_reliability_detailed(self, nmis: list[float], cross_nmis: list[float], losses: list[float], path: Path):
+        """NEW: Additional detailed reliability analysis plots."""
+        try:
+            self.__plot_reliability_distributions(nmis, losses, path)
+        except Exception as e:
+            print(f"Warning: Failed to create reliability distributions plot: {e}")
+        
+        try:
+            self.__plot_reliability_cross_nmi_heatmap(cross_nmis, path)
+        except Exception as e:
+            print(f"Warning: Failed to create reliability cross-NMI plot: {e}")
+        
+        try:
+            self.__plot_reliability_best_run(nmis, losses, path)
+        except Exception as e:
+            print(f"Warning: Failed to create reliability best run plot: {e}")
+
+    def __plot_reliability_distributions(self, nmis: list[float], losses: list[float], path: Path):
+        """Plot distribution of NMI and loss across runs."""
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+        
+        # NMI distribution
+        ax1.violinplot([nmis], positions=[0], showmeans=True, showmedians=True)
+        ax1.boxplot([nmis], positions=[0], widths=0.3, patch_artist=True,
+                    boxprops=dict(facecolor='lightblue', alpha=0.5))
+        ax1.scatter([0] * len(nmis), nmis, alpha=0.6, s=50, c='darkblue')
+        ax1.set_ylabel("NMI vs True States")
+        ax1.set_title(f"NMI Distribution\nMean: {np.mean(nmis):.3f} ± {np.std(nmis):.3f}")
+        ax1.set_xticks([0])
+        ax1.set_xticklabels(['All Runs'])
+        ax1.grid(axis='y', alpha=0.3)
+        
+        # Loss distribution
+        ax2.violinplot([losses], positions=[0], showmeans=True, showmedians=True)
+        ax2.boxplot([losses], positions=[0], widths=0.3, patch_artist=True,
+                    boxprops=dict(facecolor='lightcoral', alpha=0.5))
+        ax2.scatter([0] * len(losses), losses, alpha=0.6, s=50, c='darkred')
+        ax2.set_ylabel("Final Loss")
+        ax2.set_title(f"Loss Distribution\nMean: {np.mean(losses):.4f} ± {np.std(losses):.4f}")
+        ax2.set_xticks([0])
+        ax2.set_xticklabels(['All Runs'])
+        ax2.grid(axis='y', alpha=0.3)
+        
+        plt.suptitle("Reliability: Metric Distributions Across Runs", fontsize=14, y=1.02)
+        plt.tight_layout()
+        plt.savefig(path / "reliability_distributions.png", dpi=150, bbox_inches='tight')
+        plt.close()
+
+    def __plot_reliability_cross_nmi_heatmap(self, cross_nmis: list[float], path: Path):
+        """Plot cross-NMI heatmap showing consistency between runs."""
+        # cross_nmis is a flattened list from upper triangle
+        # Reconstruct the matrix
+        n_runs = int(np.sqrt(2 * len(cross_nmis)))  # Approximate
+        # Actually, let's assume we need to get the matrix from validator
+        # For now, create a simple bar plot of cross-NMI values
+        fig, ax = plt.subplots(figsize=(10, 6))
+        
+        x = np.arange(len(cross_nmis))
+        bars = ax.bar(x, cross_nmis, color='steelblue', alpha=0.7, edgecolor='black')
+        
+        # Color bars by value
+        for i, (bar, val) in enumerate(zip(bars, cross_nmis)):
+            if val > 0.8:
+                bar.set_color('green')
+                bar.set_alpha(0.7)
+            elif val > 0.6:
+                bar.set_color('orange')
+                bar.set_alpha(0.7)
+            else:
+                bar.set_color('red')
+                bar.set_alpha(0.7)
+        
+        ax.axhline(np.mean(cross_nmis), color='black', linestyle='--', 
+                   label=f'Mean: {np.mean(cross_nmis):.3f}')
+        ax.set_xlabel("Pairwise Comparison Index")
+        ax.set_ylabel("Cross-NMI")
+        ax.set_title(f"Cross-NMI Between Run Pairs\n(Higher = More Consistent)")
+        ax.legend()
+        ax.grid(axis='y', alpha=0.3)
+        
+        plt.tight_layout()
+        plt.savefig(path / "reliability_cross_nmi.png", dpi=150)
+        plt.close()
+
+    def __plot_reliability_best_run(self, nmis: list[float], losses: list[float], path: Path):
+        """Highlight the best run (lowest loss) metrics."""
+        best_idx = np.argmin(losses)
+        
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+        
+        # NMI comparison
+        runs = np.arange(len(nmis))
+        colors = ['green' if i == best_idx else 'lightblue' for i in runs]
+        bars1 = ax1.bar(runs, nmis, color=colors, edgecolor='black', linewidth=1.5)
+        bars1[best_idx].set_edgecolor('darkgreen')
+        bars1[best_idx].set_linewidth(3)
+        ax1.axhline(np.mean(nmis), color='red', linestyle='--', alpha=0.5, label='Mean')
+        ax1.set_xlabel("Run")
+        ax1.set_ylabel("NMI")
+        ax1.set_title(f"Best Run (Run {best_idx}): NMI = {nmis[best_idx]:.3f}")
+        ax1.legend()
+        ax1.grid(axis='y', alpha=0.3)
+        
+        # Loss comparison
+        colors = ['green' if i == best_idx else 'lightcoral' for i in runs]
+        bars2 = ax2.bar(runs, losses, color=colors, edgecolor='black', linewidth=1.5)
+        bars2[best_idx].set_edgecolor('darkgreen')
+        bars2[best_idx].set_linewidth(3)
+        ax2.axhline(np.mean(losses), color='red', linestyle='--', alpha=0.5, label='Mean')
+        ax2.set_xlabel("Run")
+        ax2.set_ylabel("Final Loss")
+        ax2.set_title(f"Best Run (Run {best_idx}): Loss = {losses[best_idx]:.4f}")
+        ax2.legend()
+        ax2.grid(axis='y', alpha=0.3)
+        
+        plt.suptitle("Performance: Best Run Selection (Lowest Loss)", fontsize=14, y=1.02)
+        plt.tight_layout()
+        plt.savefig(path / "reliability_best_run.png", dpi=150, bbox_inches='tight')
+        plt.close()
+
+    def __plot_substages_pca_comparison(self, sweep_models: dict[int, Any], 
+                                         x_val: np.ndarray, y_true: np.ndarray, 
+                                         path: Path, n_states_to_show: list[int] = None):
+        """Create side-by-side PCA comparisons for substages analysis.
+        
+        For each n_states value, shows:
+        - Left: PCA colored by true 3 states
+        - Right: PCA colored by predicted n states
+        
+        Args:
+            sweep_models: Dict mapping n_states -> trained model
+            x_val: Validation data (T, D)
+            y_true: True labels (T,) 
+            path: Output directory
+            n_states_to_show: Subset of n_states to visualize (default: all)
+        """
+        if n_states_to_show is None:
+            n_states_to_show = sorted(sweep_models.keys())
+        
+        state_names = self.data_loader.get_state_names() if self.data_loader else None
+        
+        # Sample points for visualization (max 2000 per class to keep plots readable)
+        sampled_indices = []
+        for cls in np.unique(y_true):
+            cls_indices = np.where(y_true == cls)[0]
+            sample_size = min(2000, len(cls_indices))
+            sampled = np.random.choice(cls_indices, size=sample_size, replace=False)
+            sampled_indices.extend(sampled)
+        sampled_indices = np.array(sampled_indices)
+        
+        X_sampled = x_val[sampled_indices]
+        y_sampled = y_true[sampled_indices]
+        
+        # PCA on sampled data
+        K = min(3, X_sampled.shape[1])
+        X_centered = X_sampled - X_sampled.mean(0, keepdims=True)
+        U, S, _ = np.linalg.svd(X_centered, full_matrices=False)
+        proj = U[:, :K] * S[:K]
+        
+        # Color palette for up to 10 states
+        palette = sns.color_palette("tab10", n_colors=10)
+        
+        def get_colors(labels, n_colors=None):
+            """Map labels to colors."""
+            unique_labels = np.unique(labels)
+            if n_colors is None:
+                n_colors = len(unique_labels)
+            color_map = {label: palette[i % len(palette)] for i, label in enumerate(unique_labels)}
+            return np.array([color_map[label] for label in labels])
+        
+        # Generate plots for each n_states value
+        for n_states in n_states_to_show:
+            if n_states not in sweep_models:
+                print(f"Warning: Model for n_states={n_states} not found, skipping PCA plot")
+                continue
+            
+            model = sweep_models[n_states]
+            
+            # Get predictions on sampled validation data
+            try:
+                # Predictions on full validation set, then sample
+                y_pred_full = model.predict(torch.from_numpy(x_val).float())
+                if isinstance(y_pred_full, torch.Tensor):
+                    y_pred_full = y_pred_full.cpu().numpy()
+                y_pred = y_pred_full[sampled_indices]
+            except Exception as e:
+                print(f"Warning: Failed to get predictions for n_states={n_states}: {e}")
+                continue
+            
+            # Create side-by-side PCA plot
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+            
+            # Left panel: True states (always 3)
+            colors_true = get_colors(y_sampled, n_colors=3)
+            ax1.scatter(proj[:, 0], proj[:, 1], c=colors_true, s=8, alpha=0.6, edgecolors='none')
+            ax1.set_title(f'True States (N=3)', fontsize=13, fontweight='bold')
+            ax1.set_xlabel('PC1', fontsize=11)
+            ax1.set_ylabel('PC2', fontsize=11)
+            ax1.grid(alpha=0.3)
+            
+            # Legend for true states
+            unique_true = np.unique(y_sampled)
+            if state_names and len(state_names) >= len(unique_true):
+                true_labels = [state_names[int(label)] for label in unique_true]
+            else:
+                true_labels = [f"State {int(label)}" for label in unique_true]
+            
+            legend_elements_true = [
+                plt.Line2D([0], [0], marker='o', color='w',
+                          markerfacecolor=palette[i % len(palette)],
+                          label=true_labels[i], markersize=8)
+                for i in range(len(unique_true))
+            ]
+            ax1.legend(handles=legend_elements_true, loc='best', title='True States', 
+                      fontsize=9, framealpha=0.9)
+            
+            # Right panel: Predicted states
+            colors_pred = get_colors(y_pred, n_colors=n_states)
+            ax2.scatter(proj[:, 0], proj[:, 1], c=colors_pred, s=8, alpha=0.6, edgecolors='none')
+            ax2.set_title(f'Predicted States (N={n_states})', fontsize=13, fontweight='bold')
+            ax2.set_xlabel('PC1', fontsize=11)
+            ax2.set_ylabel('PC2', fontsize=11)
+            ax2.grid(alpha=0.3)
+            
+            # Legend for predicted states
+            unique_pred = np.unique(y_pred)
+            pred_labels = [f"State {int(label)}" for label in unique_pred]
+            
+            legend_elements_pred = [
+                plt.Line2D([0], [0], marker='o', color='w',
+                          markerfacecolor=palette[i % len(palette)],
+                          label=pred_labels[i], markersize=8)
+                for i in range(len(unique_pred))
+            ]
+            ax2.legend(handles=legend_elements_pred, loc='best', title=f'Pred States', 
+                      fontsize=9, framealpha=0.9, ncol=2 if n_states > 5 else 1)
+            
+            plt.suptitle(f'Substages PCA Comparison: {n_states} States', 
+                        fontsize=15, fontweight='bold', y=0.98)
+            plt.tight_layout()
+            
+            output_file = path / f"substages_pca_n{n_states}.png"
+            plt.savefig(output_file, dpi=180, bbox_inches='tight')
+            plt.close(fig)
+            
+            print(f"   Saved PCA comparison for n_states={n_states}")
+
+    def __plot_substages_pca_comparison_from_predictions(self, init_predictions_dict: dict[int, np.ndarray],
+                                                          trained_predictions_dict: dict[int, np.ndarray],
+                                                          x_val: np.ndarray, y_true: np.ndarray,
+                                                          path: Path, n_states_to_show: list[int] = None):
+        """Create tripanel PCA comparisons: Init → Peak → Ground Truth.
+        
+        Shows model progression from initialization through peak NMI performance
+        compared to ground truth labels.
+        
+        Args:
+            init_predictions_dict: Dict mapping n_states -> initial predictions (epoch 0) array (T,)
+            trained_predictions_dict: Dict mapping n_states -> trained predictions (at max NMI) array (T,)
+            x_val: Validation data (T, D)
+            y_true: True labels (T,)
+            path: Output directory
+            n_states_to_show: Subset of n_states to visualize (default: all)
+        """
+        if n_states_to_show is None:
+            n_states_to_show = sorted(trained_predictions_dict.keys())
+        
+        state_names = self.data_loader.get_state_names() if self.data_loader else None
+        
+        # For each n_states, check if we need to adjust y_true length due to burn-in
+        # (predictions are already saved post-burn-in from validation)
+        min_length = len(y_true)
+        for n_states in sorted(trained_predictions_dict.keys()):
+            if n_states in trained_predictions_dict:
+                min_length = min(min_length, len(trained_predictions_dict[n_states]))
+            if n_states in init_predictions_dict:
+                min_length = min(min_length, len(init_predictions_dict[n_states]))
+        
+        # Truncate y_true and x_val if needed to match prediction lengths
+        y_true = y_true[:min_length]
+        x_val = x_val[:min_length]
+        
+        # Sample points for visualization (max 2000 per class to keep plots readable)
+        sampled_indices = []
+        for cls in np.unique(y_true):
+            cls_indices = np.where(y_true == cls)[0]
+            sample_size = min(2000, len(cls_indices))
+            sampled = np.random.choice(cls_indices, size=sample_size, replace=False)
+            sampled_indices.extend(sampled)
+        sampled_indices = np.array(sampled_indices)
+        
+        X_sampled = x_val[sampled_indices]
+        y_sampled = y_true[sampled_indices]
+        
+        # PCA on sampled data
+        K = min(3, X_sampled.shape[1])
+        X_centered = X_sampled - X_sampled.mean(0, keepdims=True)
+        U, S, _ = np.linalg.svd(X_centered, full_matrices=False)
+        proj = U[:, :K] * S[:K]
+        
+        # Color palette for up to 10 states
+        palette = sns.color_palette("tab10", n_colors=10)
+        
+        def get_colors(labels, n_colors=None):
+            """Map labels to colors."""
+            unique_labels = np.unique(labels)
+            if n_colors is None:
+                n_colors = len(unique_labels)
+            color_map = {label: palette[i % len(palette)] for i, label in enumerate(unique_labels)}
+            return np.array([color_map[label] for label in labels])
+        
+        # Generate tripanel plots for each n_states value
+        for n_states in n_states_to_show:
+            if n_states not in trained_predictions_dict or n_states not in init_predictions_dict:
+                print(f"Warning: Predictions for n_states={n_states} not found, skipping PCA plot")
+                continue
+            
+            # Get predictions for sampled indices (already aligned with y_true after truncation)
+            y_init_full = init_predictions_dict[n_states]
+            y_trained_full = trained_predictions_dict[n_states]
+            y_init = y_init_full[sampled_indices]
+            y_trained = y_trained_full[sampled_indices]
+            
+            # Create tripanel PCA plot: Init | Peak | Truth
+            fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(18, 5))
+            
+            # Left panel: Initial predictions (epoch 0)
+            colors_init = get_colors(y_init, n_colors=n_states)
+            ax1.scatter(proj[:, 0], proj[:, 1], c=colors_init, s=8, alpha=0.6, edgecolors='none')
+            ax1.set_title(f'Init (Epoch 0)', fontsize=13, fontweight='bold')
+            ax1.set_xlabel('PC1', fontsize=11)
+            ax1.set_ylabel('PC2', fontsize=11)
+            ax1.grid(alpha=0.3)
+            
+            # Legend for init predictions
+            unique_init = np.unique(y_init)
+            init_labels = [f"State {int(label)}" for label in unique_init]
+            legend_elements_init = [
+                plt.Line2D([0], [0], marker='o', color='w',
+                          markerfacecolor=palette[i % len(palette)],
+                          label=init_labels[i], markersize=8)
+                for i in range(len(unique_init))
+            ]
+            ax1.legend(handles=legend_elements_init, loc='best', title='Init States',
+                      fontsize=9, framealpha=0.9, ncol=2 if n_states > 5 else 1)
+            
+            # Middle panel: Trained predictions (at max NMI)
+            colors_trained = get_colors(y_trained, n_colors=n_states)
+            ax2.scatter(proj[:, 0], proj[:, 1], c=colors_trained, s=8, alpha=0.6, edgecolors='none')
+            ax2.set_title(f'Peak Performance', fontsize=13, fontweight='bold')
+            ax2.set_xlabel('PC1', fontsize=11)
+            ax2.set_ylabel('PC2', fontsize=11)
+            ax2.grid(alpha=0.3)
+            
+            # Legend for trained predictions
+            unique_trained = np.unique(y_trained)
+            trained_labels = [f"State {int(label)}" for label in unique_trained]
+            legend_elements_trained = [
+                plt.Line2D([0], [0], marker='o', color='w',
+                          markerfacecolor=palette[i % len(palette)],
+                          label=trained_labels[i], markersize=8)
+                for i in range(len(unique_trained))
+            ]
+            ax2.legend(handles=legend_elements_trained, loc='best', title='Trained States',
+                      fontsize=9, framealpha=0.9, ncol=2 if n_states > 5 else 1)
+            
+            # Right panel: True states
+            colors_true = get_colors(y_sampled, n_colors=3)
+            ax3.scatter(proj[:, 0], proj[:, 1], c=colors_true, s=8, alpha=0.6, edgecolors='none')
+            ax3.set_title(f'Ground Truth', fontsize=13, fontweight='bold')
+            ax3.set_xlabel('PC1', fontsize=11)
+            ax3.set_ylabel('PC2', fontsize=11)
+            ax3.grid(alpha=0.3)
+            
+            # Legend for ground truth (right panel)
+            unique_true = np.unique(y_sampled)
+            if state_names and len(state_names) >= len(unique_true):
+                true_labels = [state_names[int(label)] for label in unique_true]
+            else:
+                true_labels = [f"State {int(label)}" for label in unique_true]
+            
+            legend_elements_true = [
+                plt.Line2D([0], [0], marker='o', color='w',
+                          markerfacecolor=palette[i % len(palette)],
+                          label=true_labels[i], markersize=8)
+                for i in range(len(unique_true))
+            ]
+            ax3.legend(handles=legend_elements_true, loc='best', title='True States',
+                      fontsize=9, framealpha=0.9)
+            
+            plt.suptitle(f'PCA Progression: N={n_states} States',
+                        fontsize=15, fontweight='bold', y=1.02)
+            plt.tight_layout()
+            
+            output_file = path / f"substages_pca_tripanel_n{n_states}.png"
+            plt.savefig(output_file, dpi=180, bbox_inches='tight')
+            plt.close(fig)
+            
+            print(f"   Saved tripanel PCA for n_states={n_states}")
+
+    def __plot_substages_metrics(self, n_states_list: list[int], val_lls: list[float], 
+                                   nmis: list[float], path: Path,
+                                   model_type: str = None, dataset_type: str = None):
+        """Plot substages analysis: n_states vs validation log likelihood and NMI with annotations."""
+        fig, ax1 = plt.subplots(figsize=(12, 6))
+        
+        # Plot validation log likelihood
+        color1 = 'tab:blue'
+        ax1.set_xlabel('Number of States', fontsize=12)
+        ax1.set_ylabel('Validation Log Likelihood', color=color1, fontsize=12)
+        line1 = ax1.plot(n_states_list, val_lls, color=color1, marker='o', 
+                         markersize=8, linewidth=2, label='Val LL')
+        ax1.tick_params(axis='y', labelcolor=color1)
+        ax1.grid(axis='both', alpha=0.3)
+        
+        # Annotate each point with exact value
+        for i, (x, y) in enumerate(zip(n_states_list, val_lls)):
+            ax1.annotate(f'{y:.3f}', 
+                        xy=(x, y), 
+                        xytext=(0, 10), 
+                        textcoords='offset points',
+                        ha='center',
+                        fontsize=9,
+                        bbox=dict(boxstyle='round,pad=0.3', facecolor=color1, alpha=0.3))
+        
+        # Plot NMI on second y-axis
+        ax2 = ax1.twinx()
+        color2 = 'tab:red'
+        ax2.set_ylabel('NMI vs True States', color=color2, fontsize=12)
+        line2 = ax2.plot(n_states_list, nmis, color=color2, marker='s', 
+                         markersize=8, linewidth=2, label='NMI')
+        ax2.tick_params(axis='y', labelcolor=color2)
+        
+        # Annotate each NMI point
+        for i, (x, y) in enumerate(zip(n_states_list, nmis)):
+            ax2.annotate(f'{y:.3f}', 
+                        xy=(x, y), 
+                        xytext=(0, -25), 
+                        textcoords='offset points',
+                        ha='center',
+                        fontsize=9,
+                        bbox=dict(boxstyle='round,pad=0.3', facecolor=color2, alpha=0.3))
+        
+        # Title and legend
+        title_parts = []
+        if model_type:
+            title_parts.append(model_type)
+        if dataset_type:
+            title_parts.append(dataset_type)
+        
+        if title_parts:
+            title_prefix = f"{' - '.join(title_parts)}: "
+        else:
+            title_prefix = ""
+        
+        plt.title(f'{title_prefix}Substages: Model Complexity vs Performance', 
+                  fontsize=14, pad=20)
+        
+        # Combine legends
+        lines = line1 + line2
+        labels = [l.get_label() for l in lines]
+        ax1.legend(lines, labels, loc='upper left', fontsize=10)
+        
+        # Set x-axis to show all n_states values
+        ax1.set_xticks(n_states_list)
+        
+        # Create filename with model and dataset type
+        filename_parts = ['substages']
+        if model_type:
+            filename_parts.append(model_type.lower())
+        if dataset_type:
+            filename_parts.append(dataset_type.lower())
+        filename_parts.append('metrics.png')
+        filename = '_'.join(filename_parts)
+        
+        plt.tight_layout()
+        plt.savefig(path / filename, dpi=150, bbox_inches='tight')
+        plt.close()
+
+    def __plot_generalization_comparison(self, train_ll: float, test_ll: float, 
+                                          train_nmi: float, test_nmi: float, 
+                                          test_subject: str, path: Path):
+        """Plot train vs test comparison for generalization experiments."""
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+        
+        # Log Likelihood comparison
+        x_pos = [0, 1]
+        ll_values = [train_ll, test_ll]
+        colors = ['steelblue', 'coral']
+        bars1 = ax1.bar(x_pos, ll_values, color=colors, edgecolor='black', linewidth=1.5, alpha=0.7)
+        ax1.set_ylabel('Log Likelihood (Higher = Better)', fontsize=11)
+        ax1.set_title('Predictive Log Likelihood', fontsize=12, fontweight='bold')
+        ax1.set_xticks(x_pos)
+        ax1.set_xticklabels(['Train', f'Test ({test_subject})'])
+        ax1.grid(axis='y', alpha=0.3)
+        
+        # Annotate values
+        for i, (bar, val) in enumerate(zip(bars1, ll_values)):
+            ax1.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.01*abs(max(ll_values)), 
+                    f'{val:.4f}', ha='center', va='bottom', fontsize=10, fontweight='bold')
+        
+        # Calculate generalization gap
+        gen_gap = train_ll - test_ll
+        gap_color = 'red' if gen_gap > 0 else 'green'
+        ax1.text(0.5, min(ll_values) + 0.5*(max(ll_values)-min(ll_values)), 
+                f'Gap: {gen_gap:.4f}', 
+                ha='center', fontsize=10, 
+                bbox=dict(boxstyle='round,pad=0.5', facecolor=gap_color, alpha=0.3))
+        
+        # NMI comparison
+        nmi_values = [train_nmi, test_nmi]
+        bars2 = ax2.bar(x_pos, nmi_values, color=colors, edgecolor='black', linewidth=1.5, alpha=0.7)
+        ax2.set_ylabel('NMI vs True States', fontsize=11)
+        ax2.set_title('NMI Performance', fontsize=12, fontweight='bold')
+        ax2.set_xticks(x_pos)
+        ax2.set_xticklabels(['Train', f'Test ({test_subject})'])
+        ax2.set_ylim([0, 1])
+        ax2.grid(axis='y', alpha=0.3)
+        
+        # Annotate NMI values
+        for i, (bar, val) in enumerate(zip(bars2, nmi_values)):
+            ax2.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.02, 
+                    f'{val:.3f}', ha='center', va='bottom', fontsize=10, fontweight='bold')
+        
+        plt.suptitle(f'Generalization: Train vs Test Performance on {test_subject}', 
+                    fontsize=14, fontweight='bold', y=1.02)
+        plt.tight_layout()
+        plt.savefig(path / f"generalization_comparison_{test_subject}.png", dpi=150, bbox_inches='tight')
+        plt.close()
     
+    def __plot_generalization_auto(self, train_details_list: list[TrainDetails], validations: dict, path: Path):
+        """Automatically create generalization plot using aggregated validation metrics.
+        
+        Called automatically from visualize_runs() for all experiments.
+        Shows validation performance statistics across runs.
+        """
+        try:
+            # Get test subject name (from first validation dataset if available)
+            test_subject = "validation"
+            if hasattr(self.data_loader, 'datasets') and len(self.data_loader.datasets) > 0:
+                test_subject = getattr(self.data_loader.datasets[0], 'id', 'validation')
+            
+            # Extract metrics from validations dict
+            # Note: Keys are now without 'val_' prefix (logger adds 'val/' when logging to W&B)
+            val_ll_stats = validations.get('log_likelihood', {})
+            nmi_stats = validations.get('nmi', {})
+            
+            if not val_ll_stats or not nmi_stats:
+                # Skip if metrics aren't available
+                return
+            
+            # Use mean values across runs
+            val_ll_mean = val_ll_stats.get('mean', 0.0)
+            nmi_mean = nmi_stats.get('mean', 0.0)
+            
+            # For "train" metrics, we'll use a proxy: the model's performance on validation data
+            # is typically better during training than on held-out test subjects.
+            # We'll show validation stats with error bars instead of train/test comparison.
+            
+            # Create a simpler single-bar plot showing validation performance
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
+            
+            # Log Likelihood
+            ax1.bar([0], [val_ll_mean], color='coral', edgecolor='black', linewidth=1.5, alpha=0.7, width=0.5)
+            if 'std' in val_ll_stats:
+                ax1.errorbar([0], [val_ll_mean], yerr=[val_ll_stats['std']], 
+                           fmt='none', ecolor='black', capsize=5, capthick=2)
+            ax1.set_ylabel('Validation Log Likelihood', fontsize=11)
+            ax1.set_title('Predictive Log Likelihood', fontsize=12, fontweight='bold')
+            ax1.set_xticks([0])
+            ax1.set_xticklabels([f'{test_subject}'])
+            ax1.grid(axis='y', alpha=0.3)
+            ax1.text(0, val_ll_mean + 0.02*abs(val_ll_mean), 
+                    f'{val_ll_mean:.2f}', ha='center', va='bottom', fontsize=10, fontweight='bold')
+            
+            # NMI
+            ax2.bar([0], [nmi_mean], color='coral', edgecolor='black', linewidth=1.5, alpha=0.7, width=0.5)
+            if 'std' in nmi_stats:
+                ax2.errorbar([0], [nmi_mean], yerr=[nmi_stats['std']], 
+                           fmt='none', ecolor='black', capsize=5, capthick=2)
+            ax2.set_ylabel('NMI vs True States', fontsize=11)
+            ax2.set_title('NMI Performance', fontsize=12, fontweight='bold')
+            ax2.set_xticks([0])
+            ax2.set_xticklabels([f'{test_subject}'])
+            ax2.set_ylim([0, 1])
+            ax2.grid(axis='y', alpha=0.3)
+            ax2.text(0, nmi_mean + 0.02, 
+                    f'{nmi_mean:.3f}', ha='center', va='bottom', fontsize=10, fontweight='bold')
+            
+            plt.suptitle(f'Validation Performance on {test_subject} ({len(train_details_list)} runs)', 
+                        fontsize=14, fontweight='bold', y=1.02)
+            plt.tight_layout()
+            plt.savefig(path / "validation_performance.png", dpi=150, bbox_inches='tight')
+            plt.close()
+            
+        except Exception as e:
+            # Fail silently - this is an optional enhancement
+            if self.global_config.verbose:
+                print(f"Note: Skipped validation performance visualization: {e}")
+
+    def __plot_validation_performance_single(self, train_details: TrainDetails, path: Path):
+        """Create validation performance plot for single run (generalization experiment)."""
+        validations = train_details.validations
+        if not validations:
+            return
+        
+        # Get the latest validation epoch
+        latest_epoch = max(validations.keys())
+        latest_val = validations[latest_epoch]
+        
+        # Extract metrics
+        log_likelihood = latest_val.get('log_likelihood')
+        nmi = latest_val.get('nmi')
+        
+        if log_likelihood is None or nmi is None:
+            return
+        
+        # Get test subject name from validation dataset
+        test_subject = "validation"
+        if hasattr(self.data_loader, 'datasets') and len(self.data_loader.datasets) > 0:
+            test_subject = getattr(self.data_loader.datasets[0], 'id', 'validation')
+        
+        # Create plot
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
+        
+        # Log Likelihood
+        ax1.bar([0], [log_likelihood], color='coral', edgecolor='black', linewidth=1.5, alpha=0.7, width=0.5)
+        ax1.set_ylabel('Validation Log Likelihood', fontsize=11)
+        ax1.set_title('Predictive Log Likelihood', fontsize=12, fontweight='bold')
+        ax1.set_xticks([0])
+        ax1.set_xticklabels([f'{test_subject}'])
+        ax1.grid(axis='y', alpha=0.3)
+        ax1.text(0, log_likelihood + 0.02*abs(log_likelihood), 
+                f'{log_likelihood:.2f}', ha='center', va='bottom', fontsize=10, fontweight='bold')
+        
+        # NMI
+        ax2.bar([0], [nmi], color='coral', edgecolor='black', linewidth=1.5, alpha=0.7, width=0.5)
+        ax2.set_ylabel('NMI vs True States', fontsize=11)
+        ax2.set_title('NMI Performance', fontsize=12, fontweight='bold')
+        ax2.set_xticks([0])
+        ax2.set_xticklabels([f'{test_subject}'])
+        ax2.set_ylim([0, 1])
+        ax2.grid(axis='y', alpha=0.3)
+        ax2.text(0, nmi + 0.02, 
+                f'{nmi:.3f}', ha='center', va='bottom', fontsize=10, fontweight='bold')
+        
+        plt.suptitle(f'Validation Performance on {test_subject} (Epoch {latest_epoch})', 
+                    fontsize=14, fontweight='bold', y=1.02)
+        plt.tight_layout()
+        plt.savefig(path / "validation_performance.png", dpi=150, bbox_inches='tight')
+        plt.close()
+
+
+    def visualize_substages_sweep(self, sweep_results: dict[int, dict[str, float]], 
+                                   path: Path = None,
+                                   model_type: str = None,
+                                   dataset_type: str = None):
+        """Visualize substages sweep results across different n_states values.
+        
+        Args:
+            sweep_results: Dict mapping n_states -> {'val_log_likelihood': float, 'nmi': float}
+            path: Optional path to save plots (defaults to config results_dir)
+            model_type: Model type (e.g., 'HMM', 'MARHMM') for plot title
+            dataset_type: Dataset type (e.g., 'SYNTHETIC', 'MSSV') for plot title
+        """
+        if path is None:
+            path = Path(self.global_config.results_dir) / self.global_config.run_name / "plots"
+        path.mkdir(parents=True, exist_ok=True)
+        
+        try:
+            # Extract sorted lists
+            n_states_list = sorted(sweep_results.keys())
+            val_lls = [sweep_results[n]['val_log_likelihood'] for n in n_states_list]
+            nmis = [sweep_results[n]['nmi'] for n in n_states_list]
+            
+            self.__plot_substages_metrics(n_states_list, val_lls, nmis, path, 
+                                          model_type=model_type, dataset_type=dataset_type)
+        except Exception as e:
+            print(f"Warning: Failed to create substages sweep plots: {e}")
+
+    def visualize_generalization(self, train_metrics: dict[str, float], 
+                                  test_metrics: dict[str, float],
+                                  test_subject: str,
+                                  path: Path = None):
+        """Visualize generalization performance comparing train vs test.
+        
+        Args:
+            train_metrics: {'log_likelihood': float, 'nmi': float} for training data
+            test_metrics: {'log_likelihood': float, 'nmi': float} for test data
+            test_subject: Name of test subject (e.g., 'sub-039')
+            path: Optional path to save plots (defaults to config results_dir)
+        """
+        if path is None:
+            path = Path(self.global_config.results_dir) / self.global_config.run_name / "plots"
+        path.mkdir(parents=True, exist_ok=True)
+        
+        try:
+            self.__plot_generalization_comparison(
+                train_ll=train_metrics['log_likelihood'],
+                test_ll=test_metrics['log_likelihood'],
+                train_nmi=train_metrics['nmi'],
+                test_nmi=test_metrics['nmi'],
+                test_subject=test_subject,
+                path=path
+            )
+        except Exception as e:
+            print(f"Warning: Failed to create generalization comparison plot for {test_subject}: {e}")
