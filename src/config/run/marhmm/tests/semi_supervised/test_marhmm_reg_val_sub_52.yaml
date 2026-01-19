@@ -1,19 +1,19 @@
-# Base config for substages experiment: MAR-HMM on MSSV Features
-# This config will be used by the substages sweep
-# The sweep will override model.n_states from 2 to 10
+# Reliability experiment: MAR-HMM on MSSV Data with Features
+# Best parameters from sweep: lr=0.0001, init=random_uniform
+# Purpose: Test how reliably the model finds the same solution across multiple runs
 
 trainer:
-  epochs: 80000
-  learning_rate: 0.00005  # Best from sweep
+  epochs: 5000
+  learning_rate: 0.0005
   optimizer: adam
-  grad_clip: null
-  validate_per_epoch: 500
+  grad_clip: 0.5
+  validate_per_epoch: 10
   early_stopping:
     enabled: false
     patience: 100
     min_delta: 0.001
   scheduler:
-    enabled: true
+    enabled: false
     type: exponential
     step_size: null
     gamma: 0.999972
@@ -21,11 +21,11 @@ trainer:
 validator:
   nmi: True
   accuracy: True
-  cross_nmi: False
+  cross_nmi: True  # Critical for reliability analysis
   learning_rate: True
   state_distinctness: True
   summary_statistics: True
-  log_likelihood: True  # Track model fit quality
+  log_likelihood: True  # Track predictive log likelihood on validation set
 
 visualizer:
   losses: True
@@ -37,23 +37,26 @@ visualizer:
   historic_values: True
 
 dataloader:
-  num_batches: 8192
-  batch_size: 32
-  validation_batch_size: 256
+  num_batches: 64
+  batch_size: 512
+  validation_batch_size: 512
   window_size: 512
   stride: 512
   shuffle: True
   normalize: True
   transforms:
+    # EEG channel transforms
     - type: band_pass_filter
       channel: EEG
-      params:
-        low_cutoff: 0.5
-        high_cutoff: 30
+      params: {
+        "low_cutoff": 0.5,
+        "high_cutoff": 30,
+      }
     - type: percentile_clipping
       channel: EEG
-      params:
-        percentile: 0.5
+      params: {
+        "percentile": 0.5
+      }
     - type: rms
       channel: EEG
       params: {}
@@ -76,16 +79,18 @@ dataloader:
           - [0.5, 4]
           - [6, 9]
           - [15, 30]
+
+    # EMG channel transforms
     - type: percentile_clipping
       channel: EMG
-      params:
-        percentile: 0.1
+      params: {
+        "percentile": 0.1
+      }
     - type: rms
       channel: EMG
       params: {}
 
 train_datasets:
-  # Train on all mice EXCEPT sub-039 runs 1,2,3 (reserved for validation)
   - type: mssv
     id: sub-038
     run: 1
@@ -123,6 +128,18 @@ train_datasets:
     run: 1
     remove_artifact: True
   - type: mssv
+    id: sub-048
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-048
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-048
+    run: 3
+    remove_artifact: True
+  - type: mssv
     id: sub-054
     run: 1
     remove_artifact: True
@@ -142,24 +159,15 @@ train_datasets:
     id: sub-060
     run: 1
     remove_artifact: True
-  - type: mssv
-    id: sub-069
-    run: 1
-    remove_artifact: True
 
 val_datasets:
-  # Validate on sub-048 runs 1,2,3 (held-out test set)
   - type: mssv
-    id: sub-048
+    id: sub-052
     run: 1
     remove_artifact: True
   - type: mssv
-    id: sub-048
+    id: sub-052
     run: 2
-    remove_artifact: True
-  - type: mssv
-    id: sub-048
-    run: 3
     remove_artifact: True
 
 model:
@@ -168,26 +176,17 @@ model:
   init_strategy: random_uniform  # Best from sweep
   init_noisy: false
   features: true
-  n_states: 3  # Will be overridden by sweep
+  n_states: 3
   params:
-    lags: [1, 2, 4, 8]
-    ridge: 0.1
-    var_reg: 0.05
-    sticky_coef: 0.1
-    sticky_kappa: 0.9
+    lags: [1, 2, 3]
+    ridge: 2.0
+    var_reg: 1.0
+    sticky_coef: 1e-2
+    sticky_kappa: 0.8
 
 verbose: true
-seed: 123
-results_dir: results/substages/marhmm
-run_name: substages_marhmm_mssv_features
-runs: 3
+seed: 42  # Will auto-increment for each run
+results_dir: results/testing/marhmm
+run_name: testing_marhmm_regularisation_val_sub_52
+runs: 1  # Multiple runs for reliability analysis
 validate_data: True
-
-wandb:
-  enabled: true
-  group: substages_marhmm_mssv_features
-  tags:
-    - substages
-    - marhmm
-    - mssv
-    - features

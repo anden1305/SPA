@@ -1,19 +1,20 @@
-# Reliability experiment: MAR-HMM on MSSV Data with Features
+# Generalization experiment: MAR-HMM on MSSV Features - Test on sub-039
+# Purpose: Test between-mouse generalization by training on all mice except sub-039
+# then validating on sub-039 runs 1,2,3
 # Best parameters from sweep: lr=0.0001, init=random_uniform
-# Purpose: Test how reliably the model finds the same solution across multiple runs
 
 trainer:
-  epochs: 1000
-  learning_rate: 0.00005
+  epochs: 100000
+  learning_rate: 0.0001  # Best from sweep
   optimizer: adam
-  grad_clip: 0.5
-  validate_per_epoch: 10
+  grad_clip: null
+  validate_per_epoch: 500
   early_stopping:
     enabled: false
     patience: 100
     min_delta: 0.001
   scheduler:
-    enabled: false
+    enabled: true
     type: exponential
     step_size: null
     gamma: 0.999972
@@ -21,11 +22,11 @@ trainer:
 validator:
   nmi: True
   accuracy: True
-  cross_nmi: True  # Critical for reliability analysis
+  cross_nmi: False
   learning_rate: True
   state_distinctness: True
   summary_statistics: True
-  log_likelihood: True  # Track predictive log likelihood on validation set
+  log_likelihood: True  # Critical for generalization analysis
 
 visualizer:
   losses: True
@@ -37,9 +38,9 @@ visualizer:
   historic_values: True
 
 dataloader:
-  num_batches: 64
-  batch_size: 512
-  validation_batch_size: 512
+  num_batches: 8192
+  batch_size: 32
+  validation_batch_size: 256
   window_size: 512
   stride: 512
   shuffle: True
@@ -90,6 +91,7 @@ dataloader:
       channel: EMG
       params: {}
 
+# Train on all mice EXCEPT sub-039 (all lab 3 clean subjects minus sub-039)
 train_datasets:
   - type: mssv
     id: sub-038
@@ -98,18 +100,6 @@ train_datasets:
   - type: mssv
     id: sub-038
     run: 2
-    remove_artifact: True
-  - type: mssv
-    id: sub-039
-    run: 1
-    remove_artifact: True
-  - type: mssv
-    id: sub-039
-    run: 2
-    remove_artifact: True
-  - type: mssv
-    id: sub-039
-    run: 3
     remove_artifact: True
   - type: mssv
     id: sub-041
@@ -159,15 +149,24 @@ train_datasets:
     id: sub-060
     run: 1
     remove_artifact: True
+  - type: mssv
+    id: sub-069
+    run: 1
+    remove_artifact: True
 
+# Validate on sub-039 (held-out mouse)
 val_datasets:
   - type: mssv
-    id: sub-058
+    id: sub-039
     run: 1
     remove_artifact: True
   - type: mssv
-    id: sub-058
+    id: sub-039
     run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-039
+    run: 3
     remove_artifact: True
 
 model:
@@ -178,15 +177,26 @@ model:
   features: true
   n_states: 3
   params:
-    lags: [1, 2, 3]
-    ridge: 2.0
-    var_reg: 1.0
-    sticky_coef: 1e-2
-    sticky_kappa: 0.8
+    lags: [1, 2, 4, 8]
+    ridge: 0.1
+    var_reg: 0.05
+    sticky_coef: 0.1
+    sticky_kappa: 0.9
 
 verbose: true
-seed: 123  # Will auto-increment for each run
-results_dir: results/testing/marhmm
-run_name: testing_marhmm_regularisation_val
-runs: 1  # Multiple runs for reliability analysis
+seed: 123
+results_dir: results/generalization/marhmm
+run_name: generalization_marhmm_mssv_features_test_sub039
+runs: 1  # Can increase for multiple runs
 validate_data: True
+
+wandb:
+  enabled: true
+  group: generalization_marhmm_mssv_features
+  tags:
+    - generalization
+    - between-mouse
+    - marhmm
+    - mssv
+    - features
+    - test-sub039

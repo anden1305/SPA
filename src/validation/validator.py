@@ -30,6 +30,11 @@ class Validator:
         self.predictions: dict[int, list] = {}
         self.historic_values: dict[str, list] = {}
         self.data_validations: dict[str, Any] = {}
+        # Separate tracking for train and val coherence ratios
+        self._prev_val_ll: float | None = None
+        self._prev_val_perp: float | None = None
+        self._prev_train_ll: float | None = None
+        self._prev_train_perp: float | None = None
 
     ####### GENERAL METHODS #######
 
@@ -70,15 +75,13 @@ class Validator:
         self.model.prepare_for_inference()
         xt, yt = self.data_loader.get_all_data()
         with torch.no_grad():
+            predst = self.model.predict(xt)
             # Compute validation loss (negative log likelihood)
             if self.config.log_likelihood:
                 val_nll = self.model.forward(xt)
-                # Store both NLL and LL (higher LL is better for comparing models)
-                # Note: keys stored without 'val_' prefix; logger adds 'val/' prefix
                 self.validations[epoch]["nll"] = val_nll.item()
                 self.validations[epoch]["log_likelihood"] = -val_nll.item()
-            
-            predst = self.model.predict(xt)
+                self.validations[epoch]["likelihood"] = np.exp(-val_nll.item())
             
             # Handle MARHMM burn-in
             if hasattr(self.model, 'max_lag') and self.model.max_lag > 0:
@@ -92,15 +95,25 @@ class Validator:
                 self.validations[epoch]["nmi"] = nmi
             
             # Compute state entropy and perplexity for validation data
-            entropy_metrics = self.__compute_state_entropy(preds, self.data_loader.get_num_states())
+            entropy_metrics = self.__compute_state_entropy(preds, self.model.num_states)
+            eps = 1e-12  
             self.validations[epoch]["entropy"] = entropy_metrics["entropy"]
             self.validations[epoch]["perplexity"] = entropy_metrics["perplexity"]
-            
+            self.validations[epoch]["likelihood_perplexity_product"] = entropy_metrics["perplexity"] / self.model.num_states * self.validations[epoch]["likelihood"]
+            self.validations[epoch]["log_likelihood_perplexity_sum"] = np.log(entropy_metrics["perplexity"] / self.model.num_states) + self.validations[epoch]["log_likelihood"]
+            self.validations[epoch]["weighted_log_likelihood_perplexity_sum"] = 0.9 * self.validations[epoch]["log_likelihood"] + np.log((entropy_metrics["perplexity"] / self.model.num_states) + eps)
+            self.validations[epoch]["coherence_ratio"] = self.__compute_coherence_ratio(self.validations[epoch]["log_likelihood"], entropy_metrics["perplexity"] / self.model.num_states, is_train=False)
+
             # Compute train NMI if train data loader is available
             if self.config.nmi and self.train_data_loader is not None:
                 x_train, y_train = self.train_data_loader.get_all_data()
                 preds_train = self.model.predict(x_train)
-                
+                if self.config.log_likelihood:
+                    train_nll = self.model.forward(x_train)
+                    self.validations[epoch]["train_nll"] = train_nll.item()
+                    self.validations[epoch]["train_log_likelihood"] = -train_nll.item()
+                    self.validations[epoch]["train_likelihood"] = np.exp(-train_nll.item())
+
                 # Handle MARHMM burn-in for train data
                 if hasattr(self.model, 'max_lag') and self.model.max_lag > 0:
                     preds_train = preds_train[:, self.model.max_lag:]
@@ -109,14 +122,18 @@ class Validator:
                 y_train_np = y_train.detach().cpu().numpy().flatten()
                 preds_train_np = preds_train.detach().cpu().numpy().flatten()
                 train_nmi = calculate_nmi(preds_train_np, y_train_np)
-                # Store with 'train_' prefix to distinguish from val NMI
-                # Note: logger will add 'train/' prefix when logging
                 self.validations[epoch]["train_nmi"] = train_nmi
                 
                 # Compute state entropy and perplexity for training data
-                train_entropy_metrics = self.__compute_state_entropy(preds_train_np, self.train_data_loader.get_num_states())
+                train_entropy_metrics = self.__compute_state_entropy(preds_train_np, self.model.num_states)
+                eps = 1e-12  
                 self.validations[epoch]["train_entropy"] = train_entropy_metrics["entropy"]
                 self.validations[epoch]["train_perplexity"] = train_entropy_metrics["perplexity"]
+                self.validations[epoch]["train_likelihood_perplexity_product"] = train_entropy_metrics["perplexity"] / self.model.num_states * self.validations[epoch]["train_likelihood"]
+                self.validations[epoch]["train_log_likelihood_perplexity_sum"] = np.log(train_entropy_metrics["perplexity"] / self.model.num_states) + self.validations[epoch]["train_log_likelihood"]
+                self.validations[epoch]["train_weighted_log_likelihood_perplexity_sum"] = 0.9 * self.validations[epoch]["train_log_likelihood"] + np.log((train_entropy_metrics["perplexity"] / self.model.num_states) + eps)
+                self.validations[epoch]["train_coherence_ratio"] = self.__compute_coherence_ratio(self.validations[epoch]["train_log_likelihood"],  train_entropy_metrics["perplexity"] / self.model.num_states, is_train=True)
+
             if self.config.accuracy:
                 try:
                     aligned_preds = align_labels_hungarian(y, preds)
@@ -141,14 +158,15 @@ class Validator:
             acc_val = self.validations[epoch].get('accuracy', 'N/A')
             perp_val = self.validations[epoch].get('perplexity', 'N/A')
             train_perp_val = self.validations[epoch].get('train_perplexity', 'N/A')
+            # round it for 4 decimal places for printing
             nmi_str = f"{nmi_val:.4f}" if isinstance(nmi_val, (int, float)) else str(nmi_val)
             train_nmi_str = f"{train_nmi_val:.4f}" if isinstance(train_nmi_val, (int, float)) else str(train_nmi_val)
             acc_str = f"{acc_val:.4f}" if isinstance(acc_val, (int, float)) else str(acc_val)
             perp_str = f"{perp_val:.2f}" if isinstance(perp_val, (int, float)) else str(perp_val)
             train_perp_str = f"{train_perp_val:.2f}" if isinstance(train_perp_val, (int, float)) else str(train_perp_val)
             print(f"Epoch {epoch + 1} - Val NMI: {nmi_str}, Train NMI: {train_nmi_str}, "
-                  f"Val Perp: {perp_str}/{self.data_loader.get_num_states()}, "
-                  f"Train Perp: {train_perp_str}/{self.train_data_loader.get_num_states() if self.train_data_loader else 'N/A'}, "
+                  f"Val Perp: {perp_str}/{self.model.num_states}, "
+                  f"Train Perp: {train_perp_str}/{self.model.num_states}, "
                   f"Acc: {acc_str}")
     
     def validate_runs(self, train_details: list[TrainDetails]):
@@ -191,6 +209,46 @@ class Validator:
             json.dump(self.data_validations, f, indent=2)
 
     ####### HELPER METHODS #######
+
+    def __compute_coherence_ratio(self, log_likelihood: float, normalized_perplexity: float, is_train: bool) -> float:
+        """Compute ratio of change: delta_log_likelihood / delta_normalized_perplexity.
+        
+        Helps identify when NMI peaks while perplexity improvement slows.
+        Tracks train and val separately to avoid interference.
+        """
+        if is_train:
+            prev_ll = self._prev_train_ll
+            prev_perp = self._prev_train_perp
+        else:
+            prev_ll = self._prev_val_ll
+            prev_perp = self._prev_val_perp
+        
+        if prev_ll is None or prev_perp is None:
+            # First epoch - store and return 0
+            if is_train:
+                self._prev_train_ll = log_likelihood
+                self._prev_train_perp = normalized_perplexity
+            else:
+                self._prev_val_ll = log_likelihood
+                self._prev_val_perp = normalized_perplexity
+            return 0.0
+        
+        delta_ll = log_likelihood - prev_ll
+        delta_perp = normalized_perplexity - prev_perp
+        
+        # Update for next iteration
+        if is_train:
+            self._prev_train_ll = log_likelihood
+            self._prev_train_perp = normalized_perplexity
+        else:
+            self._prev_val_ll = log_likelihood
+            self._prev_val_perp = normalized_perplexity
+        
+        # Compute ratio, avoiding division by zero
+        if abs(delta_perp) > 1e-10:
+            return delta_ll / delta_perp
+        else:
+            return 0.0
 
     def __compute_state_entropy(self, predictions: np.ndarray, num_states: int) -> dict[str, float]:
         """Compute state usage entropy and perplexity (effective number of states).
@@ -410,6 +468,10 @@ class Validator:
         self.validations = {}
         self.predictions = {}
         self.historic_values = {}
+        self._prev_val_ll = None
+        self._prev_val_perp = None
+        self._prev_train_ll = None
+        self._prev_train_perp = None
 
     def get_predictions(self) -> dict[int, list]:
         assert self.predictions, "Inference has not been run yet."

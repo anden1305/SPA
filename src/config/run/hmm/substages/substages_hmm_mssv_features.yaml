@@ -3,8 +3,8 @@
 # The sweep will override model.n_states from 2 to 10
 
 trainer:
-  epochs: 100000
-  learning_rate: 0.0005  # Best from sweep
+  epochs: 80000
+  learning_rate: 0.00005  # Best from sweep
   optimizer: adam
   grad_clip: null
   validate_per_epoch: 500
@@ -95,6 +95,18 @@ train_datasets:
     run: 2
     remove_artifact: True
   - type: mssv
+    id: sub-039
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-039
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-039
+    run: 3
+    remove_artifact: True
+  - type: mssv
     id: sub-041
     run: 1
     remove_artifact: True
@@ -109,18 +121,6 @@ train_datasets:
   - type: mssv
     id: sub-043
     run: 1
-    remove_artifact: True
-  - type: mssv
-    id: sub-048
-    run: 1
-    remove_artifact: True
-  - type: mssv
-    id: sub-048
-    run: 2
-    remove_artifact: True
-  - type: mssv
-    id: sub-048
-    run: 3
     remove_artifact: True
   - type: mssv
     id: sub-054
@@ -148,17 +148,17 @@ train_datasets:
     remove_artifact: True
 
 val_datasets:
-  # Validate on sub-039 runs 1,2,3 (held-out test set)
+  # Validate on sub-048 runs 1,2,3 (held-out test set)
   - type: mssv
-    id: sub-039
+    id: sub-048
     run: 1
     remove_artifact: True
   - type: mssv
-    id: sub-039
+    id: sub-048
     run: 2
     remove_artifact: True
   - type: mssv
-    id: sub-039
+    id: sub-048
     run: 3
     remove_artifact: True
 
@@ -175,7 +175,7 @@ verbose: true
 seed: 123
 results_dir: results/substages/hmm
 run_name: substages_hmm_mssv_features
-runs: 1
+runs: 3
 validate_data: True
 
 wandb:

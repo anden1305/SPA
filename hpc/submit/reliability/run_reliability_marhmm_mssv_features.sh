@@ -1,7 +1,7 @@
 #!/bin/bash
 #BSUB -J reliability_marhmm_mssv_features                             
-#BSUB -q gpua100            
-#BSUB -W 24:00  
+#BSUB -q gpuv100            
+#BSUB -W 6:00  
 #BSUB -n 4
 #BSUB -R "span[hosts=1]"                      
 #BSUB -R "rusage[mem=5GB]"

@@ -3,17 +3,17 @@
 # Purpose: Test how reliably the model finds the same solution across multiple runs
 
 trainer:
-  epochs: 1000
-  learning_rate: 0.00005
+  epochs: 60000
+  learning_rate: 0.0001  # Best from sweep
   optimizer: adam
-  grad_clip: 0.5
-  validate_per_epoch: 10
+  grad_clip: null
+  validate_per_epoch: 500
   early_stopping:
     enabled: false
     patience: 100
     min_delta: 0.001
   scheduler:
-    enabled: false
+    enabled: true
     type: exponential
     step_size: null
     gamma: 0.999972
@@ -37,9 +37,9 @@ visualizer:
   historic_values: True
 
 dataloader:
-  num_batches: 64
-  batch_size: 512
-  validation_batch_size: 512
+  num_batches: 8192
+  batch_size: 32
+  validation_batch_size: 256
   window_size: 512
   stride: 512
   shuffle: True
@@ -162,72 +162,12 @@ train_datasets:
 
 val_datasets:
   - type: mssv
-    id: sub-038
+    id: sub-058
     run: 1
     remove_artifact: True
   - type: mssv
-    id: sub-038
+    id: sub-058
     run: 2
-    remove_artifact: True
-  - type: mssv
-    id: sub-039
-    run: 1
-    remove_artifact: True
-  - type: mssv
-    id: sub-039
-    run: 2
-    remove_artifact: True
-  - type: mssv
-    id: sub-039
-    run: 3
-    remove_artifact: True
-  - type: mssv
-    id: sub-041
-    run: 1
-    remove_artifact: True
-  - type: mssv
-    id: sub-041
-    run: 2
-    remove_artifact: True
-  - type: mssv
-    id: sub-041
-    run: 3
-    remove_artifact: True
-  - type: mssv
-    id: sub-043
-    run: 1
-    remove_artifact: True
-  - type: mssv
-    id: sub-048
-    run: 1
-    remove_artifact: True
-  - type: mssv
-    id: sub-048
-    run: 2
-    remove_artifact: True
-  - type: mssv
-    id: sub-048
-    run: 3
-    remove_artifact: True
-  - type: mssv
-    id: sub-054
-    run: 1
-    remove_artifact: True
-  - type: mssv
-    id: sub-054
-    run: 2
-    remove_artifact: True
-  - type: mssv
-    id: sub-056
-    run: 1
-    remove_artifact: True
-  - type: mssv
-    id: sub-059
-    run: 1
-    remove_artifact: True
-  - type: mssv
-    id: sub-060
-    run: 1
     remove_artifact: True
 
 model:
@@ -238,15 +178,15 @@ model:
   features: true
   n_states: 3
   params:
-    lags: [1, 2, 3]
-    ridge: 2.0
-    var_reg: 1.0
-    sticky_coef: 1e-2
-    sticky_kappa: 0.8
+    lags: [1, 2, 4, 8]
+    ridge: 0.1
+    var_reg: 0.05
+    sticky_coef: 0.1
+    sticky_kappa: 0.9
 
 verbose: true
 seed: 123  # Will auto-increment for each run
-results_dir: results/testing/marhmm
-run_name: testing_marhmm_regularisation
+results_dir: results/testing/marhmm/semi_supervised
+run_name: semi_supervised_marhmm_mssv_features
 runs: 1  # Multiple runs for reliability analysis
 validate_data: True

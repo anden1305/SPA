@@ -41,12 +41,13 @@ def init_random_uniform(model: BaseModel,
         model.log_var.copy_(log_var)
     # Initialize initial and transition probabilities with small random values
     # This breaks symmetry and allows the model to learn different transition patterns
-    # model.initial_logits.data.uniform_(-0.5, 0.5) # BEFORE
-    # model.transition_logits.data.uniform_(-0.5, 0.5) # BEFORE
-    model.initial_logits.data.zero_()
-    model.transition_logits.data.zero_()
-    model.initial_logits.data.add_(logits_jitter * torch.randn_like(model.initial_logits.data))
-    model.transition_logits.data.add_(logits_jitter * torch.randn_like(model.transition_logits.data))
+
+    model.initial_logits.data.uniform_(-0.5, 0.5)
+    model.transition_logits.data.uniform_(-0.5, 0.5)
+    # model.initial_logits.data.zero_()
+    # model.transition_logits.data.zero_()
+    # model.initial_logits.data.add_(logits_jitter * torch.randn_like(model.initial_logits.data))
+    # model.transition_logits.data.add_(logits_jitter * torch.randn_like(model.transition_logits.data))
 
     # Uniform initial and transition probabilities
     # model.initial_logits.data.uniform_(-1.0, 1.0)

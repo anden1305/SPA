@@ -4,7 +4,7 @@
 
 trainer:
   epochs: 100000
-  learning_rate: 0.0001  # Best from sweep
+  learning_rate: 0.00005  # Best from sweep
   optimizer: adam
   grad_clip: null
   validate_per_epoch: 500
