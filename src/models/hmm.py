@@ -23,7 +23,6 @@ from src.initializations.random_separated import init_random_separated
 from src.initializations.kmeans import init_kmeans
 from src.initializations.kmeans_pca import init_kmeans_pca
 from src.initializations.apply_noise import apply_noise_and_bias
-from line_profiler import profile
 
 class HMM(BaseModel):
     def __init__(self,
@@ -82,7 +81,6 @@ class HMM(BaseModel):
         nll = -logp
         return nll.mean()
     
-    @profile
     def __emission_log_prob(self, x: Tensor) -> Tensor:
         """Return log p(x_t | z_t) for all states.
 
@@ -110,22 +108,23 @@ class HMM(BaseModel):
             const = D * self._log_2pi
             return -0.5 * (quad + const)
         else:  # full
-            # Batched triangular solves across states to avoid Python loop over S
-            # Shapes: L (S,D,D), diff (B,T,S,D)
+            # Full covariance with Cholesky factorization
             L = self.__full_cov_cholesky()  # (S,D,D)
-            # log det Σ_s = 2 * sum(log(diag(L_s))) -> (S,)
-            log_det = 2 * torch.log(torch.diagonal(L, dim1=1, dim2=2)).sum(-1)
-
-            # Reorder/flatten diff to match batched solve: (S,D,B*T)
-            d_s_btd = diff.permute(2, 0, 1, 3).reshape(S, B * T, D).transpose(1, 2)  # (S,D,B*T)
-            # Solve L_s * y_s = d_s^T for all s in batch
-            y = torch.linalg.solve_triangular(L, d_s_btd, upper=False)  # (S,D,B*T)
-            # Mahalanobis distance per state and time: sum over D, then reshape to (S,B,T)
-            m_dist2 = y.pow(2).sum(dim=1).reshape(S, B, T)  # (S,B,T)
-            # Broadcast constants to (S,B,T), then permute back to (B,T,S)
-            const = (D * self._log_2pi).expand_as(m_dist2)
-            lp_sbt = -0.5 * (m_dist2 + log_det[:, None, None] + const)  # (S,B,T)
-            return lp_sbt.permute(1, 2, 0)  # (B,T,S)
+            # Precompute log det Σ_s = 2 * sum(log(diag(L_s)))
+            log_det = 2 * torch.log(torch.diagonal(L, dim1=1, dim2=2)).sum(-1)  # (S,)
+            
+            # Loop over states (faster than batched solve for this pattern)
+            log_probs = []
+            for s in range(S):
+                Ls = L[s]  # (D,D)
+                # Flatten (B*T,D) for solve
+                diff_flat = diff[:, :, s, :].reshape(B * T, D).T  # (D, B*T)
+                # Solve L y = diff^T -> y
+                y = torch.linalg.solve_triangular(Ls, diff_flat, upper=False)  # (D, B*T)
+                m_dist2 = (y.pow(2).sum(0)).reshape(B, T)  # (B,T)
+                lp_s = -0.5 * (m_dist2 + log_det[s] + D * self._log_2pi)  # (B,T)
+                log_probs.append(lp_s.unsqueeze(-1))  # (B,T,1)
+            return torch.cat(log_probs, dim=-1)  # (B,T,S)
 
     def __full_cov_cholesky(self) -> Tensor:
         """Return lower‑triangular Cholesky factors L (S,D,D) with positive diag."""
@@ -139,7 +138,6 @@ class HMM(BaseModel):
         L = L + torch.diag_embed(diag_pos - diag_raw)
         return L
 
-    @profile
     def __forward_algorithm(self, log_emiss: Tensor, log_pi: Tensor, log_A: Tensor) -> Tensor:
         """Run forward algorithm.
 
@@ -153,15 +151,12 @@ class HMM(BaseModel):
         log_likelihood : (B,)
         """
         _, T, _ = log_emiss.shape
-        A_prob = torch.exp(log_A)  # (S,S)
-        eps = torch.finfo(log_emiss.dtype).tiny
         # alpha_0
         alpha = log_pi.unsqueeze(0) + log_emiss[:, 0, :]  # (B,S)
         for t in range(1, T):
-            m = alpha.max(dim=1, keepdim=True).values                 # (B,1)
-            v = torch.exp(alpha - m)                                   # (B,S)
-            u = v @ A_prob                                             # (B,S)
-            alpha = log_emiss[:, t, :] + m + torch.log(u.clamp_min(eps))
+            # (B,S,S): previous alpha_j + log_A_{j->i}
+            prev = alpha.unsqueeze(2) + log_A.unsqueeze(0)
+            alpha = log_emiss[:, t, :] + torch.logsumexp(prev, dim=1)
         return torch.logsumexp(alpha, dim=1)  # (B,)
 
     @torch.no_grad()
@@ -170,7 +165,6 @@ class HMM(BaseModel):
         return self.__decode_viterbi(x)
 
     @torch.no_grad()
-    @profile
     def __decode_viterbi(self, x: Tensor) -> Tensor:
         """Most likely state sequence (Viterbi path).
 
