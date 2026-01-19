@@ -1,7 +1,11 @@
 import torch
 from src.models.base_model import BaseModel
 
-def init_random_uniform(model: BaseModel, coeff_std: float = 1.0, jitter_std: float = 0.0, var_init: float = 1.0) -> None:
+def init_random_uniform(model: BaseModel, 
+                        coeff_std: float = 1.0, 
+                        jitter_std: float = 0.0, 
+                        var_init: float = 1.0, 
+                        logits_jitter: float = 1e-3) -> None:
     """Fully random means or AR coeffs, unit covariance or scaled variance, uniform π and A."""
     S, D = model.num_states, model.num_features
     device = next(model.parameters()).device  # Use first parameter's device
@@ -37,8 +41,12 @@ def init_random_uniform(model: BaseModel, coeff_std: float = 1.0, jitter_std: fl
         model.log_var.copy_(log_var)
     # Initialize initial and transition probabilities with small random values
     # This breaks symmetry and allows the model to learn different transition patterns
-    model.initial_logits.data.uniform_(-0.5, 0.5)
-    model.transition_logits.data.uniform_(-0.5, 0.5)
+    # model.initial_logits.data.uniform_(-0.5, 0.5) # BEFORE
+    # model.transition_logits.data.uniform_(-0.5, 0.5) # BEFORE
+    model.initial_logits.data.zero_()
+    model.transition_logits.data.zero_()
+    model.initial_logits.data.add_(logits_jitter * torch.randn_like(model.initial_logits.data))
+    model.transition_logits.data.add_(logits_jitter * torch.randn_like(model.transition_logits.data))
 
     # Uniform initial and transition probabilities
     # model.initial_logits.data.uniform_(-1.0, 1.0)

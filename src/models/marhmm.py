@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Sequence
 import math
 import torch
-from torch import Tensor
+from torch import Tensor, diag
 import torch.nn as nn
 
 from src.data.data_loader_collection import DataLoaderCollection
@@ -198,56 +198,129 @@ class MARHMM(BaseModel):
 		L[:, diag_idx, diag_idx] = torch.nn.functional.softplus(diag) + self.jitter
 		return L
 
-	def regularization_loss(self) -> Tensor:
-		"""Composite regularization: ridge on coeffs + variance stabilisation.
+	# def regularization_loss(self) -> Tensor:
+	# 	"""Composite regularization: ridge on coeffs + variance stabilisation.
 
-		Variance term (optional via var_reg) discourages extremely small or large
-		variances which can cause state collapse or numerical issues.
-		"""
+	# 	Variance term (optional via var_reg) discourages extremely small or large
+	# 	variances which can cause state collapse or numerical issues.
+	# 	"""
+	# 	reg = torch.zeros((), device=self.coeffs.device)
+	# 	# L2 on AR coefficients discourages unbounded growth that can lead to near-deterministic emissions
+	# 	if self.ridge > 0:
+	# 		reg = reg + self.ridge * self.coeffs.pow(2).sum()
+	# 	# Variance regularization to avoid collapse to extremely small or huge variances
+	# 	var_reg = float(getattr(self, "var_reg", 0.0))
+	# 	if var_reg > 0:
+	# 		if self.covariance_type == "diag":
+	# 			var = torch.exp(self.log_var)  # (S,D)
+	# 			min_var = 1e-3
+	# 			max_var = 1e3
+	# 			small_pen = torch.clamp(min_var - var, min=0).div(min_var).pow(2)
+	# 			large_pen = torch.clamp(var - max_var, min=0).div(max_var).pow(2)
+	# 			reg = reg + var_reg * (small_pen.sum() + large_pen.sum())
+	# 		elif self.covariance_type == "full":
+	# 			# Regularize Cholesky diagonal entries
+	# 			L = self.__full_cov_cholesky()
+	# 			diag = torch.diagonal(L, dim1=1, dim2=2)
+	# 			min_diag = 1e-3
+	# 			max_diag = 1e3
+	# 			small_pen = torch.clamp(min_diag - diag, min=0).div(min_diag).pow(2)
+	# 			large_pen = torch.clamp(diag - max_diag, min=0).div(max_diag).pow(2)
+	# 			reg = reg + var_reg * (small_pen.sum() + large_pen.sum())
+	# 	else:
+	# 		# Light penalty against too-small variances by default
+	# 		if self.covariance_type == "diag":
+	# 			var = torch.exp(self.log_var)
+	# 			reg = reg + 1e-3 * torch.clamp(1e-4 - var, min=0).pow(2).sum()
+	# 		elif self.covariance_type == "full":
+	# 			L = self.__full_cov_cholesky()
+	# 			diag = torch.diagonal(L, dim1=1, dim2=2)
+	# 			reg = reg + 1e-3 * torch.clamp(1e-4 - diag, min=0).pow(2).sum()
+	# 	# Sticky transitions: encourage self-transitions via KL(A || A_prior)
+	# 	sticky_coef = float(getattr(self, "sticky_coef", 0.0))
+	# 	if sticky_coef > 0:
+	# 		A = torch.softmax(self.transition_logits, dim=-1)
+	# 		S = A.shape[-1]
+	# 		kappa = float(self.sticky_kappa)
+	# 		off = (1.0 - kappa) / max(1, S - 1)
+	# 		A_prior = torch.full_like(A, off)
+	# 		idx = torch.arange(S, device=A.device)
+	# 		A_prior[idx, idx] = kappa
+	# 		kl = A * (torch.log(torch.clamp(A, min=1e-12)) - torch.log(torch.clamp(A_prior, min=1e-12)))
+	# 		reg = reg + sticky_coef * kl.sum()
+	# 	return reg
+	def regularization_loss(self) -> Tensor:
+
+		# -------------------------
+		# Targets / desired scales
+		# -------------------------
+		# Assumes inputs are roughly standardized (per-feature std ~= 1.0).
+		# If your inputs are not standardized, consider setting target_var from data stats.
+		target_var: float = 1.0             # desired per-dimension variance (diag cov)
+		target_std: float = math.sqrt(target_var)  # desired per-dimension std (full cov diag of Cholesky)
+		target_log_var: float = math.log(target_var)
+		target_log_std: float = math.log(target_std)
+
+		# Optional: shrink off-diagonal Cholesky entries (proxy for correlation complexity)
+		# If you don’t have a separate coefficient in config, keep it at 0.
+		corr_reg: float = float(getattr(self, "corr_reg", 0.0))
+
+		# -------------------------
+		# Build regularization
+		# -------------------------
 		reg = torch.zeros((), device=self.coeffs.device)
-		# L2 on AR coefficients discourages unbounded growth that can lead to near-deterministic emissions
-		if self.ridge > 0:
-			reg = reg + self.ridge * self.coeffs.pow(2).sum()
-		# Variance regularization to avoid collapse to extremely small or huge variances
+
+		# 1) L2 on AR coefficients (from params: self.ridge)
+		if getattr(self, "ridge", 0.0) > 0:
+			# mean() keeps the scale more stable across different S/D/L
+			reg = reg + self.ridge * self.coeffs.pow(2).mean()
+
+		# 2) Emission scale shrinkage (from params: self.var_reg)
 		var_reg = float(getattr(self, "var_reg", 0.0))
 		if var_reg > 0:
 			if self.covariance_type == "diag":
-				var = torch.exp(self.log_var)  # (S,D)
-				min_var = 1e-3
-				max_var = 1e3
-				small_pen = torch.clamp(min_var - var, min=0).div(min_var).pow(2)
-				large_pen = torch.clamp(var - max_var, min=0).div(max_var).pow(2)
-				reg = reg + var_reg * (small_pen.sum() + large_pen.sum())
+				# Penalize deviation of log-variance from target
+				# shape: (S, D)
+				reg = reg + var_reg * (self.log_var - target_log_var).pow(2).mean()
+
 			elif self.covariance_type == "full":
-				# Regularize Cholesky diagonal entries
-				L = self.__full_cov_cholesky()
-				diag = torch.diagonal(L, dim1=1, dim2=2)
-				min_diag = 1e-3
-				max_diag = 1e3
-				small_pen = torch.clamp(min_diag - diag, min=0).div(min_diag).pow(2)
-				large_pen = torch.clamp(diag - max_diag, min=0).div(max_diag).pow(2)
-				reg = reg + var_reg * (small_pen.sum() + large_pen.sum())
-		else:
-			# Light penalty against too-small variances by default
-			if self.covariance_type == "diag":
-				var = torch.exp(self.log_var)
-				reg = reg + 1e-3 * torch.clamp(1e-4 - var, min=0).pow(2).sum()
-			elif self.covariance_type == "full":
-				L = self.__full_cov_cholesky()
-				diag = torch.diagonal(L, dim1=1, dim2=2)
-				reg = reg + 1e-3 * torch.clamp(1e-4 - diag, min=0).pow(2).sum()
-		# Sticky transitions: encourage self-transitions via KL(A || A_prior)
+				# Penalize deviation of log(diag(L)) from target_log_std
+				# diag(L) corresponds to std-like scale of each dimension in the Cholesky factor
+				L = self.__full_cov_cholesky()  # (S, D, D)
+				diag = torch.diagonal(L, dim1=1, dim2=2)  # (S, D)
+				reg = reg + var_reg * (torch.log(diag) - target_log_std).pow(2).mean()
+    
+				print("diag min/max:", diag.min().item(), diag.max().item())
+				print("log(diag) min/max:", torch.log(diag).min().item(), torch.log(diag).max().item())
+				print('reg:', reg.item())
+				print('var_reg:', var_reg)
+
+				# Optional: shrink off-diagonal entries of L (encourages simpler correlation structure)
+				if corr_reg > 0:
+					S, D = diag.shape
+					off = L.clone()
+					idx = torch.arange(D, device=L.device)
+					off[:, idx, idx] = 0.0
+					reg = reg + corr_reg * off.pow(2).mean()
+			else:
+				raise ValueError(f"Unsupported covariance_type: {self.covariance_type}")
+
+		# 3) Sticky transitions (from params: self.sticky_coef)
 		sticky_coef = float(getattr(self, "sticky_coef", 0.0))
 		if sticky_coef > 0:
 			A = torch.softmax(self.transition_logits, dim=-1)
 			S = A.shape[-1]
-			kappa = float(self.sticky_kappa)
+			kappa = float(getattr(self, "sticky_kappa", 0.9))
 			off = (1.0 - kappa) / max(1, S - 1)
+
 			A_prior = torch.full_like(A, off)
 			idx = torch.arange(S, device=A.device)
 			A_prior[idx, idx] = kappa
+
+			# KL(A || A_prior)
 			kl = A * (torch.log(torch.clamp(A, min=1e-12)) - torch.log(torch.clamp(A_prior, min=1e-12)))
 			reg = reg + sticky_coef * kl.sum()
+
 		return reg
 
 	@torch.no_grad()
@@ -300,17 +373,17 @@ class MARHMM(BaseModel):
 	@torch.no_grad()
 	def __initialize_weights(
 		self,
-		coeff_std: float = 0.05,
-		jitter_std: float = 0.05,
-		var_init: float = 0.05,
+		coeff_std: float = 1e-2, # HERE
+		jitter_std: float = 1e-3, # HERE
+		var_init: float = 1.0, # HERE
 		kmeans_iters: int = 150,
 		estimate_transitions: bool = True,
-		mean_std: float = 0.01,
-		cov_noise_std: float = 0.01,
-		init_logits_std: float = 0.01,
-		self_transition_bias: float = 0.01,
-		jitter_std_separated: float = 0.05,
-		ar_noise_std_init: float = 0.0001,
+		mean_std: float = 0.1,
+		cov_noise_std: float = 0.1,
+		init_logits_std: float = 0.1,
+		self_transition_bias: float = 0.1,
+		jitter_std_separated: float = 0.5,
+		ar_noise_std_init: float = 0.01,
 		spread: float = 0.05,
 	) -> None:
 		"""Parameter initialization with support for different strategies.
@@ -342,9 +415,15 @@ class MARHMM(BaseModel):
 			init_noisy = True
 
 		data = None
+		print(f"Initializing MARHMM with strategy: {strategy}, init_noisy: {init_noisy}")
 		if strategy in {"kmeans", "kmeans_pca"}:
-			data, _ = self.data_loader.get_all_data()
-			data = self.__validate_input(data)
+			if self.get_latent_features is not None:
+				x, y, sub_ids = self.data_loader.get_all_data()
+				data = self.get_latent_features(x, sub_ids)
+				data = self.__validate_input(data)
+			else:
+				data, _, _ = self.data_loader.get_all_data()
+				data = self.__validate_input(data)
 
 		if strategy == "random_uniform":
 			init_random_uniform(self, coeff_std=coeff_std, jitter_std=jitter_std, var_init=var_init)
@@ -358,7 +437,7 @@ class MARHMM(BaseModel):
 			init_kmeans_pca(self, data, kmeans_iters=kmeans_iters, estimate_transitions=estimate_transitions)
 		else:
 			raise ValueError(f"Unknown initialization strategy: {strategy}")
-
+		
 		if init_noisy:
 			apply_noise_and_bias(
 				self,
