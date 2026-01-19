@@ -13,7 +13,7 @@ NUM_AGENTS=$2
 ### default values for optional arguments. Default is 1 trial per agent
 TRIALS_PER_AGENT=${3:-1}
 ### default is 4 hours per job
-WALLTIME=${4:-12:00}
+WALLTIME=${4:-12:00} 
 ### default is gpuv100, but options are [gpuv100, gpua100, gpua10, gpul40s]
 ### bqueues | grep -i gpu
 QUEUE=${5:-gpuv100}
@@ -68,7 +68,7 @@ bsub -J "wandb_sweep_agent[1-${NUM_AGENTS}]" \
   -o "$OUTPUT_DIR/sweep_${SWEEP_ID}_job_%J_agent_%I.out" \
   -e "$OUTPUT_DIR/sweep_${SWEEP_ID}_job_%J_agent_%I.err" \
   -n 4 \
-  -R "rusage[mem=6GB]" \
+  -R "rusage[mem=5GB]" \
   -R "span[hosts=1]" \
   -W "$WALLTIME" \
   -gpu "num=1:mode=exclusive_process" \
@@ -101,6 +101,6 @@ echo "Submitted array job. Monitor with bjobs and check hpc/output/sweep_${SWEEP
 ### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/marhmm/marhmm_mssv_features.yaml 9 1 12:00 gpua100
 
 ###    raw
-### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/hmm/hmm_mssv_raw.yaml 15 1 24:00 gpua100
-### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/marhmm/marhmm_mssv_raw.yaml 15 1 24:00 gpua100
+### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/hmm/hmm_mssv_raw.yaml 9 1 12:00 gpua100
+### bash hpc/submit/launch_wandb_sweep.sh src/config/sweep/marhmm/marhmm_mssv_raw.yaml 9 1 12:00 gpua100
 
