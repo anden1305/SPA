@@ -290,10 +290,10 @@ class MARHMM(BaseModel):
 				diag = torch.diagonal(L, dim1=1, dim2=2)  # (S, D)
 				reg = reg + var_reg * (torch.log(diag) - target_log_std).pow(2).mean()
     
-				print("diag min/max:", diag.min().item(), diag.max().item())
-				print("log(diag) min/max:", torch.log(diag).min().item(), torch.log(diag).max().item())
-				print('reg:', reg.item())
-				print('var_reg:', var_reg)
+				# print("diag min/max:", diag.min().item(), diag.max().item())
+				# print("log(diag) min/max:", torch.log(diag).min().item(), torch.log(diag).max().item())
+				# print('reg:', reg.item())
+				# print('var_reg:', var_reg)
 
 				# Optional: shrink off-diagonal entries of L (encourages simpler correlation structure)
 				if corr_reg > 0:
