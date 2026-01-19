@@ -19,8 +19,10 @@ class Validator:
     def __init__(self,
                  data_loader: DataLoaderCollection,
                  model: BaseModel,
-                 config: GlobalConfig):
+                 config: GlobalConfig,
+                 train_data_loader: DataLoaderCollection | None = None):
         self.data_loader = data_loader
+        self.train_data_loader = train_data_loader
         self.model = model
         self.global_config = config
         self.config = self.global_config.validator
@@ -88,6 +90,33 @@ class Validator:
             if self.config.nmi:
                 nmi = calculate_nmi(preds, y)
                 self.validations[epoch]["nmi"] = nmi
+            
+            # Compute state entropy and perplexity for validation data
+            entropy_metrics = self.__compute_state_entropy(preds, self.data_loader.get_num_states())
+            self.validations[epoch]["entropy"] = entropy_metrics["entropy"]
+            self.validations[epoch]["perplexity"] = entropy_metrics["perplexity"]
+            
+            # Compute train NMI if train data loader is available
+            if self.config.nmi and self.train_data_loader is not None:
+                x_train, y_train = self.train_data_loader.get_all_data()
+                preds_train = self.model.predict(x_train)
+                
+                # Handle MARHMM burn-in for train data
+                if hasattr(self.model, 'max_lag') and self.model.max_lag > 0:
+                    preds_train = preds_train[:, self.model.max_lag:]
+                    y_train = y_train[:, self.model.max_lag:]
+                
+                y_train_np = y_train.detach().cpu().numpy().flatten()
+                preds_train_np = preds_train.detach().cpu().numpy().flatten()
+                train_nmi = calculate_nmi(preds_train_np, y_train_np)
+                # Store with 'train_' prefix to distinguish from val NMI
+                # Note: logger will add 'train/' prefix when logging
+                self.validations[epoch]["train_nmi"] = train_nmi
+                
+                # Compute state entropy and perplexity for training data
+                train_entropy_metrics = self.__compute_state_entropy(preds_train_np, self.train_data_loader.get_num_states())
+                self.validations[epoch]["train_entropy"] = train_entropy_metrics["entropy"]
+                self.validations[epoch]["train_perplexity"] = train_entropy_metrics["perplexity"]
             if self.config.accuracy:
                 try:
                     aligned_preds = align_labels_hungarian(y, preds)
@@ -108,10 +137,19 @@ class Validator:
         self.model.train()  # Set back to training mode
         if self.global_config.verbose:
             nmi_val = self.validations[epoch].get('nmi', 'N/A')
+            train_nmi_val = self.validations[epoch].get('train_nmi', 'N/A')
             acc_val = self.validations[epoch].get('accuracy', 'N/A')
+            perp_val = self.validations[epoch].get('perplexity', 'N/A')
+            train_perp_val = self.validations[epoch].get('train_perplexity', 'N/A')
             nmi_str = f"{nmi_val:.4f}" if isinstance(nmi_val, (int, float)) else str(nmi_val)
+            train_nmi_str = f"{train_nmi_val:.4f}" if isinstance(train_nmi_val, (int, float)) else str(train_nmi_val)
             acc_str = f"{acc_val:.4f}" if isinstance(acc_val, (int, float)) else str(acc_val)
-            print(f"Epoch {epoch + 1} - NMI: {nmi_str}, Accuracy: {acc_str}")
+            perp_str = f"{perp_val:.2f}" if isinstance(perp_val, (int, float)) else str(perp_val)
+            train_perp_str = f"{train_perp_val:.2f}" if isinstance(train_perp_val, (int, float)) else str(train_perp_val)
+            print(f"Epoch {epoch + 1} - Val NMI: {nmi_str}, Train NMI: {train_nmi_str}, "
+                  f"Val Perp: {perp_str}/{self.data_loader.get_num_states()}, "
+                  f"Train Perp: {train_perp_str}/{self.train_data_loader.get_num_states() if self.train_data_loader else 'N/A'}, "
+                  f"Acc: {acc_str}")
     
     def validate_runs(self, train_details: list[TrainDetails]):
         validations = {}
@@ -153,6 +191,41 @@ class Validator:
             json.dump(self.data_validations, f, indent=2)
 
     ####### HELPER METHODS #######
+
+    def __compute_state_entropy(self, predictions: np.ndarray, num_states: int) -> dict[str, float]:
+        """Compute state usage entropy and perplexity (effective number of states).
+        
+        Args:
+            predictions: Array of predicted state labels
+            num_states: Total number of states in the model
+            
+        Returns:
+            Dictionary with 'entropy' and 'perplexity' keys
+        """
+        # Count state frequencies
+        counts = np.bincount(predictions.astype(int), minlength=num_states)
+        total = counts.sum()
+        
+        if total == 0:
+            return {"entropy": 0.0, "perplexity": 0.0}
+        
+        # Compute probability distribution
+        probs = counts / total
+        
+        # Compute entropy: H = -sum(p * log(p))
+        # Use base-e logarithm for natural entropy
+        entropy = 0.0
+        for p in probs:
+            if p > 0:  # avoid log(0)
+                entropy -= p * np.log(p)
+        
+        # Perplexity = exp(entropy) = effective number of states
+        perplexity = np.exp(entropy)
+        
+        return {
+            "entropy": float(entropy),
+            "perplexity": float(perplexity)
+        }
 
     def __calculate_cross_nmi(self, train_details: list[TrainDetails]):
         cross_nmis: dict[int, float] = {}

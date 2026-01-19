@@ -74,7 +74,12 @@ class ExperimentLogger:
         if isinstance(val_metrics, dict):
             for k, v in val_metrics.items():
                 if isinstance(v, (int, float)):
-                    payload[f'val/{k}'] = float(v)
+                    # Separate train metrics from validation metrics
+                    if k.startswith('train_'):
+                        # Remove 'train_' prefix and add to train/ namespace
+                        payload[f'train/{k[6:]}'] = float(v)
+                    else:
+                        payload[f'val/{k}'] = float(v)
         # Don't pass step to avoid non-monotonic warnings across internal runs
         self._wb.log(payload)
 
