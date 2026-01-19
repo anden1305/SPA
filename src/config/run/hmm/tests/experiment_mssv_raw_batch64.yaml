@@ -29,8 +29,8 @@ visualizer:
   summary_statistics: True
   historic_values: True
 dataloader:
-  num_batches: 4000
-  batch_size: 32
+  num_batches: 2000
+  batch_size: 64
   validation_batch_size: 1024
   window_size: null
   stride: null

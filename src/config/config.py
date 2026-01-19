@@ -40,6 +40,7 @@ class ValidatorConfig(BaseModel):
     learning_rate: bool = Field(..., description="Whether to compute learning rate.")
     state_distinctness: bool = Field(..., description="Whether to compute state distinctness.")
     summary_statistics: bool = Field(..., description="Whether to compute summary statistics.")
+    log_likelihood: bool = Field(..., description="Whether to compute validation log likelihood.")
     # No hardcoded constants - all validation metrics are configurable toggles
 
 class VisualizerConfig(BaseModel):
@@ -81,6 +82,7 @@ class ModelConfig(BaseModel):
     init_strategy: str = Field(..., pattern="^(random_uniform|random_dirichlet|random_separated|kmeans|kmeans_pca|kmeans_pca_noisy)$", description="Initialization strategy for the model.")
     init_noisy: bool = Field(...)  # Adds Gaussian noise to initialization; noise levels hardcoded below
     features : bool = Field(..., description="Whether the model is to be used on raw or feature data.")
+    n_states: int | None = Field(None, ge=2, description="Number of states/stages for the model. If None, inferred from data labels. Use this to override (e.g., for substages experiments).")
     params: dict[str, Any] = Field(..., description="Model-specific parameters.")
     # MAR-HMM params (via params dict - these ARE configurable):
     #   - ridge: L2 penalty on regression coefficients (default 0.0)
