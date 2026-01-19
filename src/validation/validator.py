@@ -68,6 +68,14 @@ class Validator:
         self.model.prepare_for_inference()
         xt, yt = self.data_loader.get_all_data()
         with torch.no_grad():
+            # Compute validation loss (negative log likelihood)
+            if self.config.log_likelihood:
+                val_nll = self.model.forward(xt)
+                # Store both NLL and LL (higher LL is better for comparing models)
+                # Note: keys stored without 'val_' prefix; logger adds 'val/' prefix
+                self.validations[epoch]["nll"] = val_nll.item()
+                self.validations[epoch]["log_likelihood"] = -val_nll.item()
+            
             predst = self.model.predict(xt)
             
             # Handle MARHMM burn-in
