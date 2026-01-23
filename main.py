@@ -13,7 +13,7 @@ if __name__ == "__main__":
     method = args.method
     config_path = args.config_path
 
-    if method not in ["train", "train_vae", "generate", "explore_synthetic", "sweep"]:
+    if method not in ["train", "train_vae", "generate", "explore_synthetic", "sweep", "validate_cvae_gmm", "plot_substages"]:
         raise ValueError(f"Unknown method: {method}")
     
     # Enforce that profiling is only valid for training runs
@@ -34,3 +34,9 @@ if __name__ == "__main__":
         data_orchestrator.explore_synthetic()
     elif method == "sweep":
         run_sweep(config_path)
+    elif method == "validate_cvae_gmm":
+        orchestrator = Orchestrator(config_path, profile=args.profile)
+        orchestrator.predict_cvae()
+    elif method == "plot_substages":
+        from scripts.substage_analysis.run_substage_analysis import run_substage_analysis
+        run_substage_analysis(config_path)
