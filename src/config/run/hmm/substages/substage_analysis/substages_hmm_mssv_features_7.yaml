@@ -1,0 +1,184 @@
+# Substages HMM on MSSV Features: n_states=6
+
+trainer:
+  epochs: 100000
+  learning_rate: 0.00005
+  optimizer: adam
+  grad_clip: null
+  validate_per_epoch: 500
+  early_stopping:
+    enabled: false
+    patience: 100
+    min_delta: 0.001
+  scheduler:
+    enabled: true
+    type: exponential
+    step_size: null
+    gamma: 0.999972
+
+validator:
+  nmi: True
+  accuracy: True
+  cross_nmi: False
+  learning_rate: True
+  state_distinctness: True
+  summary_statistics: True
+  log_likelihood: True
+
+visualizer:
+  losses: True
+  learning_rate: True
+  pca_tripanel: True
+  confusion_matrix: True
+  state_distinctness: True
+  summary_statistics: True
+  historic_values: True
+
+dataloader:
+  num_batches: 8192
+  batch_size: 32
+  validation_batch_size: 256
+  window_size: 512
+  stride: 512
+  shuffle: True
+  normalize: True
+  transforms:
+    - type: band_pass_filter
+      channel: EEG
+      params:
+        low_cutoff: 0.5
+        high_cutoff: 30
+    - type: percentile_clipping
+      channel: EEG
+      params:
+        percentile: 0.5
+    - type: rms
+      channel: EEG
+      params: {}
+    - type: theta_delta_ratio
+      channel: EEG
+      params: {}
+    - type: theta_beta_ratio
+      channel: EEG
+      params: {}
+    - type: beta_delta_ratio
+      channel: EEG
+      params: {}
+    - type: theta_gamma_pac
+      channel: EEG
+      params: {}
+    - type: fft_relative_band_power
+      channel: EEG
+      params:
+        bands:
+          - [0.5, 4]
+          - [6, 9]
+          - [15, 30]
+    - type: percentile_clipping
+      channel: EMG
+      params:
+        percentile: 0.1
+    - type: rms
+      channel: EMG
+      params: {}
+
+train_datasets:
+  - type: mssv
+    id: sub-038
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-038
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-039
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-039
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-039
+    run: 3
+    remove_artifact: True
+  - type: mssv
+    id: sub-041
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-041
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-041
+    run: 3
+    remove_artifact: True
+  - type: mssv
+    id: sub-043
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-054
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-054
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-056
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-059
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-060
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-069
+    run: 1
+    remove_artifact: True
+
+val_datasets:
+  - type: mssv
+    id: sub-048
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-048
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-048
+    run: 3
+    remove_artifact: True
+
+model:
+  type: hmm
+  covariance_type: full
+  init_strategy: random_uniform
+  init_noisy: false
+  features: true
+  n_states: 7
+  params: {}
+
+verbose: true
+seed: 123
+results_dir: results/substages_analysis/hmm
+run_name: substages_hmm_mssv_features_7
+runs: 1
+validate_data: True
+
+wandb:
+  enabled: false
+  group: substages_hmm_mssv_features
+  tags:
+    - substages
+    - hmm
+    - mssv
+    - features

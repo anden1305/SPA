@@ -10,21 +10,29 @@ mkdir -p hpc/output/reliability
 echo "Submitting Reliability Experiments..."
 echo "======================================"
 
-echo ""
-echo "1. HMM on MSSV Features (10 runs, ~24 hours)"
-bsub < hpc/submit/reliability/run_reliability_hmm_mssv_features.sh
+# echo ""
+# echo "1. HMM on MSSV Features (10 runs, ~24 hours)"
+# bsub < hpc/submit/reliability/run_reliability_hmm_mssv_features.sh
+
+# echo ""
+# echo "2. HMM on Synthetic Features (10 runs, ~12 hours)"
+# bsub < hpc/submit/reliability/run_reliability_hmm_synth_features.sh
+
+# echo ""
+# echo "3. MAR-HMM on MSSV Features (10 runs, ~24 hours)"
+# bsub < hpc/submit/reliability/run_reliability_marhmm_mssv_features.sh
+
+# echo ""
+# echo "4. MAR-HMM on Synthetic Features (10 runs, ~12 hours)"
+# bsub < hpc/submit/reliability/run_reliability_marhmm_synth_features.sh
 
 echo ""
-echo "2. HMM on Synthetic Features (10 runs, ~12 hours)"
-bsub < hpc/submit/reliability/run_reliability_hmm_synth_features.sh
+echo "5. HMM on Synthetic RAW (10 runs, ~24 hours)"
+bsub < hpc/submit/reliability/run_reliability_hmm_synth_raw.sh
 
 echo ""
-echo "3. MAR-HMM on MSSV Features (10 runs, ~24 hours)"
-bsub < hpc/submit/reliability/run_reliability_marhmm_mssv_features.sh
-
-echo ""
-echo "4. MAR-HMM on Synthetic Features (10 runs, ~12 hours)"
-bsub < hpc/submit/reliability/run_reliability_marhmm_synth_features.sh
+echo "6. MAR-HMM on Synthetic RAW (10 runs, ~24 hours)"
+bsub < hpc/submit/reliability/run_reliability_marhmm_synth_raw.sh
 
 echo ""
 echo "======================================"
