@@ -40,6 +40,7 @@ class ValidatorConfig(BaseModel):
     learning_rate: bool = Field(..., description="Whether to compute learning rate.")
     state_distinctness: bool = Field(..., description="Whether to compute state distinctness.")
     summary_statistics: bool = Field(..., description="Whether to compute summary statistics.")
+    log_likelihood: bool = Field(..., description="Whether to compute log-likelihood.")
     # No hardcoded constants - all validation metrics are configurable toggles
 
 class VisualizerConfig(BaseModel):
@@ -156,6 +157,7 @@ class GlobalConfig(BaseModel):
     validate_data: bool = Field(..., description="Whether to perform data validation before training.")
     wandb: WandbConfig | None = Field(default_factory=WandbConfig, description="Weights & Biases settings.")
     cvae: CVAE = Field(default_factory=CVAE)
+    num_states: int | None = Field(default=None, description="Number of hidden states in the model.")
     # No hardcoded constants at global level - all experiment settings are configurable
 
     @classmethod

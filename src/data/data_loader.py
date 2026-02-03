@@ -80,10 +80,11 @@ class DataLoader(Iterator):
         self.feature_names = []
         
         # apply transforms
-        x, y = vae_preprocessing(x, y)
+        x, y, x_non_norm = vae_preprocessing(x, y)
         
         # save & print data
         self.data = (x, y)
+        self.x_non_norm = x_non_norm
         self.__print_data_info()
     
     def __process_data_legacy(self):
@@ -409,6 +410,9 @@ class DataLoader(Iterator):
     
     def get_data(self) -> tuple[np.ndarray, np.ndarray]:
         return self.data
+    
+    def get_non_normalized_data(self) -> np.ndarray:
+        return self.x_non_norm
     
     def __iter__(self) -> "DataLoader":
         """Handles every start of new epoch logic (shuffle etc.)."""

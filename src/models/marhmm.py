@@ -297,11 +297,6 @@ class MARHMM(BaseModel):
 				L = self.__full_cov_cholesky()  # (S, D, D)
 				diag = torch.diagonal(L, dim1=1, dim2=2)  # (S, D)
 				reg = reg + var_reg * (torch.log(diag) - target_log_std).pow(2).mean()
-    
-				print("diag min/max:", diag.min().item(), diag.max().item())
-				print("log(diag) min/max:", torch.log(diag).min().item(), torch.log(diag).max().item())
-				print('reg:', reg.item())
-				print('var_reg:', var_reg)
 
 				# Optional: shrink off-diagonal entries of L (encourages simpler correlation structure)
 				if corr_reg > 0:
@@ -385,8 +380,8 @@ class MARHMM(BaseModel):
 		coeff_std: float = 1e-2, # HERE
 		jitter_std: float = 1e-3, # HERE
 		var_init: float = 1.0, # HERE
-		kmeans_iters: int = 150,
-		estimate_transitions: bool = True,
+		kmeans_iters: int = 15000,
+		estimate_transitions: bool = False,
 		mean_std: float = 0.1,
 		cov_noise_std: float = 0.1,
 		init_logits_std: float = 0.1,

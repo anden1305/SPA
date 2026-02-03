@@ -268,8 +268,8 @@ class VAEPreprocessing(BaseTransform):
         y = self.__downsample_by_majority_voting(y_windows=y)
         x, y = self.__apply_sequence_length(x, y)
         if self.global_config.cvae.post_normalize:
-            x = self.__normalize(x, TYPE="fft")
-        return x, y
+            x_norm = self.__normalize(x, TYPE="fft")
+        return x_norm, y, x
     
     def get_short_name(self):
         return "VAEPreprocessing"

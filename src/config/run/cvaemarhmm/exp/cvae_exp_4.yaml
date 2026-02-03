@@ -202,7 +202,7 @@ model:
     ridge: 0.1
     var_reg: 0.05
     sticky_coef: 0.1
-    sticky_kappa: 0.9
+    sticky_kappa: 1.0
     
     # CVAE parameters
     # weights

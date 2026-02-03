@@ -56,6 +56,7 @@ class Visualizer:
             self.__plot_feature_correlations(path=path)
         self.__plot_feature_separability(path=path)
     
+    
     def visualize(self, train_details: TrainDetails):
         path = train_details.get_path() / "plots"
         path.mkdir(parents=True, exist_ok=True)
@@ -79,6 +80,24 @@ class Visualizer:
             self.__plot_historic_values(train_details)
         if self.config.learning_rate:
             self.__plot_learning_rate(train_details)
+        y_hat = train_details.get_trained_predictions()
+        np.savez(path / "results.npz", y_hat=y_hat, y_true=y, x_latent=x)
+    
+    
+    def visualize_cvae_gmm(self, y_hat, y_true, x_latent: torch.Tensor, x: torch.Tensor, nmi, likelihood):
+        path = Path(self.global_config.results_dir) / self.global_config.run_name / "plots"
+        path.mkdir(parents=True, exist_ok=True)
+        y_hat = y_hat.flatten().cpu().numpy()
+        y_true = y_true.flatten().cpu().numpy()
+        x_latent = x_latent.detach().cpu().numpy()
+        self.__plot_pca_tripanel(None, x=x_latent, y=y_true, overwrite_path=path, pred_y=y_hat)
+        # write a txt file with nmi and likelihood
+        with open(path / "metrics.txt", "w") as f:
+            f.write(f"NMI: {nmi}\n")
+            f.write(f"Likelihood: {likelihood}\n")
+        # write y_hat, y_true, x_latent to npz
+        np.savez(path / "results.npz", y_hat=y_hat, y_true=y_true, x_latent=x_latent, x=x)
+        
     
     def visualize_runs(self, train_details: list[TrainDetails], validations: dict[str, Any]):
         path = Path(self.global_config.results_dir) / self.global_config.run_name / "plots"
@@ -1131,18 +1150,22 @@ class Visualizer:
             if loss_values:
                 print(f"Min Loss at epoch {min_loss_epoch}: {min_loss:.6g}")
 
-    def __plot_pca_tripanel(self, train_details: TrainDetails, x: Tensor, y: Tensor, overwrite_path: str = None):
+    def __plot_pca_tripanel(self, train_details: TrainDetails, x: Tensor, y: Tensor, overwrite_path: str = None, pred_y: np.ndarray = None):
         """Save tri-panel PCA plots comparing HMM-init, HMM-trained, and True labels."""
         
         if len(y.shape) == 3:
             y = y[:, :, 0]
         
-        if train_details is None:
+        if train_details is None and pred_y is None:
             return
         
-        init_arr = train_details.get_initial_predictions()
-        trained_arr = train_details.get_trained_predictions()
-
+        if pred_y is not None:
+            init_arr = pred_y
+            trained_arr = pred_y
+        else:
+            init_arr = train_details.get_initial_predictions()
+            trained_arr = train_details.get_trained_predictions()
+        
         X = x.reshape(-1, x.shape[-1]) if x.ndim >= 2 else None
         if X is None or X.ndim != 2:
             raise ValueError(f"x must be (T,D) or (B,T,D); got {x.shape}")
@@ -1178,7 +1201,7 @@ class Visualizer:
         proj = U[:, :K] * S[:K]
 
         # Colors and titles
-        palette = np.array(["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"])
+        palette = np.array(["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"])
         def colors(a):
             u = np.unique(a)
             lut = {v: palette[i % len(palette)] for i, v in enumerate(u)}

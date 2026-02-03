@@ -426,3 +426,116 @@ class ConditionalVAE(nn.Module):
             self.beta = max(self.min_beta, self.max_beta - (self.max_beta - self.min_beta) * excess_epochs / self.beta_slowdown_epochs)
         reg = self.beta * reg_loss
         return reg
+    
+    
+    ## USE GMM TO PREDICT CLUSTERS
+
+    @torch.no_grad()
+    def predict_gmm_labels(
+        self,
+        x: torch.Tensor,
+        subject_ids: torch.Tensor,
+        *,
+        use_mu: bool = True,
+        likelihood_type: str = "posterior",  # "posterior" | "log_posterior" | "joint" | "log_joint"
+        initialize_if_needed: bool = False,
+        max_points: int = 200_000,
+    ):
+        """
+        Predict labels (GMM component indices) from the learned GMM prior via maximum likelihood.
+
+        Args:
+            x: (B, S, C, F)
+            subject_ids: (B,) or (B, S)
+            use_mu: If True, use encoder mean mu as latent z (deterministic).
+                    If False, sample z via reparameterization (stochastic).
+            likelihood_type:
+                - "posterior":     p(k* | z)          (recommended)
+                - "log_posterior": log p(k* | z)
+                - "joint":         p(z, k*) = pi_k* N(z|...)
+                - "log_joint":     log p(z, k*)
+            initialize_if_needed: If prior is "warm_gmm" and not initialized, optionally run KMeans init.
+            max_points: Passed to KMeans init if used.
+
+        Returns:
+            y: (B, S) LongTensor of predicted component indices
+            likelihood: (B, S) Tensor of chosen likelihood quantity (see likelihood_type)
+        """
+        if self.prior not in ("gmm", "warm_gmm"):
+            raise ValueError(f"predict_gmm_labels requires a GMM prior, got prior='{self.prior}'.")
+
+        # If warm_gmm and not initialized, optionally initialize from current encoder means.
+        if self.prior == "warm_gmm" and (not getattr(self, "gmm_warmup_initialized", False)):
+            if not initialize_if_needed:
+                raise RuntimeError(
+                    "GMM prior not initialized (warm_gmm). "
+                    "Run training past gmm_warmup_epochs or call with initialize_if_needed=True."
+                )
+            means, logvars, logits = self.__get_kmeans_centroids(max_points=max_points)
+            self.prior_means.copy_(means)
+            self.prior_logvars.copy_(logvars)
+            self.prior_logits.copy_(logits)
+            self.gmm_warmup_initialized = True
+
+        self.eval()
+
+        B, S, _, _ = x.shape
+        x = x.to(self.device)
+
+        # Encode to latent
+        mu, logvar = self.encode(x, subject_ids=subject_ids)
+        z = mu if use_mu else self.reparameterize(mu, logvar)  # (B, S, L)
+
+        # Flatten to (N, L) where N = B*S
+        z_flat = z.reshape(-1, self.latent_dim)
+
+        # Compute log p(z | k) for each component k
+        # Shapes:
+        #   z_ex:        (N, 1, L)
+        #   means_ex:    (1, K, L)
+        #   logvars_ex:  (1, K, L)
+        z_ex = z_flat.unsqueeze(1)
+        means_ex = self.prior_means.unsqueeze(0)
+        logvars_ex = self.prior_logvars.unsqueeze(0)
+
+        log_prob_components = -0.5 * (
+            math.log(2 * math.pi) +
+            logvars_ex +
+            (z_ex - means_ex).pow(2) / logvars_ex.exp()
+        ).sum(dim=2)  # (N, K)
+
+        # Add log mixture weights
+        log_mix = F.log_softmax(self.prior_logits, dim=0).unsqueeze(0)  # (1, K)
+        log_joint = log_prob_components + log_mix  # (N, K)  == log p(z, k)
+
+        # ML label: argmax_k log p(z, k)
+        y_flat = torch.argmax(log_joint, dim=1)  # (N,)
+
+        # Gather chosen component scores
+        log_joint_chosen = log_joint.gather(1, y_flat.unsqueeze(1)).squeeze(1)  # (N,)
+
+        # Posterior of chosen label: p(k* | z) = exp(log p(z,k*) - logsumexp_k log p(z,k))
+        log_norm = torch.logsumexp(log_joint, dim=1)  # (N,)
+        log_post_chosen = log_joint_chosen - log_norm  # (N,)
+
+        if likelihood_type == "posterior":
+            lik_flat = log_post_chosen.exp()
+        elif likelihood_type == "log_posterior":
+            lik_flat = log_post_chosen
+        elif likelihood_type == "joint":
+            lik_flat = log_joint_chosen.exp()
+        elif likelihood_type == "log_joint":
+            lik_flat = log_joint_chosen
+        else:
+            raise ValueError(
+                "likelihood_type must be one of: "
+                "'posterior', 'log_posterior', 'joint', 'log_joint'"
+            )
+        
+        # Reshape back to (B, S)
+        y = y_flat.view(B, S).long()
+        likelihood = lik_flat.view(B, S)
+        # expected likelihood
+        likelihood = likelihood.mean()
+        
+        return y, likelihood, mu

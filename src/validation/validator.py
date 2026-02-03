@@ -19,9 +19,11 @@ from src.helpers.state_distinctness import compute_state_distinctness
 class Validator:
     def __init__(self,
                  data_loader: DataLoaderCollection,
+                 train_data_loader: DataLoaderCollection,
                  model: BaseModel,
                  config: GlobalConfig):
         self.data_loader = data_loader
+        self.train_data_loader = train_data_loader
         self.model = model
         self.global_config = config
         self.config = self.global_config.validator
@@ -40,7 +42,10 @@ class Validator:
         self.model.prepare_for_inference()
         xt, yt, sub_ids = self.data_loader.get_all_data()
         with torch.no_grad():
-            predst = self.model.predict(xt, sub_ids)
+            if type(self.model) == CVAEMARHMM:
+                predst = self.model.predict(xt, sub_ids)
+            else:
+                predst = self.model.predict(xt)
             
             # Handle MARHMM burn-in
             if hasattr(self.model, 'max_lag') and self.model.max_lag > 0:
@@ -69,7 +74,19 @@ class Validator:
         self.model.prepare_for_inference()
         xt, yt, sub_ids = self.data_loader.get_all_data()
         with torch.no_grad():
-            predst = self.model.predict(xt, sub_ids)
+            if self.config.log_likelihood:
+                if type(self.model) == CVAEMARHMM:
+                    val_nll, _ = self.model.forward(xt, sub_ids, epoch)
+                else:
+                    val_nll = self.model.forward(xt)
+                
+                self.validations[epoch]['log_likelihood'] = -val_nll.item()
+                self.validations[epoch]['likelihood'] = np.exp(-val_nll.item())
+                self.validations[epoch]['nll'] = val_nll.item()
+            if type(self.model) == CVAEMARHMM:
+                predst = self.model.predict(xt, sub_ids)
+            else:
+                predst = self.model.predict(xt)
             
             # Handle MARHMM burn-in
             if hasattr(self.model, 'max_lag') and self.model.max_lag > 0:
@@ -81,17 +98,68 @@ class Validator:
             if self.config.nmi:
                 nmi = calculate_nmi(preds, y)
                 self.validations[epoch]["nmi"] = nmi
-            if self.config.accuracy:
-                try:
-                    aligned_preds = align_labels_hungarian(y, preds)
-                    acc = accuracy(aligned_preds, y)
-                    self.validations[epoch]["accuracy"] = acc
-                except Exception as e:
-                    print(f"Error occurred while calculating accuracy at epoch {epoch}: {e}")
-                    self.validations[epoch]["accuracy"] = None
-            if self.config.learning_rate:
-                self.validations[epoch]["learning_rate"] = optimizer.param_groups[0]['lr']
-            self.predictions[epoch] = preds.tolist()
+                
+        # Compute state entropy and perplexity for validation data
+        entropy_metrics = self.__compute_state_entropy(preds, self.data_loader.get_num_states())
+        self.validations[epoch]["entropy"] = entropy_metrics["entropy"]
+        self.validations[epoch]["perplexity"] = entropy_metrics["perplexity"]
+        
+        perp = entropy_metrics["perplexity"] / self.train_data_loader.get_num_states()
+        ll = self.validations[epoch]["likelihood"]
+        eps = 1e-12
+        w = 0.9
+        nlpp = w * np.log(ll + eps) + (1 - w) * np.log(perp + eps)
+        self.validations[epoch]["nlpp"] = nlpp
+        
+        # Compute train NMI if train data loader is available
+        if self.config.nmi and self.train_data_loader is not None:
+            x_train, y_train, sub_ids = self.train_data_loader.get_all_data()
+            with torch.no_grad():
+                if type(self.model) == CVAEMARHMM:
+                    preds_train = self.model.predict(x_train, sub_ids)
+                    nll, _ = self.model.forward(x_train, sub_ids, epoch)
+                else:
+                    preds_train = self.model.predict(x_train)
+                    nll = self.model.forward(x_train)
+            
+            # Handle MARHMM burn-in for train data
+            if hasattr(self.model, 'max_lag') and self.model.max_lag > 0:
+                preds_train = preds_train[:, self.model.max_lag:]
+                y_train = y_train[:, self.model.max_lag:]
+            
+            y_train_np = y_train.detach().cpu().numpy().flatten()
+            preds_train_np = preds_train.detach().cpu().numpy().flatten()
+            train_nmi = calculate_nmi(preds_train_np, y_train_np)
+            # Store with 'train_' prefix to distinguish from val NMI
+            # Note: logger will add 'train/' prefix when logging
+            self.validations[epoch]["train_nmi"] = train_nmi
+            
+            # Compute state entropy and perplexity for training data
+            train_entropy_metrics = self.__compute_state_entropy(preds_train_np, self.train_data_loader.get_num_states())
+            self.validations[epoch]["train_entropy"] = train_entropy_metrics["entropy"]
+            self.validations[epoch]["train_perplexity"] = train_entropy_metrics["perplexity"] 
+            self.validations[epoch]["train_nll"] = nll.item()
+            self.validations[epoch]["train_log_likelihood"] = -nll.item()
+            self.validations[epoch]["train_likelihood"] = np.exp(-nll.item())
+            
+            train_perp = train_entropy_metrics["perplexity"] / self.train_data_loader.get_num_states()
+            train_ll = self.validations[epoch]["train_likelihood"]
+            eps = 1e-12
+            w = 0.9
+            train_nlpp = w * np.log(train_ll + eps) + (1 - w) * np.log(train_perp + eps)
+            self.validations[epoch]["train_nlpp"] = train_nlpp  
+        
+        if self.config.accuracy:
+            try:
+                aligned_preds = align_labels_hungarian(y, preds)
+                acc = accuracy(aligned_preds, y)
+                self.validations[epoch]["accuracy"] = acc
+            except Exception as e:
+                print(f"Error occurred while calculating accuracy at epoch {epoch}: {e}")
+                self.validations[epoch]["accuracy"] = None
+        if self.config.learning_rate:
+            self.validations[epoch]["learning_rate"] = optimizer.param_groups[0]['lr']
+        self.predictions[epoch] = preds.tolist()
         self.model.prepare_for_training()
             
         # Save historic values for this epoch
@@ -102,10 +170,20 @@ class Validator:
         self.model.train()  # Set back to training mode
         if self.global_config.verbose:
             nmi_val = self.validations[epoch].get('nmi', 'N/A')
+            train_nmi_val = self.validations[epoch].get('train_nmi', 'N/A')
             acc_val = self.validations[epoch].get('accuracy', 'N/A')
+            perp_val = self.validations[epoch].get('perplexity', 'N/A')
+            train_perp_val = self.validations[epoch].get('train_perplexity', 'N/A')
+            train_nmi_str = f"{train_nmi_val:.4f}" if isinstance(train_nmi_val, (int, float)) else str(train_nmi_val)
             nmi_str = f"{nmi_val:.4f}" if isinstance(nmi_val, (int, float)) else str(nmi_val)
             acc_str = f"{acc_val:.4f}" if isinstance(acc_val, (int, float)) else str(acc_val)
-            print(f"Epoch {epoch + 1} - NMI: {nmi_str}, Accuracy: {acc_str}")
+            perp_str = f"{perp_val:.2f}" if isinstance(perp_val, (int, float)) else str(perp_val)
+            train_perp_str = f"{train_perp_val:.2f}" if isinstance(train_perp_val, (int, float)) else str(train_perp_val)
+            print(f"Epoch {epoch + 1} - Val NMI: {nmi_str}, Train NMI: {train_nmi_str}, "
+                  f"Val Perp: {perp_str}/{self.data_loader.get_num_states()}, "
+                  f"Train Perp: {train_perp_str}/{self.train_data_loader.get_num_states() if self.train_data_loader else 'N/A'}, "
+                  f"Acc: {acc_str}")
+            # print(f"Epoch {epoch + 1} - NMI: {nmi_str}, Accuracy: {acc_str}")
     
     
     
@@ -171,6 +249,16 @@ class Validator:
         self.validations[epoch]['cvae_latent_kmeans_nmi'] = nmi
         print(f"CVAE Latent KMeans NMI: {nmi:.4f}")
         self.model.prepare_for_training()
+    
+    def validate_cvae_gmm(self):
+        assert type(self.model) == CVAEMARHMM, "Model must be of type CVAEMARHMM to validate CVAE latent representations."
+        x, y, sub_ids = self.data_loader.get_all_data()
+        x_non_norm = self.data_loader.get_non_normalized_data()
+        self.model.prepare_for_inference()
+        with torch.no_grad():
+            x_latent, y_hat, likelihood = self.model.predict_gmm(x, sub_ids)
+        nmi = calculate_nmi(y_hat.detach().cpu().numpy().flatten(), y.detach().cpu().numpy().flatten())
+        return nmi, likelihood, y_hat, y, x_latent, x_non_norm
     
     ####### HELPER METHODS #######
     
@@ -351,6 +439,43 @@ class Validator:
     
     
     ####### PUBLIC HELPER METHODS #######
+    
+    
+    def __compute_state_entropy(self, predictions: np.ndarray, num_states: int) -> dict[str, float]:
+        """Compute state usage entropy and perplexity (effective number of states).
+        
+        Args:
+            predictions: Array of predicted state labels
+            num_states: Total number of states in the model
+            
+        Returns:
+            Dictionary with 'entropy' and 'perplexity' keys
+        """
+        # Count state frequencies
+        counts = np.bincount(predictions.astype(int), minlength=num_states)
+        total = counts.sum()
+        
+        if total == 0:
+            return {"entropy": 0.0, "perplexity": 0.0}
+        
+        # Compute probability distribution
+        probs = counts / total
+        
+        # Compute entropy: H = -sum(p * log(p))
+        # Use base-e logarithm for natural entropy
+        entropy = 0.0
+        for p in probs:
+            if p > 0:  # avoid log(0)
+                entropy -= p * np.log(p)
+        
+        # Perplexity = exp(entropy) = effective number of states
+        perplexity = np.exp(entropy)
+        
+        return {
+            "entropy": float(entropy),
+            "perplexity": float(perplexity)
+        }
+    
     
     def __print_validation(self, epoch: int):
         val = self.validations[epoch]

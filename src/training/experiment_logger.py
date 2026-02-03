@@ -73,7 +73,15 @@ class ExperimentLogger:
             payload['train/lr'] = float(lr)
         if isinstance(val_metrics, dict):
             for k, v in val_metrics.items():
-                if isinstance(v, (int, float)):
+                try:
+                    float_v = float(v)
+                except Exception as e:
+                    print(f"Warning: skipping non-float val metric '{k}': {v} ({e})")
+                    continue
+                if k.startswith('train_'):
+                    # Remove 'train_' prefix and add to train/ namespace
+                    payload[f'train/{k[6:]}'] = float(v)
+                else:
                     payload[f'val/{k}'] = float(v)
         # Don't pass step to avoid non-monotonic warnings across internal runs
         self._wb.log(payload)

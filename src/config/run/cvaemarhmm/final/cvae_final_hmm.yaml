@@ -191,8 +191,8 @@ val_datasets:
 model:
   type: cvae_marhmm
   covariance_type: full
-  init_strategy: kmeans_pca
-  init_noisy: false
+  init_strategy: random_uniform
+  init_noisy: True
   features: false
   params:
     
@@ -201,7 +201,7 @@ model:
     ridge: 0.1
     var_reg: 0.05
     sticky_coef: 0.1
-    sticky_kappa: 0.9
+    sticky_kappa: 0.8
     
     # CVAE parameters
     # weights

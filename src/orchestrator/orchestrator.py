@@ -136,44 +136,63 @@ class Orchestrator:
             
     
     def train_cvae(self):
+        for i in range(self.global_config.runs):
+            self.run_number = i + 1
+            self.global_config.seed += 1
+            self.model.reset()
+            self.trainer.reset()
+            # self.validator.validate(epoch=0)  
+            run_dir = Path(self.global_config.results_dir) / self.global_config.run_name / str(self.run_number)
+        
+            # CVAE training
+            if self.global_config.cvae.model_checkpoint_path is not None:
+                print(f"Loading CVAE model from checkpoint: {self.global_config.cvae.model_checkpoint_path}")
+                state = torch.load(self.global_config.cvae.model_checkpoint_path, map_location="cpu")
+                cvae_state = {k[len("cvae."):]: v for k, v in state.items() if k.startswith("cvae.")}
+                # self.model.load_state_dict(torch.load(self.global_config.cvae.model_checkpoint_path))
+                self.model.cvae.load_state_dict(cvae_state, strict=False)
+            
+            
+            if self.global_config.cvae.traning_pipeline in ['cvae_then_marhmm', 'cvae']:
+                self.model.training_pipeline = 'cvae'
+                self.trainer.train()
+                self.validator.validate_cvae()
+                try:
+                    train_details = self.__collect_training_details()
+                except Exception as e:
+                    print(f"Error collecting training details: {e}")
+                    train_details = None
+                self.visualizer.visualize_cvae(model=self.model, train_details=train_details)
+                torch.save(self.model.state_dict(), f"{self.global_config.results_dir}/{self.global_config.run_name}/cvae_final_model.pth")
+            
+            if self.global_config.cvae.traning_pipeline in ['marhmm', 'cvae_then_marhmm']:
+                self.model.training_pipeline = 'marhmm'
+                self.__prepare_run(ignore_model=True)
+                self.model.data_loader = self.train_loader
+                if self.global_config.cvae.reinit_marhmm:
+                    self.model.reinitialize_marhmm()
+                    self.validator = Validator(data_loader=self.val_loader, train_data_loader=self.train_loader, model=self.model, config=self.global_config)
+                    self.trainer = Trainer(data_loader=self.train_loader, model=self.model, config=self.global_config, validator=self.validator)
+                    self.visualizer = Visualizer(data_loader=self.val_loader, config=self.global_config, model=self.model, validator=self.validator)
+                self.trainer.train()
+                train_details = self.__collect_training_details()
+                self.visualizer.visualize(train_details=train_details)
+                torch.save(self.model.state_dict(), f"{self.global_config.results_dir}/{self.global_config.run_name}/cvaehmm_final_model.pth")
+    
+    
+    def predict_cvae(self):
+        
         # CVAE training
         if self.global_config.cvae.model_checkpoint_path is not None:
             print(f"Loading CVAE model from checkpoint: {self.global_config.cvae.model_checkpoint_path}")
-            self.model.load_state_dict(torch.load(self.global_config.cvae.model_checkpoint_path))
+            state = torch.load(self.global_config.cvae.model_checkpoint_path, map_location="cpu")
+            cvae_state = {k[len("cvae."):]: v for k, v in state.items() if k.startswith("cvae.")}
+            # self.model.load_state_dict(torch.load(self.global_config.cvae.model_checkpoint_path))
+            self.model.cvae.load_state_dict(cvae_state, strict=False)
+        nmi, likelihood, y_hat, y, x_latent, x = self.validator.validate_cvae_gmm()
+        self.visualizer.visualize_cvae_gmm(y_hat, y, x_latent, x, nmi, likelihood)
+        print(f"GMM NMI: {nmi}, Likelihood: {likelihood}")
         
-        
-        if self.global_config.cvae.traning_pipeline in ['cvae_then_marhmm', 'cvae']:
-            self.model.training_pipeline = 'cvae'
-            self.trainer.train()
-            self.validator.validate_cvae()
-            try:
-                train_details = self.__collect_training_details()
-            except Exception as e:
-                print(f"Error collecting training details: {e}")
-                train_details = None
-            self.visualizer.visualize_cvae(model=self.model, train_details=train_details)
-            torch.save(self.model.state_dict(), f"{self.global_config.results_dir}/{self.global_config.run_name}/cvae_final_model.pth")
-        
-        if self.global_config.cvae.traning_pipeline in ['marhmm', 'cvae_then_marhmm']:
-            self.model.training_pipeline = 'marhmm'
-            # self.global_config.trainer.epochs = 10000
-            # # self.global_config.trainer.validate_per_epoch = 1
-            # self.global_config.trainer.learning_rate = 0.003 # 1e-7
-            # self.global_config.dataloader.num_batches = 128 # 128
-            # self.global_config.dataloader.batch_size = 128 # 16
-            # self.global_config.dataloader.validation_batch_size = 128 # 2048 # 128
-            # self.global_config.dataloader.sequence_length = 128 # 2048 # 128
-            self.__prepare_run(ignore_model=True)
-            self.model.data_loader = self.train_loader
-            if self.global_config.cvae.reinit_marhmm:
-                self.model.reinitialize_marhmm()
-                self.validator = Validator(data_loader=self.val_loader, model=self.model, config=self.global_config)
-                self.trainer = Trainer(data_loader=self.train_loader, model=self.model, config=self.global_config, validator=self.validator)
-                self.visualizer = Visualizer(data_loader=self.val_loader, config=self.global_config, model=self.model, validator=self.validator)
-            self.trainer.train()
-            train_details = self.__collect_training_details()
-            self.visualizer.visualize(train_details=train_details)
-            torch.save(self.model.state_dict(), f"{self.global_config.results_dir}/{self.global_config.run_name}/cvaehmm_final_model.pth")
     
     ### private methods ###
     
@@ -207,7 +226,7 @@ class Orchestrator:
         self.val_loader = DataLoaderCollection(datasets=self.val_datasets, config=self.global_config, for_validation=True, device=self.device)
         if not ignore_model:
             self.model = self.__get_model(self.device)
-        self.validator = Validator(data_loader=self.val_loader, model=self.model, config=self.global_config)
+        self.validator = Validator(data_loader=self.val_loader, train_data_loader=self.train_loader, model=self.model, config=self.global_config)
         self.trainer = Trainer(data_loader=self.train_loader, model=self.model, config=self.global_config, validator=self.validator)
         self.visualizer = Visualizer(data_loader=self.val_loader, config=self.global_config, model=self.model, validator=self.validator)
 

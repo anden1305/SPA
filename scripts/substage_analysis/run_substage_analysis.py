@@ -2,6 +2,8 @@ from scripts.substage_analysis.plot_substages import pca_scatter_random_samples
 import numpy as np
 from scripts.substage_analysis.kmeans import kmeans_predict_labels
 from scripts.substage_analysis.transition_matrix import plot_transition_matrix
+from scripts.substage_analysis.frequency_plot import plot_label_channel_frequency_grid
+from scripts.substage_analysis.distribution_plot import plot_label_distribution
 
 RESULT_PATH = "results/substages/gmm/substages_gmm_population_6 [20260122-211745]/plots/results.npz"
 ANALYSIS_NAME = "PCA Scatter Example"
@@ -25,7 +27,10 @@ def run_substage_analysis(config_path: str) -> None:
     labels_true = data["y_true"]
     LABEL_NAMES_TRUE = ["Awake", "NREM", "REM"]
     labels_pred = data["y_hat"]
-    LABEL_NAMES_PRED = [f"Label {i}" for i in range(np.max(labels_pred) + 1)]
+    LABEL_NAMES_PRED = [f"Substage {i+1}" for i in range(np.max(labels_pred) + 1)]
+    raw_datapoints = data["x"]
+    N, T, C, F = raw_datapoints.shape
+    raw_datapoints = raw_datapoints.reshape(N * T, C, F)
     
     labels_kmeans = kmeans_predict_labels(
         datapoints=datapoints,
@@ -82,4 +87,22 @@ def run_substage_analysis(config_path: str) -> None:
         label_names=LABEL_NAMES_PRED,
         plot_name="Transition Matrix - KMeans Labels",
         save_path=RESULT_PATH.replace(".npz", "_transition_matrix_kmeans.png"),
+    )
+    
+    plot_label_channel_frequency_grid(
+        raw_datapoints=raw_datapoints,
+        sample_rate=128,
+        y_pred=labels_pred,
+        label_names=LABEL_NAMES_PRED,
+        channel_names=["EEG1", "EEG2", "EMG"],
+        channel_freq_ranges=[(0, 20), (0, 20), (5, 60)],
+        plot_title="Frequency Plot GMM Predicted Substages",
+        save_path=RESULT_PATH.replace(".npz", "_frequency_plot_gmm_predicted.png"),
+    )
+    
+    plot_label_distribution(
+        y_pred=labels_pred,
+        label_names=LABEL_NAMES_PRED,
+        plot_title="Label Distribution - GMM Predicted Substages",
+        save_path=RESULT_PATH.replace(".npz", "_label_distribution_gmm_predicted.png"),
     )

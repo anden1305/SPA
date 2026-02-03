@@ -33,16 +33,19 @@ class DataLoaderCollection:
         self.random_seed = self.global_config.seed
         self.subject_map = self.get_subject_map()
         self.pre_load_to_device = True
-        self.x, self.y, self.sub_ids = self.prepare_data()
+        self.x, self.y, self.sub_ids, self.x_non_norm_all = self.prepare_data()
         self.batches_per_next = self.config.num_batches
         
-    def prepare_data(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def prepare_data(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, np.ndarray]:
         x = []
+        x_non_norm = []
         y = []
         sub_ids = []
         for dl in self.data_loaders:
             x_dl, y_dl = dl.get_data()
+            x_dl_non_norm = dl.get_non_normalized_data()
             x.append(x_dl)
+            x_non_norm.append(x_dl_non_norm)
             y.append(y_dl)
             
             # Create sub_ids array matching x_dl shape (except feature dim)
@@ -53,6 +56,7 @@ class DataLoaderCollection:
         
         x_all = np.concatenate(x, axis=0)
         y_all = np.concatenate(y, axis=0)
+        x_non_norm_all = np.concatenate(x_non_norm, axis=0)
         sub_ids_all = np.concatenate(sub_ids, axis=0)
         
         # normalize
@@ -74,7 +78,7 @@ class DataLoaderCollection:
             x_all = x_all.to(self.device, non_blocking=True)
             y_all = y_all.to(self.device, non_blocking=True)
             sub_ids_all = sub_ids_all.to(self.device, non_blocking=True)
-        return x_all, y_all, sub_ids_all
+        return x_all, y_all, sub_ids_all, x_non_norm_all
     
     def __build_data_loaders_in_parallel(self, device: torch.device):
         with ThreadPoolExecutor(max_workers=20) as ex:
@@ -120,6 +124,9 @@ class DataLoaderCollection:
         if self.device.type == "cuda" and not self.pre_load_to_device:
             return self.x.to(self.device, non_blocking=True), self.y.to(self.device, non_blocking=True), self.sub_ids.to(self.device, non_blocking=True)
         return self.x, self.y, self.sub_ids
+    
+    def get_non_normalized_data(self) -> np.ndarray:
+        return self.x_non_norm_all
     
     def has_features_enabled(self):
         return self.data_loaders[0].has_features_enabled()
