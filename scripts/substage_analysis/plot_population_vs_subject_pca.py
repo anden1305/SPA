@@ -136,17 +136,10 @@ def plot_population_vs_subject_pca(
     save_path_population: str,
     save_path_subject: str,
     *,
-<<<<<<< HEAD
-    n_samples_population: Optional[int] = 7500,
-    n_samples_subject: Optional[int] = 7500,
-    seed: int = 124,
-    figsize: Tuple[float, float] = (16, 7),
-=======
     n_samples_population: Optional[int] = None,
     n_samples_subject: Optional[int] = None,
     seed: int = 42,
     figsize: Tuple[float, float] = (9, 7),
->>>>>>> a60ce47 (Refactor PCA plotting function to create separate plots for population and subject data, and implement caching for faster data loading.)
     point_size: float = 18.0,
     alpha: float = 0.75,
     center: bool = True,
