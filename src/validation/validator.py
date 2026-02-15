@@ -102,7 +102,12 @@ class Validator:
             self.validations[epoch]["likelihood_perplexity_product"] = entropy_metrics["perplexity"] / self.model.num_states * self.validations[epoch]["likelihood"]
             self.validations[epoch]["log_likelihood_perplexity_sum"] = np.log(entropy_metrics["perplexity"] / self.model.num_states) + self.validations[epoch]["log_likelihood"]
             self.validations[epoch]["weighted_log_likelihood_perplexity_sum"] = 0.9 * self.validations[epoch]["log_likelihood"] + np.log((entropy_metrics["perplexity"] / self.model.num_states) + eps)
+            # Normalized entropy: H_norm(Ŷ) = H(Ŷ) / log(K_pred), bounded in [0,1]
+            # 0 = all probability on single state, 1 = uniform distribution across states
+            norm_entropy = entropy_metrics["entropy"] / np.log(self.model.num_states)
+            self.validations[epoch]["weighted_log_likelihood_entropy_sum"]    = 0.9 * self.validations[epoch]["log_likelihood"] + 0.1 * norm_entropy
             self.validations[epoch]["coherence_ratio"] = self.__compute_coherence_ratio(self.validations[epoch]["log_likelihood"], entropy_metrics["perplexity"] / self.model.num_states, is_train=False)
+
 
             # Compute train NMI if train data loader is available
             if self.config.nmi and self.train_data_loader is not None:

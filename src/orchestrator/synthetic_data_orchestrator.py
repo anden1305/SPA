@@ -36,7 +36,7 @@ class SyntheticDataOrchestrator:
         summary_path.write_text("\n".join(summary_lines))
         summarize_labels(labels, meta, results)
         epoch_std_distribution(eeg, results)
-        raw_eeg_excerpt(eeg, labels, meta, results, seconds=40)
+        raw_eeg_excerpt(eeg, labels, meta, results, seconds=40, num_excerpts=10)
         mean_power_spectrum(eeg, labels, meta, results)
         print("Synthetic exploration v2 complete ->", results)
         return 0

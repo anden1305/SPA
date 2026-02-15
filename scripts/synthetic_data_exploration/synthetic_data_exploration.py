@@ -142,14 +142,30 @@ def epoch_std_distribution(eeg: np.ndarray, results: Path):
 
 # ---------------------- Raw EEG Excerpt ----------------------
 
-def raw_eeg_excerpt(eeg: np.ndarray, labels: np.ndarray, meta: dict, results: Path, seconds: int = 40, show_labels: bool = True):
+def raw_eeg_excerpt(
+    eeg: np.ndarray,
+    labels: np.ndarray,
+    meta: dict,
+    results: Optional[Path] = None,
+    seconds: int = 40,
+    show_labels: bool = True,
+    num_excerpts: int = 1,
+    seed: Optional[int] = None,
+):
     """Exact-style raw EEG excerpt (port of original plot_raw_eeg logic).
 
     Accepts either (epochs, samples) EEG or 1-D continuous. Determines epoch samples
     from total length / n_labels. Colors spans by stage with legend.
     """
+    if isinstance(results, (int, float)):
+        seconds = int(results)
+        results = None
+    results_path = Path(results) if results is not None else RESULTS
+    results_path.mkdir(parents=True, exist_ok=True)
+
     fs = int(meta.get('sampling_rate_hz', 128))
-    if fs <= 0: fs = 1
+    if fs <= 0:
+        fs = 1
     # Flatten if 2D
     if eeg.ndim == 2:
         flat = eeg.reshape(-1)
@@ -164,58 +180,92 @@ def raw_eeg_excerpt(eeg: np.ndarray, labels: np.ndarray, meta: dict, results: Pa
         print('Epoch sample calculation failed; skipping raw excerpt')
         return
     # Use provided stage names or numeric indices
-    stages = meta.get('stages') or [str(i) for i in range(int(labels.max())+1)]
+    stages = meta.get('stages') or [str(i) for i in range(int(labels.max()) + 1)]
     samples_to_show = min(int(seconds * fs), len(flat))
     actual_seconds = samples_to_show / fs
-    sig = flat[:samples_to_show]
-    time = np.arange(samples_to_show) / fs
-    fig, ax = plt.subplots(figsize=(14,4))
-    ax.set_xlabel('Time (s)'); ax.set_ylabel('Amplitude (µV)')
-    ax.set_title(f'Raw Synthetic EEG Excerpt ({actual_seconds:.1f}s)')
     epoch_len_s = ep_samples / fs
-    # Plot each epoch segment in its stage color (and optional translucent background span)
-    # Build a color map: if provided stage names absent from predefined, assign palette colors
+    if samples_to_show <= 0:
+        print('Requested excerpt length is empty; skipping raw excerpt')
+        return
+    num_excerpts = max(1, int(num_excerpts))
+    max_start = len(flat) - samples_to_show
+    if max_start <= 0:
+        start_samples = [0]
+    elif num_excerpts == 1:
+        start_samples = [0]
+    else:
+        if max_start + 1 >= num_excerpts:
+            rng = np.random.default_rng(seed)
+            start_samples = rng.choice(max_start + 1, size=num_excerpts, replace=False)
+            start_samples = sorted(int(s) for s in start_samples)
+        else:
+            start_samples = list(np.linspace(0, max_start, num_excerpts, dtype=int))
+
+    # Plot each excerpt in its stage color (and optional translucent background span)
     defined_colors = SYN_SLEEP_STAGE_COLORS
-    # If any stage not in predefined map, create new palette mapping all stages
     if any((s not in defined_colors) for s in stages):
         palette = sns.color_palette('tab10', n_colors=len(stages))
         stage_color_map = {s: palette[i] for i, s in enumerate(stages)}
     else:
         stage_color_map = {s: defined_colors[s] for s in stages if s in defined_colors}
 
-    for i, st in enumerate(labels):
-        start_sample = i * ep_samples
-        start_t = start_sample / fs
-        if start_t >= actual_seconds:
-            break
-        end_sample = start_sample + ep_samples
-        end_t = min(end_sample / fs, actual_seconds)
-        stage_name = stages[st] if st < len(stages) else str(st)
-        color = stage_color_map.get(stage_name, '#666666')
-        # Background span
-        ax.axvspan(start_t, end_t, color=color, alpha=0.10, lw=0)
-        # Line segment (clip to available samples)
-        seg_end_sample = min(end_sample, samples_to_show)
-        seg = flat[start_sample:seg_end_sample]
-        seg_time = np.arange(start_sample, start_sample + len(seg)) / fs
-        ax.plot(seg_time, seg, color=color, linewidth=0.9)
-        if show_labels and epoch_len_s:
-            if (end_t - start_t) >= max(0.6, 0.35 * epoch_len_s):
-                ax.text((start_t + end_t)/2, 0.95, stage_name, ha='center', va='top', color='black', fontsize=9,
-                        transform=ax.get_xaxis_transform())
-    shown_epochs = int(np.ceil(actual_seconds / epoch_len_s)) if epoch_len_s else 0
-    present_stage_indices = np.unique(labels[:shown_epochs]) if shown_epochs else []
-    handles = []
-    for idx in present_stage_indices:
-        sn = stages[idx] if idx < len(stages) else str(idx)
-        handles.append(plt.Line2D([0],[0], color=stage_color_map.get(sn, '#ccc'), lw=6, label=sn))
-    if handles:
-        ax.legend(handles=handles, loc='upper right', framealpha=0.85, title='Stage')
-    ax.set_xlim(0, actual_seconds)
-    ax.grid(alpha=0.25, axis='y')
-    fig.tight_layout()
-    fig.savefig(results / 'raw_eeg_excerpt.png', dpi=300)
-    plt.close(fig)
+    for excerpt_idx, start_sample in enumerate(start_samples, start=1):
+        end_sample = start_sample + samples_to_show
+        fig, ax = plt.subplots(figsize=(14, 4))
+        ax.set_xlabel('Time (s)')
+        ax.set_ylabel('Amplitude (µV)')
+        title = f'Raw Synthetic EEG Excerpt ({actual_seconds:.1f}s)'
+        if num_excerpts > 1:
+            title = f'{title} #{excerpt_idx}'
+        ax.set_title(title)
+
+        start_epoch = start_sample // ep_samples
+        end_epoch = (end_sample - 1) // ep_samples
+        for i in range(start_epoch, end_epoch + 1):
+            epoch_start = i * ep_samples
+            epoch_end = epoch_start + ep_samples
+            seg_start = max(epoch_start, start_sample)
+            seg_end = min(epoch_end, end_sample)
+            if seg_end <= seg_start:
+                continue
+            start_t = (seg_start - start_sample) / fs
+            end_t = (seg_end - start_sample) / fs
+            stage_name = stages[labels[i]] if labels[i] < len(stages) else str(labels[i])
+            color = stage_color_map.get(stage_name, '#666666')
+            ax.axvspan(start_t, end_t, color=color, alpha=0.10, lw=0)
+            seg = flat[seg_start:seg_end]
+            seg_time = (np.arange(seg_start, seg_end) - start_sample) / fs
+            ax.plot(seg_time, seg, color=color, linewidth=0.9)
+            if show_labels and epoch_len_s:
+                if (end_t - start_t) >= max(0.6, 0.35 * epoch_len_s):
+                    ax.text(
+                        (start_t + end_t) / 2,
+                        0.95,
+                        stage_name,
+                        ha='center',
+                        va='top',
+                        color='black',
+                        fontsize=9,
+                        transform=ax.get_xaxis_transform(),
+                    )
+
+        shown_epochs = end_epoch - start_epoch + 1
+        present_stage_indices = np.unique(labels[start_epoch:start_epoch + shown_epochs]) if shown_epochs else []
+        handles = []
+        for idx in present_stage_indices:
+            sn = stages[idx] if idx < len(stages) else str(idx)
+            handles.append(plt.Line2D([0], [0], color=stage_color_map.get(sn, '#ccc'), lw=6, label=sn))
+        if handles:
+            ax.legend(handles=handles, loc='upper right', framealpha=0.85, title='Stage')
+        ax.set_xlim(0, actual_seconds)
+        ax.grid(alpha=0.25, axis='y')
+        fig.tight_layout()
+        if num_excerpts == 1:
+            out_name = 'raw_eeg_excerpt.png'
+        else:
+            out_name = f'raw_eeg_excerpt_{excerpt_idx:02d}.png'
+        fig.savefig(results_path / out_name, dpi=300)
+        plt.close(fig)
 
 # ---------------------- PSD Helpers ----------------------
 
