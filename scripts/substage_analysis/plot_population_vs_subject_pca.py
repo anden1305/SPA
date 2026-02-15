@@ -133,19 +133,27 @@ def plot_population_vs_subject_pca(
     subject_labels: np.ndarray,
     label_names: list,
     subject_id: str,
-    save_path: str,
+    save_path_population: str,
+    save_path_subject: str,
     *,
+<<<<<<< HEAD
     n_samples_population: Optional[int] = 7500,
     n_samples_subject: Optional[int] = 7500,
     seed: int = 124,
     figsize: Tuple[float, float] = (16, 7),
+=======
+    n_samples_population: Optional[int] = None,
+    n_samples_subject: Optional[int] = None,
+    seed: int = 42,
+    figsize: Tuple[float, float] = (9, 7),
+>>>>>>> a60ce47 (Refactor PCA plotting function to create separate plots for population and subject data, and implement caching for faster data loading.)
     point_size: float = 18.0,
     alpha: float = 0.75,
     center: bool = True,
     standardize: bool = False,
 ) -> None:
     """
-    Create side-by-side PCA plots: population-level vs subject-specific.
+    Create two separate PCA plots: population-level and subject-specific.
     
     Args:
         population_data: (N_pop, F) population-level feature data
@@ -154,11 +162,12 @@ def plot_population_vs_subject_pca(
         subject_labels: (N_sub,) true labels for subject
         label_names: Names for each label class
         subject_id: Subject identifier (e.g., "39")
-        save_path: Path to save the figure
+        save_path_population: Path to save the population plot
+        save_path_subject: Path to save the subject plot
         n_samples_population: Number of samples to plot for population (None = all)
         n_samples_subject: Number of samples to plot for subject (None = all)
         seed: Random seed for sampling
-        figsize: Figure size (width, height)
+        figsize: Figure size for each plot (width, height)
         point_size: Point size for scatter
         alpha: Point transparency
         center: Whether to center data before PCA
@@ -234,54 +243,56 @@ def plot_population_vs_subject_pca(
         sub_pc2 = sub_scores[:, 1]
         sub_labels_plot = subject_labels
     
-    # Create figure with two subplots
-    print("🔄 Creating plots...")
-    fig, axes = plt.subplots(1, 2, figsize=figsize)
+    # Create population plot
+    print("🔄 Creating population plot...")
+    fig_pop, ax_pop = plt.subplots(figsize=figsize)
     
-    # Left plot: Population level
     plot_pca_scatter(
-        ax=axes[0],
+        ax=ax_pop,
         pc1=pop_pc1,
         pc2=pop_pc2,
         labels=pop_labels_plot,
         label_names=label_names,
         evr1=pop_evr[0] if pop_evr.size > 0 else 0.0,
         evr2=pop_evr[1] if pop_evr.size > 1 else 0.0,
-        title="Population Level (All Subjects)",
+        title="PCA Visualization of Expert-Driven Feature Latent Space\nPopulation Level (All Subjects)",
         point_size=point_size,
         alpha=alpha,
     )
     
-    # Right plot: Subject-specific
+    # Save population plot
+    print(f"💾 Saving population plot to {save_path_population}...")
+    fig_pop.tight_layout()
+    fig_pop.savefig(save_path_population, dpi=300, bbox_inches='tight')
+    plt.close(fig_pop)
+    
+    # Create subject plot
+    print(f"🔄 Creating subject {subject_id} plot...")
+    fig_sub, ax_sub = plt.subplots(figsize=figsize)
+    
     plot_pca_scatter(
-        ax=axes[1],
+        ax=ax_sub,
         pc1=sub_pc1,
         pc2=sub_pc2,
         labels=sub_labels_plot,
         label_names=label_names,
         evr1=sub_evr[0] if sub_evr.size > 0 else 0.0,
         evr2=sub_evr[1] if sub_evr.size > 1 else 0.0,
-        title=f"Subject {subject_id}",
+        title=f"PCA Visualization of Expert-Driven Feature Latent Space\nSubject {subject_id}",
         point_size=point_size,
         alpha=alpha,
     )
     
-    # Overall title
-    fig.suptitle(
-        "PCA Visualization of Expert-Driven Feature Latent Space with Human Labels",
-        fontsize=14,
-        fontweight='bold',
-        y=0.995,
-    )
-    
-    # Save
-    print(f"💾 Saving figure to {save_path}...")
-    fig.tight_layout(rect=[0, 0, 1, 0.98])
-    fig.savefig(save_path, dpi=300, bbox_inches='tight')
-    plt.close(fig)
+    # Save subject plot
+    print(f"💾 Saving subject plot to {save_path_subject}...")
+    fig_sub.tight_layout()
+    fig_sub.savefig(save_path_subject, dpi=300, bbox_inches='tight')
+    plt.close(fig_sub)
     
     print(f"\n{'='*80}")
-    print(f"✅ PLOT SAVED SUCCESSFULLY!")
+    print(f"✅ PLOTS SAVED SUCCESSFULLY!")
+    print(f"  Population: {save_path_population}")
+    print(f"  Subject {subject_id}: {save_path_subject}")
     print(f"{'='*80}\n")
 
 
@@ -290,6 +301,7 @@ def load_data_from_result_dir(
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Load feature data and labels directly from result directory.
+    Caches data as NPZ for faster subsequent loads.
     
     Args:
         result_dir: Path to result directory containing config.json
@@ -311,6 +323,21 @@ def load_data_from_result_dir(
     from src.data.data_loader_collection import DataLoaderCollection
     
     result_dir = Path(result_dir)
+    
+    # Check for cached NPZ file
+    cache_path = result_dir / "latent_space_cache.npz"
+    
+    try:
+        if cache_path.exists():
+            print(f"  📦 Loading from cache: {cache_path}")
+            data = np.load(cache_path)
+            x_flat = data["x_latent"]
+            y_flat = data["y_true"]
+            print(f"  ✓ Loaded from cache: {x_flat.shape}, {y_flat.shape}")
+            return x_flat, y_flat
+    except Exception as e:
+        print(f"  ⚠️  Cache load failed: {e}")
+        print(f"  🔄 Loading from source...")
     
     # Load config
     config_path = result_dir / "config.json"
@@ -365,6 +392,14 @@ def load_data_from_result_dir(
         x_flat = x_np
     
     y_flat = y_np.flatten()
+    
+    # Try to cache for future use
+    try:
+        print(f"  💾 Caching latent space to: {cache_path}")
+        np.savez(cache_path, x_latent=x_flat, y_true=y_flat)
+        print(f"  ✓ Cache saved successfully")
+    except Exception as e:
+        print(f"  ⚠️  Cache save failed (continuing anyway): {e}")
     
     return x_flat, y_flat
 
@@ -480,18 +515,21 @@ def main():
     else:
         raise ValueError("--subject_path is required")
     
-    # Determine output path
+    # Determine output paths
     if args.output is None:
         # Strip .npz if present
         base_path = args.population_path.replace(".npz", "")
-        output_path = f"{base_path}_pca_population_vs_subject{args.subject_id}.png"
+        output_path_population = f"{base_path}_pca_population.png"
+        output_path_subject = f"{base_path}_pca_subject{args.subject_id}.png"
     else:
-        output_path = args.output
+        # If custom output specified, create two variations
+        output_path_population = args.output.replace(".png", "_population.png")
+        output_path_subject = args.output.replace(".png", f"_subject{args.subject_id}.png")
     
     # Label names
     label_names = ["Awake", "NREM", "REM"]
     
-    # Create plot
+    # Create plots
     plot_population_vs_subject_pca(
         population_data=population_data,
         population_labels=population_labels,
@@ -499,7 +537,8 @@ def main():
         subject_labels=subject_labels,
         label_names=label_names,
         subject_id=args.subject_id,
-        save_path=output_path,
+        save_path_population=output_path_population,
+        save_path_subject=output_path_subject,
         n_samples_population=args.n_samples_population,
         n_samples_subject=args.n_samples_subject,
         seed=args.seed,
