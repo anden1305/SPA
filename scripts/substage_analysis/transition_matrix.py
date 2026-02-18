@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import pandas as pd
 from typing import Sequence
 
 import numpy as np
@@ -13,11 +14,12 @@ def plot_transition_matrix(
     label_names: Sequence[str],          # length C (labels 0..C-1)
     plot_name: str,
     save_path: str,
+    csv_path: str = None,
     *,
     annotate: bool = True,
     fmt: str = ".2f",
     figsize: tuple = (9, 8),
-    font_size: int = 14,
+    font_size: int = 10,
 ) -> np.ndarray:
     """
     Transition matrix plot that IGNORE self-transitions.
@@ -84,7 +86,10 @@ def plot_transition_matrix(
     np.fill_diagonal(M, np.nan)
 
     # White -> Blue colormap
-    cmap = LinearSegmentedColormap.from_list("white_to_blue", ["white", "blue"]).copy()
+    cmap = LinearSegmentedColormap.from_list(
+        "white_to_science_blue",
+        ["#ffffff", "#1f77b4"]  # matplotlib default scientific blue
+    ).copy()
     cmap.set_bad(alpha=0.0)  # NaNs (diagonal / empty rows) transparent
 
     # Plot
@@ -123,5 +128,10 @@ def plot_transition_matrix(
     os.makedirs(os.path.dirname(save_path) or ".", exist_ok=True)
     fig.savefig(save_path, dpi=300)
     plt.close(fig)
+    
+    if csv_path is not None:
+        os.makedirs(os.path.dirname(csv_path) or ".", exist_ok=True)
+        df = pd.DataFrame(M, index=label_names, columns=label_names)
+        df.to_csv(csv_path)
 
     return M

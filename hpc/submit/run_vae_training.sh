@@ -15,5 +15,6 @@ source .venv/bin/activate
 mkdir -p output
 # python3 main.py -m train_vae -c src/config/run/cvaemarhmm/reliability/cvae_mar_reliability_1.yaml
 # python3 main.py -m train_vae -c src/config/run/cvaemarhmm/substages_vae/substages_vae_test_2.yaml
-# python3 main.py -m train_vae -c src/config/run/cvaemarhmm/substages_marhmm/substages_marhmm_9.yaml
-python3 main.py -m validate_cvae_gmm -c src/config/run/cvaemarhmm/substages_gmm/substages_gmm_population_6.yaml
+# python3 main.py -m train_vae -c src/config/run/cvaemarhmm/substages_gmm_w_artifact/substages_vae_12.yaml
+python3 main.py -m train_vae -c src/config/run/cvaemarhmm/substages_marhmm/substages_marhmm_7.yaml
+# python3 main.py -m validate_cvae_gmm -c src/config/run/cvaemarhmm/substages_gmm/substages_gmm_population_6.yaml

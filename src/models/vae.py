@@ -68,7 +68,8 @@ class ConditionalVAE(nn.Module):
     def __initialize_weights(self):
         
         # ----- Subject Embedding -----
-        self.subject_emb = nn.Embedding(self.n_subjects, self.emb_dim)
+        if not self.emb_dim == 0:
+            self.subject_emb = nn.Embedding(self.n_subjects, self.emb_dim)
         
         # ----- Encoder CNN -----
         enc_layers = []
@@ -174,6 +175,8 @@ class ConditionalVAE(nn.Module):
              subject_ids_expanded = subject_ids.view(-1)
         else:
             subject_ids_expanded = subject_ids
+        if self.emb_dim == 0:
+            return None
         emb = self.subject_emb(subject_ids_expanded)
         return emb
     
@@ -196,7 +199,8 @@ class ConditionalVAE(nn.Module):
         h_flat = h_conv.view(B * S, -1)
         
         # Add subject embedding
-        h_flat = torch.cat([h_flat, emb], dim=-1)
+        if self.emb_dim > 0:
+            h_flat = torch.cat([h_flat, emb], dim=-1)
         
         # MLP
         h = self.encoder_mlp(h_flat)
@@ -229,7 +233,11 @@ class ConditionalVAE(nn.Module):
         emb = self.get_subject_embedding(subject_ids)
         
         z_flat = z.view(B * S, L)
-        h_in = torch.cat([z_flat, emb], dim=-1)
+        
+        if self.emb_dim > 0:
+            h_in = torch.cat([z_flat, emb], dim=-1)
+        else:
+            h_in = z_flat
         
         # MLP
         h_flat = self.decoder_mlp(h_in)
@@ -538,4 +546,9 @@ class ConditionalVAE(nn.Module):
         # expected likelihood
         likelihood = likelihood.mean()
         
-        return y, likelihood, mu
+        # Latent prior log-likelihood: log p(z) = logsumexp_k log p(z,k)
+        log_pz_flat = torch.logsumexp(log_joint, dim=1)                # (N,)
+        log_pz = log_pz_flat.view(B, S)
+        log_pz = log_pz.mean()
+
+        return y, log_pz, mu

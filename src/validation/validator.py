@@ -258,7 +258,7 @@ class Validator:
         with torch.no_grad():
             x_latent, y_hat, likelihood = self.model.predict_gmm(x, sub_ids)
         nmi = calculate_nmi(y_hat.detach().cpu().numpy().flatten(), y.detach().cpu().numpy().flatten())
-        return nmi, likelihood, y_hat, y, x_latent, x_non_norm
+        return nmi, likelihood, y_hat, y, x_latent, x_non_norm, sub_ids
     
     ####### HELPER METHODS #######
     

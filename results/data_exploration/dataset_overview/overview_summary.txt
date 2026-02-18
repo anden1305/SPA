@@ -1,6 +1,0 @@
-Number of labs: 5
-Number of participants: 92
-Total runs: 148
-Median runs per participant: 1.0
-Mean runs per participant: 1.61
-Signals (sampled): EEG1, EEG2, EEG3, EEG4, EMG

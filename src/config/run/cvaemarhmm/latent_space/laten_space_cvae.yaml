@@ -212,7 +212,7 @@ model:
     gmm_warmup_epochs: 0 # FIXED
     free_nats_per_dim: 0.00 # FIXED
     no_beta_epochs: 10 # FIXED
-    num_gmm_states: 5
+    num_gmm_states: 3
 
 cvae:
   normalize_global: False # FIXED
@@ -224,13 +224,13 @@ cvae:
   band_pass_freqs: [[null, 20.0], [null, 20.0], [5.0, 60.0]] # FIXED
   band_pass_filter_type: frequency_domain # FIXED
   traning_pipeline: marhmm
-  model_checkpoint_path: results/substages/cvae/substages_vae_5 [20260120-144146]/cvae_final_model.pth
+  model_checkpoint_path: results/training/cvae/cvae_mar_reliability_1 [20260119-094202]/cvaehmm_final_model.pth
   reinit_marhmm: True
 
 verbose: True
 seed: 123
-results_dir: results/substages/analysis_2
-run_name: substages_analysis_population_5
+results_dir: results/latent_space
+run_name: latent_space_cvae
 runs: 3
 validate_data: True
-num_states: 5
+num_states: 3

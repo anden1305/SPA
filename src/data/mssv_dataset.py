@@ -12,7 +12,7 @@ class MSSVDataset(BaseDataset):
     """
     
     BASE_PATH = 'data/ds006366_processed'
-
+    
     def __init__(self, 
                  config: DatasetConfig):
         self.run = config.run if config.run is not None else 1

@@ -80,11 +80,14 @@ class DataLoader(Iterator):
         self.feature_names = []
         
         # apply transforms
-        x, y, x_non_norm = vae_preprocessing(x, y)
+        x_copy = x.copy()
+        y_copy = y.copy()
+        x, y = vae_preprocessing(x, y)
+        x_raw, _ = vae_preprocessing(x_copy, y_copy, for_raw=True)
         
         # save & print data
         self.data = (x, y)
-        self.x_non_norm = x_non_norm
+        self.x_non_norm = x_raw
         self.__print_data_info()
     
     def __process_data_legacy(self):

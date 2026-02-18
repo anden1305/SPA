@@ -61,6 +61,7 @@ class Visualizer:
         path = train_details.get_path() / "plots"
         path.mkdir(parents=True, exist_ok=True)
         x, y, subject_ids = self.data_loader.get_all_data()
+        x_non_norm = self.data_loader.get_non_normalized_data()
         if self.global_config.model.type == 'marhmm':
             x = x[:, self.global_config.model.params['lags'][-1]:]
             y = y[:, self.global_config.model.params['lags'][-1]:]
@@ -81,22 +82,24 @@ class Visualizer:
         if self.config.learning_rate:
             self.__plot_learning_rate(train_details)
         y_hat = train_details.get_trained_predictions()
-        np.savez(path / "results.npz", y_hat=y_hat, y_true=y, x_latent=x)
+        subject_ids = subject_ids.flatten().cpu().numpy()
+        np.savez(path / "results.npz", y_hat=y_hat, y_true=y, x_latent=x, x=x_non_norm, sub_ids=subject_ids)
     
     
-    def visualize_cvae_gmm(self, y_hat, y_true, x_latent: torch.Tensor, x: torch.Tensor, nmi, likelihood):
+    def visualize_cvae_gmm(self, y_hat, y_true, x_latent: torch.Tensor, x: torch.Tensor, nmi, likelihood, sub_ids):
         path = Path(self.global_config.results_dir) / self.global_config.run_name / "plots"
         path.mkdir(parents=True, exist_ok=True)
         y_hat = y_hat.flatten().cpu().numpy()
         y_true = y_true.flatten().cpu().numpy()
         x_latent = x_latent.detach().cpu().numpy()
+        sub_ids = sub_ids.flatten().cpu().numpy()
         self.__plot_pca_tripanel(None, x=x_latent, y=y_true, overwrite_path=path, pred_y=y_hat)
         # write a txt file with nmi and likelihood
         with open(path / "metrics.txt", "w") as f:
             f.write(f"NMI: {nmi}\n")
             f.write(f"Likelihood: {likelihood}\n")
         # write y_hat, y_true, x_latent to npz
-        np.savez(path / "results.npz", y_hat=y_hat, y_true=y_true, x_latent=x_latent, x=x)
+        np.savez(path / "results.npz", y_hat=y_hat, y_true=y_true, x_latent=x_latent, x=x, sub_ids=sub_ids)
         
     
     def visualize_runs(self, train_details: list[TrainDetails], validations: dict[str, Any]):

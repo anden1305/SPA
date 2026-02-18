@@ -62,7 +62,7 @@ class VAEPreprocessing(BaseTransform):
         w = np.hanning(self.window_size).astype(np.float32)
         return x * w[None, None, :]
 
-    def __complex_to_real_features(self, Xc: np.ndarray) -> np.ndarray:
+    def __complex_to_real_features(self, Xc: np.ndarray, for_raw: bool = False) -> np.ndarray:
         """Convert complex spectrum to a real-valued representation.
 
         Parameters
@@ -72,10 +72,12 @@ class VAEPreprocessing(BaseTransform):
 
         Returns
         -------
-        np.ndarray
+        tuple[np.ndarray, np.ndarray]
             Real-valued features with the same shape as Xc, dtype float32.
         """
         mag = np.abs(Xc)
+        if for_raw:
+            return mag
         power = mag ** 2
         return np.log(power + 1e-12).astype(np.float32)
     
@@ -226,50 +228,26 @@ class VAEPreprocessing(BaseTransform):
                 high_fft = int(np.ceil(high * self.window_size / self.sampling_rate))
                 x[:, c, high_fft:] = 0
         return x
-            
     
-    # def __call__(self, x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    #     TYPE = "fft"
-    #     x = self.percentile_clip_channels(x)
-    #     # x = self.__bandpass_filter_continuous(x)
-    #     if TYPE == "fft":
-    #         if self.normalize:
-    #             x = self.__normalize(x, TYPE="pre-norm")
-    #         x, y = self.__reshape_input(x, y)
-    #         # x = self.__perform_hanning_window(x=x)
-    #         x = self.__perform_fft(x=x)
-    #         x = self.band_pass_filter_fft(x)
-    #         x = self.__complex_to_real_features(x)
-    #     elif TYPE == "stft":
-    #         x = self.__perform_stft(x=x)
-    #         x = self.__complex_to_real_features(x)
-    #     elif TYPE == "raw":
-    #         x, y = self.__reshape_input(x, y)
-    #     y = self.__downsample_by_majority_voting(y_windows=y)
-    #     x, y = self.__apply_sequence_length(x, y)
-    #     if self.normalize:
-    #         x = self.__normalize(x, TYPE=TYPE)
-    #     return x, y
-    
-    def __call__(self, x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    def __call__(self, x: np.ndarray, y: np.ndarray, for_raw: bool = False) -> tuple[np.ndarray, np.ndarray]:
         if self.global_config.cvae.percentile_clip_channels:
             x = self.percentile_clip_channels(x)
-        if self.global_config.cvae.band_pass_filter_fft and self.global_config.cvae.band_pass_filter_type == "time_domain":
+        if self.global_config.cvae.band_pass_filter_fft and self.global_config.cvae.band_pass_filter_type == "time_domain" and not for_raw:
             x = self.__bandpass_filter_continuous(x)
-        if self.global_config.cvae.pre_normalize:
+        if self.global_config.cvae.pre_normalize and not for_raw:
             x = self.__normalize(x, TYPE="pre-norm")
         x, y = self.__reshape_input(x, y)
-        if self.global_config.cvae.perform_hanning_window:
+        if self.global_config.cvae.perform_hanning_window and not for_raw:
             x = self.__perform_hanning_window(x=x)
         x = self.__perform_fft(x=x)
-        if self.global_config.cvae.band_pass_filter_fft and self.global_config.cvae.band_pass_filter_type == "frequency_domain":
+        if self.global_config.cvae.band_pass_filter_fft and self.global_config.cvae.band_pass_filter_type == "frequency_domain" and not for_raw:
             x = self.band_pass_filter_fft(x)
-        x = self.__complex_to_real_features(x)
+        x = self.__complex_to_real_features(x, for_raw)
         y = self.__downsample_by_majority_voting(y_windows=y)
         x, y = self.__apply_sequence_length(x, y)
-        if self.global_config.cvae.post_normalize:
-            x_norm = self.__normalize(x, TYPE="fft")
-        return x_norm, y, x
+        if self.global_config.cvae.post_normalize and not for_raw:
+            x = self.__normalize(x, TYPE="fft")
+        return x, y
     
     def get_short_name(self):
         return "VAEPreprocessing"

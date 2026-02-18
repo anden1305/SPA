@@ -229,7 +229,7 @@ cvae:
 
 verbose: True
 seed: 123
-results_dir: results/substages/analysis
+results_dir: results/substages/analysis_2
 run_name: substages_analysis_population_7
 runs: 3
 validate_data: True

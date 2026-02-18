@@ -189,8 +189,8 @@ class Orchestrator:
             cvae_state = {k[len("cvae."):]: v for k, v in state.items() if k.startswith("cvae.")}
             # self.model.load_state_dict(torch.load(self.global_config.cvae.model_checkpoint_path))
             self.model.cvae.load_state_dict(cvae_state, strict=False)
-        nmi, likelihood, y_hat, y, x_latent, x = self.validator.validate_cvae_gmm()
-        self.visualizer.visualize_cvae_gmm(y_hat, y, x_latent, x, nmi, likelihood)
+        nmi, likelihood, y_hat, y, x_latent, x, sub_ids = self.validator.validate_cvae_gmm()
+        self.visualizer.visualize_cvae_gmm(y_hat, y, x_latent, x, nmi, likelihood, sub_ids)
         print(f"GMM NMI: {nmi}, Likelihood: {likelihood}")
         
     

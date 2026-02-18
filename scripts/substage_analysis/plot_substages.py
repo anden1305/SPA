@@ -1,10 +1,15 @@
 from __future__ import annotations
 
-from typing import List, Optional, Sequence, Tuple, Union
+from typing import Sequence, Tuple, Union
 import os
 
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
+
+sns.set_theme(style="whitegrid", context="paper")
+
+ColorLike = Union[str, Tuple[float, float, float], Tuple[float, float, float, float]]
 
 
 def pca_scatter_random_samples(
@@ -16,25 +21,21 @@ def pca_scatter_random_samples(
     n_samples: int,
     save_path: str,
     *,
+    label_colors: Sequence[ColorLike],     # length C
     sample_without_replacement: bool = True,
     point_size: float = 18.0,
     alpha: float = 0.75,
     center: bool = True,
     standardize: bool = False,
     return_details: bool = False,
+    # --- NEW ---
+    trim_outliers: bool = True,
+    outlier_percent: float = 0.5,          # total trimmed per axis (e.g., 1.0 -> 0.5% low + 0.5% high)
 ) -> Union[None, Tuple[np.ndarray, np.ndarray, np.ndarray]]:
     """
-    1) Fits PCA on ALL datapoints (N,F).
-    2) Randomly selects n_samples datapoints and projects them into PCA space.
-    3) Scatter plot of selected points in (PC1, PC2) colored by their labels.
-    4) Legend uses label_names.
-    5) Title uses analysis_name.
-    6) Saves figure to save_path.
-
-    Notes:
-    - PCA is implemented with SVD (no sklearn dependency).
-    - If standardize=True, features are z-scored before PCA (after optional centering).
-    - Returns (selected_indices, pc_scores_selected, explained_variance_ratio) if return_details=True.
+    ...
+    - If trim_outliers=True, removes outliers in (PC1, PC2) by trimming
+      `outlier_percent` total per axis using percentile bounds, then plots.
     """
     # -----------------
     # Input validation
@@ -61,16 +62,20 @@ def pca_scatter_random_samples(
     if not isinstance(save_path, str) or not save_path.strip():
         raise ValueError("save_path must be a non-empty string.")
 
+    C = len(label_names)
+    if len(label_colors) != C:
+        raise ValueError(
+            f"label_colors must have same length as label_names "
+            f"(expected {C}, got {len(label_colors)})."
+        )
+
     # Ensure labels are integer-like
     if not np.issubdtype(labels.dtype, np.integer):
-        # try to safely cast if they look integer-like
         if np.all(np.isfinite(labels)) and np.all(np.equal(labels, np.round(labels))):
             labels = labels.astype(int)
         else:
             raise ValueError("labels must be integer dtype (or safely castable to integers).")
 
-    # Decide number of classes from label_names (assumes labels are 0..C-1)
-    C = len(label_names)
     if labels.min() < 0:
         raise ValueError("labels must be >= 0.")
     if labels.max() >= C:
@@ -79,12 +84,18 @@ def pca_scatter_random_samples(
             "Expected labels in [0, C-1]."
         )
 
+    if trim_outliers:
+        if not (0.0 <= outlier_percent < 100.0):
+            raise ValueError("outlier_percent must be in [0, 100).")
+        if outlier_percent > 0 and n_samples < 20:
+            # not strictly required, but percentiles get silly with tiny samples
+            pass
+
     # -----------------
     # PCA fit on ALL data
     # -----------------
     X = datapoints.astype(np.float64, copy=False)
 
-    # Center / standardize
     mu = X.mean(axis=0) if center else np.zeros(F, dtype=np.float64)
     Xc = X - mu
 
@@ -93,12 +104,9 @@ def pca_scatter_random_samples(
         sigma[sigma == 0.0] = 1.0
         Xc = Xc / sigma
 
-    # SVD: Xc = U S Vt, principal axes are rows of Vt
-    # PCs scores for a sample x: (x_centered) @ V, where V = Vt.T
     U, S, Vt = np.linalg.svd(Xc, full_matrices=False)
-    V = Vt.T  # (F, F)
-    # explained variance ratio
-    # eigenvalues of covariance: (S^2) / (N-1)
+    V = Vt.T
+
     if N > 1:
         eigvals = (S ** 2) / (N - 1)
         explained_variance_ratio = eigvals / eigvals.sum()
@@ -109,32 +117,42 @@ def pca_scatter_random_samples(
     # Sample + project
     # -----------------
     rng = np.random.default_rng(seed)
-    if sample_without_replacement:
-        idx = rng.choice(N, size=n_samples, replace=False)
-    else:
-        idx = rng.choice(N, size=n_samples, replace=True)
+    idx = rng.choice(N, size=n_samples, replace=not sample_without_replacement)
 
     X_sel = X[idx]
     X_sel_c = X_sel - mu
     if standardize:
         X_sel_c = X_sel_c / sigma
 
-    # scores in PC space (n_samples, F)
     scores_sel = X_sel_c @ V
     pc1 = scores_sel[:, 0]
     pc2 = scores_sel[:, 1]
     y_sel = labels[idx]
 
     # -----------------
+    # NEW: Trim outliers in PC1/PC2 before plotting
+    # -----------------
+    if trim_outliers and outlier_percent > 0:
+        tail = outlier_percent / 2.0
+        lo, hi = tail, 100.0 - tail
+
+        pc1_lo, pc1_hi = np.percentile(pc1, [lo, hi])
+        pc2_lo, pc2_hi = np.percentile(pc2, [lo, hi])
+
+        keep = (pc1 >= pc1_lo) & (pc1 <= pc1_hi) & (pc2 >= pc2_lo) & (pc2 <= pc2_hi)
+
+        # filter everything consistently
+        pc1 = pc1[keep]
+        pc2 = pc2[keep]
+        y_sel = y_sel[keep]
+        scores_sel = scores_sel[keep]
+        idx = idx[keep]
+
+    # -----------------
     # Plot
     # -----------------
     fig, ax = plt.subplots(figsize=(9, 7))
 
-    # Use discrete colormap for C classes
-    cmap = plt.get_cmap("tab10" if C <= 10 else "tab20")
-    colors = [cmap(i % cmap.N) for i in range(C)]
-
-    # Plot per class to get clean legend entries
     for c in range(C):
         mask = (y_sel == c)
         if not np.any(mask):
@@ -145,7 +163,7 @@ def pca_scatter_random_samples(
             s=point_size,
             alpha=alpha,
             label=label_names[c],
-            color=colors[c],
+            color=label_colors[c],
             edgecolors="none",
         )
 
