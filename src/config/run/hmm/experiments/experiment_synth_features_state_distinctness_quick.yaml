@@ -1,0 +1,97 @@
+trainer:
+  epochs: 1
+  learning_rate: 0.0001
+  optimizer: adam
+  grad_clip: null
+  validate_per_epoch: 1
+  early_stopping:
+    enabled: false
+    patience: 100
+    min_delta: 0.001
+  scheduler:
+    enabled: false
+    type: exponential
+    step_size: null
+    gamma: 0.999972
+validator:
+  nmi: true
+  accuracy: true
+  cross_nmi: false
+  learning_rate: false
+  state_distinctness: true
+  summary_statistics: true
+  log_likelihood: true
+visualizer:
+  losses: false
+  learning_rate: false
+  pca_tripanel: false
+  confusion_matrix: false
+  state_distinctness: true
+  summary_statistics: true
+  historic_values: false
+dataloader:
+  num_batches: 128
+  validation_batch_size: 128
+  batch_size: 32
+  window_size: 512
+  stride: 512
+  shuffle: true
+  normalize: true
+  transforms:
+    - type: band_pass_filter
+      channel: EEG
+      params:
+        low_cutoff: 0.5
+        high_cutoff: 30
+    - type: percentile_clipping
+      channel: EEG
+      params:
+        percentile: 0.5
+    - type: rms
+      channel: EEG
+      params: {}
+    - type: theta_delta_ratio
+      channel: EEG
+      params: {}
+    - type: theta_beta_ratio
+      channel: EEG
+      params: {}
+    - type: beta_delta_ratio
+      channel: EEG
+      params: {}
+    - type: theta_gamma_pac
+      channel: EEG
+      params: {}
+    - type: fft_relative_band_power
+      channel: EEG
+      params:
+        bands:
+          - [0.5, 4]
+          - [6, 9]
+          - [15, 30]
+    - type: percentile_clipping
+      channel: EMG
+      params:
+        percentile: 0.1
+    - type: rms
+      channel: EMG
+      params: {}
+train_datasets:
+  - type: synthetic
+    id: experiments
+val_datasets:
+  - type: synthetic
+    id: experiments
+model:
+  type: hmm
+  features: true
+  covariance_type: full
+  init_strategy: random_uniform
+  init_noisy: false
+  params: {}
+verbose: true
+seed: 123
+results_dir: results/state_distinctness
+run_name: exp_hmm_synth_features_state_distinctness_quick
+runs: 1
+validate_data: true

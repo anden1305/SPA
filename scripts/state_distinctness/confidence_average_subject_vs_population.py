@@ -53,6 +53,12 @@ def plot_average_subject_vs_population(
         dtype=float,
     )
     subj_avg = subj_vals_all.mean(axis=0)
+    n_subjects = subj_vals_all.shape[0]
+    if n_subjects > 1:
+        subj_sem = subj_vals_all.std(axis=0, ddof=1) / np.sqrt(n_subjects)
+    else:
+        subj_sem = np.zeros_like(subj_avg)
+    subj_ci95 = 1.96 * subj_sem
 
     # Sort by population separation (descending)
     order = np.argsort(-pop_vals)
@@ -60,38 +66,75 @@ def plot_average_subject_vs_population(
     pair_names = [p[2] for p in pairs]
     pop_vals = pop_vals[order]
     subj_avg = subj_avg[order]
+    subj_ci95 = subj_ci95[order]
 
     fig, ax = plt.subplots(figsize=(7.6, 4.6))
     x = np.arange(len(pair_names))
     width = 0.36
+    subject_shift = 0.08
 
     ax.bar(x - width / 2, pop_vals, width=width, color=pop_color, label="Population")
-    ax.bar(x + width / 2, subj_avg, width=width, color=subj_color, label="Subjects Avg")
+    ax.bar(
+        x + width / 2 + subject_shift,
+        subj_avg,
+        width=width,
+        color=subj_color,
+        label="Subjects Avg (±95% CI)",
+    )
+
+    # Draw CI whiskers to the right side of each subject bar (instead of centered)
+    subject_centers = x + width / 2 + subject_shift
+    ci_x = subject_centers + (width * 0.38)
+    ax.errorbar(
+        ci_x,
+        subj_avg,
+        yerr=subj_ci95,
+        fmt="none",
+        ecolor="#6f1a47",
+        elinewidth=1.4,
+        capsize=4,
+        capthick=1.4,
+        zorder=5,
+    )
 
     ax.set_xticks(x)
     ax.set_xticklabels(pair_names)
     ax.set_ylabel("Energy Distance")
-    ax.set_title("Population vs Average Subject Distinctness", pad=8)
     style_axes(ax)
-
-    # Tighter y-limits
-    ymax = float(max(pop_vals.max(), subj_avg.max()))
-    ax.set_ylim(0, ymax * 1.10)
 
     # Value labels + deltas (delta just above the taller bar)
     y_pad = 0.03
-    delta_y = 0.20
+    delta_y = 0.13
+
+    # Reserve vertical room for all annotations to avoid clipping
+    annotation_top = np.maximum(pop_vals, subj_avg + subj_ci95) + delta_y
+    y_top = float(np.max(annotation_top) + 0.18)
+    ax.set_ylim(0, y_top)
+
     for i, (pv, sv) in enumerate(zip(pop_vals, subj_avg)):
-        ax.text(i - width / 2, pv + y_pad, f"{pv:.2f}", ha="center", va="bottom", fontsize=11)
-        ax.text(i + width / 2, sv + y_pad, f"{sv:.2f}", ha="center", va="bottom", fontsize=11)
+        ax.text(i - width / 2, pv + y_pad, f"{pv:.2f}", ha="center", va="bottom", fontsize=11, clip_on=False)
+        ax.text(i + width / 2 + subject_shift, sv + y_pad, f"{sv:.2f}", ha="center", va="bottom", fontsize=11, clip_on=False)
+        ci_label_x = ci_x[i] + 0.04
+        ci_label_y = sv + (0.35 * subj_ci95[i])
+        ax.text(
+            ci_label_x,
+            ci_label_y,
+            f"±{subj_ci95[i]:.2f}",
+            ha="left",
+            va="center",
+            fontsize=10,
+            clip_on=False,
+            bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.85, "pad": 0.15},
+        )
         ax.text(
             i,
-            max(pv, sv) + delta_y,
+            max(pv, sv + subj_ci95[i]) + delta_y,
             f"Δ {sv - pv:+.2f}",
             ha="center",
             va="bottom",
             fontsize=11,
             fontweight="bold",
+            clip_on=False,
         )
 
     # Legend (keep compact)
