@@ -89,6 +89,7 @@ class ModelConfig(BaseModel):
     #   - var_reg: variance stabilization penalty (default 0.0)
     #   - sticky_coef: sticky transition prior weight (default 0.0)
     #   - sticky_kappa: self-transition probability in prior (default 0.9)
+    #   - disable_default_var_penalty: turn off the default variance floor penalty (default False)
     #   - max_lag: autoregressive order (required for marhmm)
     #
     # Hardcoded in src/models/hmm.py & marhmm.py:

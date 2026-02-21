@@ -43,7 +43,7 @@ class MARHMM(BaseModel):
 		self.obs_dim = self.num_features
 		# Covariance type
 		self.covariance_type = self.global_config.model.covariance_type
-		self.jitter = float(1e-5)
+		self.jitter = float(1e-8)
 		# Config
 		params = self.global_config.model.params
 		lags = params.get("lags", [1, 2, 4, 8])
@@ -54,6 +54,7 @@ class MARHMM(BaseModel):
 		self.max_lag: int = max(lags)
 		self.ridge = float(params.get("ridge", 0.0))  # L2 coeff penalty
 		self.var_reg = float(params.get("var_reg", 0.0))  # variance stabiliser
+		self.disable_default_var_penalty = bool(params.get("disable_default_var_penalty", False))
 		# Optional sticky transition prior
 		self.sticky_coef = float(params.get("sticky_coef", 0.0))
 		self.sticky_kappa = float(params.get("sticky_kappa", 0.9))
@@ -132,7 +133,7 @@ class MARHMM(BaseModel):
 			# Diagonal covariance case
 			log_var = self.log_var.view(1, 1, S, D).to(dtype=x.dtype)
 			# Clamp log_var to prevent extreme values
-			log_var = torch.clamp(log_var, min=-10, max=10)
+			log_var = torch.clamp(log_var, min=-20, max=20)
 			
 			# Use more stable computation
 			log_2pi = self._log_2pi.to(dtype=x.dtype)
@@ -229,13 +230,14 @@ class MARHMM(BaseModel):
 				reg = reg + var_reg * (small_pen.sum() + large_pen.sum())
 		else:
 			# Light penalty against too-small variances by default
-			if self.covariance_type == "diag":
-				var = torch.exp(self.log_var)
-				reg = reg + 1e-3 * torch.clamp(1e-4 - var, min=0).pow(2).sum()
-			elif self.covariance_type == "full":
-				L = self.__full_cov_cholesky()
-				diag = torch.diagonal(L, dim1=1, dim2=2)
-				reg = reg + 1e-3 * torch.clamp(1e-4 - diag, min=0).pow(2).sum()
+			if not self.disable_default_var_penalty:
+				if self.covariance_type == "diag":
+					var = torch.exp(self.log_var)
+					reg = reg + 1e-3 * torch.clamp(1e-4 - var, min=0).pow(2).sum()
+				elif self.covariance_type == "full":
+					L = self.__full_cov_cholesky()
+					diag = torch.diagonal(L, dim1=1, dim2=2)
+					reg = reg + 1e-3 * torch.clamp(1e-4 - diag, min=0).pow(2).sum()
 		# Sticky transitions: encourage self-transitions via KL(A || A_prior)
 		sticky_coef = float(getattr(self, "sticky_coef", 0.0))
 		if sticky_coef > 0:
@@ -373,7 +375,7 @@ class MARHMM(BaseModel):
 	@torch.no_grad()
 	def __initialize_weights(
 		self,
-		coeff_std: float = 0.05, # HERE
+		coeff_std: float = 0.3, # INCREASED from 0.05 to help AR model fit
 		jitter_std: float = 0.05, # HERE
 		var_init: float = 0.05, # HERE
 		kmeans_iters: int = 150,

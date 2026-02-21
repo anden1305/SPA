@@ -1,0 +1,126 @@
+trainer:
+  epochs: 100000
+  learning_rate: 5.0e-05
+  optimizer: adam
+  grad_clip: null
+  validate_per_epoch: 500
+  early_stopping:
+    enabled: false
+    patience: 100
+    min_delta: 0.001
+  scheduler:
+    enabled: true
+    type: exponential
+    step_size: null
+    gamma: 0.999972
+validator:
+  nmi: true
+  accuracy: true
+  cross_nmi: true
+  learning_rate: true
+  state_distinctness: true
+  summary_statistics: true
+  log_likelihood: true
+visualizer:
+  losses: true
+  learning_rate: true
+  pca_tripanel: true
+  confusion_matrix: true
+  state_distinctness: true
+  summary_statistics: true
+  historic_values: true
+dataloader:
+  num_batches: 8192
+  batch_size: 32
+  validation_batch_size: 256
+  window_size: 512
+  stride: 512
+  shuffle: true
+  normalize: true
+  transforms:
+    - type: band_pass_filter
+      channel: EEG
+      params:
+        low_cutoff: 0.5
+        high_cutoff: 30
+    - type: percentile_clipping
+      channel: EEG
+      params:
+        percentile: 0.5
+    - type: rms
+      channel: EEG
+      params: {}
+    - type: theta_delta_ratio
+      channel: EEG
+      params: {}
+    - type: theta_beta_ratio
+      channel: EEG
+      params: {}
+    - type: beta_delta_ratio
+      channel: EEG
+      params: {}
+    - type: theta_gamma_pac
+      channel: EEG
+      params: {}
+    - type: fft_relative_band_power
+      channel: EEG
+      params:
+        bands:
+          - [0.5, 4]
+          - [6, 9]
+          - [15, 30]
+    - type: percentile_clipping
+      channel: EMG
+      params:
+        percentile: 0.1
+    - type: rms
+      channel: EMG
+      params: {}
+train_datasets:
+  - type: mssv
+    id: sub-039
+    run: 1
+    remove_artifact: true
+  - type: mssv
+    id: sub-039
+    run: 2
+    remove_artifact: true
+  - type: mssv
+    id: sub-039
+    run: 3
+    remove_artifact: true
+val_datasets:
+  - type: mssv
+    id: sub-039
+    run: 1
+    remove_artifact: true
+  - type: mssv
+    id: sub-039
+    run: 2
+    remove_artifact: true
+  - type: mssv
+    id: sub-039
+    run: 3
+    remove_artifact: true
+model:
+  type: marhmm
+  covariance_type: full
+  init_strategy: random_uniform
+  init_noisy: false
+  features: true
+  n_states: 3
+  params:
+    lags: [1, 2, 4, 8]
+    ridge: 0.0
+    var_reg: 0.0
+    sticky_coef: 0.0
+    sticky_kappa: 0.0
+    disable_default_var_penalty: true
+verbose: true
+seed: 123
+results_dir: results/regularisation_ablation_marhmm
+run_name: marhmm_sub039_run1_features_no_reg
+runs: 3
+validate_data: true
+wandb:
+  enabled: true
