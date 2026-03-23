@@ -1,0 +1,63 @@
+trainer:
+  epochs: 5000
+  learning_rate: 0.001
+  optimizer: adam
+  grad_clip: null
+  validate_per_epoch: 500
+  early_stopping:
+    enabled: true
+    patience: 75
+    min_delta: 0.0005
+  scheduler:
+    enabled: false
+    type: step
+    step_size: 100
+    gamma: 0.9
+validator:
+  nmi: True
+  accuracy: True
+  cross_nmi: True
+  learning_rate: True
+  state_distinctness: True
+  summary_statistics: True
+visualizer:
+  losses: True
+  learning_rate: True
+  pca_tripanel: True
+  confusion_matrix: True
+  state_distinctness: True
+  summary_statistics: True
+  historic_values: True
+dataloader:
+  num_batches: 1000000
+  batch_size: 256      
+  validation_batch_size: 1024
+  window_size: null
+  stride: null
+  shuffle: True
+  normalize: False       # CRITICAL: Don't destroy AR structure
+  transforms: []
+train_datasets:
+  - type: synthetic
+    id: mar_clear_temporal
+val_datasets:
+  - type: synthetic
+    id: mar_clear_temporal
+model:
+  type: marhmm
+  covariance_type: full
+  init_strategy: random_uniform
+  init_noisy: false
+  features: false
+  params:
+    lags: [1, 8, 32]     # Match generation lags exactly
+    ridge: 0.01          # Lower regularization for 3 lags
+    var_reg: 0.01
+    sticky_coef: 0.10    # Match transition matrix (0.70 self-transition)
+    sticky_kappa: 0.85
+verbose: True
+seed: 42
+results_dir: results/training/marhmm
+run_name: mar_clear_temporal_marhmm
+runs: 1
+validate_data: True

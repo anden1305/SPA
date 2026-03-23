@@ -1,0 +1,56 @@
+name: spectral_wavelength_comparison7
+sampling_rate_hz: 128
+epoch_length_s: 4  # Match MSSV data
+n_epochs: 3000  # More data for 3 classes
+n_stages: 3
+
+# Balanced transitions
+transition_matrix:
+  - [0.90, 0.05, 0.05]
+  - [0.05, 0.90, 0.05]
+  - [0.05, 0.05, 0.90]
+
+# Wavelengths: 3, 6, 12 samples (perfect divisors!)
+# Frequencies: 128/3 = 42.67 Hz, 128/6 = 21.33 Hz, 128/12 = 10.67 Hz
+frequency_bins:
+  - [42.6666667, 42.6666667]  # 128/3  → wavelength = 3 samples
+  - [21.3333333, 21.3333333]  # 128/6  → wavelength = 6 samples
+  - [10.6666667, 10.6666667]  # 128/12 → wavelength = 12 samples
+
+## Recommended lags: [3, 6]
+## Lag 3: full cycle of wavelength 3, half of 6, quarter of 12
+## Lag 6: full cycle of wavelength 6, half of 12
+
+# Each state uses only one specific frequency bin
+stage_band_powers:
+  - [1.0, 0.0, 0.0]  # State 0: only 42.67 Hz (wavelength 3 samples)
+  - [0.0, 1.0, 0.0]  # State 1: only 21.33 Hz (wavelength 6 samples)
+  - [0.0, 0.0, 1.0]  # State 2: only 10.67 Hz (wavelength 12 samples)
+
+# Probability of selecting each bin per state
+stage_bin_selection_probability:
+  - [1.0, 0.0, 0.0]  # State 0: always select 42.67 Hz
+  - [0.0, 1.0, 0.0]  # State 1: always select 21.33 Hz
+  - [0.0, 0.0, 1.0]  # State 2: always select 10.67 Hz
+
+# Pure single sinusoid per epoch
+components_per_epoch: 1
+
+# No amplitude jitter for clean signals
+amplitude_jitter_range: [1.0, 1.0, 1.0]
+
+# Identical means across states (no DC offset difference)
+stage_mean_amplitudes: [0, 0, 0]
+
+# Smoothing overlap for continuity
+overlap_s: 0.01
+
+# Identical RMS scales (unit amplitude)
+stage_rms_scales: [1.0, 1.0, 1.0]
+
+# Normalize each epoch to unit variance so instantaneous statistics are identical
+normalize_epoch: true
+
+seed: 42
+
+stage_names: [Wave3, Wave6, Wave12]

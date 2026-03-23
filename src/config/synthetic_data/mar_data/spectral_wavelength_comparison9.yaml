@@ -1,0 +1,57 @@
+name: spectral_wavelength_comparison9
+sampling_rate_hz: 128
+epoch_length_s: 20  # Proven length from successful 2-class experiment
+n_epochs: 5000  # 5× more data to handle 3-class complexity
+n_stages: 3
+
+# Very sticky transitions for long stable periods
+transition_matrix:
+  - [0.93, 0.035, 0.035]
+  - [0.035, 0.93, 0.035]
+  - [0.035, 0.035, 0.93]
+
+# Perfect power-of-2 wavelengths: 4, 8, 16 samples (all integer)
+# Scale up from successful 2-class [4, 8] experiment
+frequency_bins:
+  - [32.0, 32.0]  # 128/4  = 32 Hz → wavelength = 4 samples
+  - [16.0, 16.0]  # 128/8  = 16 Hz → wavelength = 8 samples
+  - [8.0, 8.0]    # 128/16 = 8 Hz  → wavelength = 16 samples
+
+## Recommended lags: [4, 8] - perfect mathematical alignment
+## Lag 4: full cycle of wavelength 4, half of 8, quarter of 16
+## Lag 8: full cycle of wavelength 8, half of 16
+## Scales up the successful 2-class lags [2,4] pattern
+
+# Each state uses only one specific frequency bin
+stage_band_powers:
+  - [1.0, 0.0, 0.0]  # State 0: only 32 Hz (wavelength 4 samples)
+  - [0.0, 1.0, 0.0]  # State 1: only 16 Hz (wavelength 8 samples)
+  - [0.0, 0.0, 1.0]  # State 2: only 8 Hz (wavelength 16 samples)
+
+# Probability of selecting each bin per state
+stage_bin_selection_probability:
+  - [1.0, 0.0, 0.0]  # State 0: always select 32 Hz
+  - [0.0, 1.0, 0.0]  # State 1: always select 16 Hz
+  - [0.0, 0.0, 1.0]  # State 2: always select 8 Hz
+
+# Pure single sinusoid per epoch
+components_per_epoch: 1
+
+# No amplitude jitter for clean signals
+amplitude_jitter_range: [1.0, 1.0, 1.0]
+
+# Identical means across states (no DC offset difference)
+stage_mean_amplitudes: [0, 0, 0]
+
+# Smoothing overlap for continuity
+overlap_s: 0.01
+
+# Identical RMS scales (unit amplitude)
+stage_rms_scales: [1.0, 1.0, 1.0]
+
+# Normalize each epoch to unit variance so instantaneous statistics are identical
+normalize_epoch: true
+
+seed: 42
+
+stage_names: [Wave4, Wave8, Wave16]

@@ -1,0 +1,76 @@
+trainer:
+  epochs: 3000
+  learning_rate: 0.005  # Higher LR for faster convergence
+  optimizer: adam
+  grad_clip: 1.0  # Prevent exploding gradients
+  validate_per_epoch: 50
+  early_stopping:
+    enabled: true
+    patience: 50  # Stop faster if not improving
+    min_delta: 0.001
+  scheduler:
+    enabled: true
+    type: exponential
+    step_size: null
+    gamma: 0.999  # Gradual decay
+
+validator:
+  nmi: true
+  accuracy: true
+  cross_nmi: true
+  learning_rate: true
+  state_distinctness: true
+  summary_statistics: true
+
+visualizer:
+  losses: true
+  learning_rate: true
+  pca_tripanel: true
+  confusion_matrix: true
+  state_distinctness: true
+  summary_statistics: true
+  historic_values: true
+
+dataloader:
+  num_batches: 1000000
+  batch_size: 1024  # ~8 seconds at 128 Hz - captures multiple cycles
+  validation_batch_size: 2048
+  window_size: null
+  stride: null
+  shuffle: true
+  normalize: true   # CRITICAL: Ensure identical marginals (mean=0, std=1)
+  transforms: []    # No preprocessing
+
+train_datasets:
+  - type: synthetic
+    id: pure_3class
+
+val_datasets:
+  - type: synthetic
+    id: pure_3class
+model:
+  type: marhmm
+  covariance_type: full
+  init_strategy: kmeans
+  init_noisy: false
+  features: false
+  params:
+    lags: [1, 2]  # MUST MATCH generation lags
+    ridge: 0.001  # Minimal regularization - don't penalize large AR coeffs
+    var_reg: 0.001 # Minimal variance penalty
+    sticky_coef: 0.0  # No sticky transitions for proof-of-concept
+    sticky_kappa: 0.0
+
+verbose: true
+seed: 42
+results_dir: results/training/marhmm
+run_name: experiment_pure_3class_marhmm
+runs: 1
+validate_data: false
+
+wandb:
+  enabled: true
+  project: SPA
+  entity: null
+  group: stable_oscillatory_mar_experiments
+  tags: [marhmm, mar_data, synthetic, raw, oscillatory]

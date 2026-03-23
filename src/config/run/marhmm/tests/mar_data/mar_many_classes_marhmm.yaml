@@ -1,0 +1,63 @@
+trainer:
+  epochs: 5000
+  learning_rate: 0.001
+  optimizer: adam
+  grad_clip: null
+  validate_per_epoch: 200
+  early_stopping:
+    enabled: false
+    patience: 40
+    min_delta: 0.0005
+  scheduler:
+    enabled: false
+    type: step
+    step_size: 100
+    gamma: 0.9
+validator:
+  nmi: True
+  accuracy: True
+  cross_nmi: True
+  learning_rate: True
+  state_distinctness: True
+  summary_statistics: True
+visualizer:
+  losses: True
+  learning_rate: True
+  pca_tripanel: True
+  confusion_matrix: True
+  state_distinctness: True
+  summary_statistics: True
+  historic_values: True
+dataloader:
+  num_batches: 1000000
+  batch_size: 170
+  validation_batch_size: 1024
+  window_size: null
+  stride: null
+  shuffle: True
+  normalize: False
+  transforms: []
+train_datasets:
+  - type: synthetic
+    id: mar_many_classes
+val_datasets:
+  - type: synthetic
+    id: mar_many_classes
+model:
+  type: marhmm
+  covariance_type: full
+  init_strategy: random_uniform
+  init_noisy: false
+  features: false
+  params:
+    lags: [1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96]
+    ridge: 0.05
+    var_reg: 0.02
+    sticky_coef: 0.10
+    sticky_kappa: 0.85
+verbose: True
+seed: 42
+results_dir: results/training/marhmm
+run_name: mar_many_classes_marhmm
+runs: 1
+validate_data: True

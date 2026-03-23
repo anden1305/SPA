@@ -1,0 +1,39 @@
+name: mar_temporal_only
+type: mar
+sampling_rate_hz: 128
+epoch_length_s: 4
+n_epochs: 120          # Slightly more epochs for richer temporal statistics
+n_stages: 4
+stage_names: [Stage1, Stage2, Stage3, Stage4]
+
+# Moderate self-transition probability with balanced off-diagonals; forces enough switches
+transition_matrix:
+  - [0.60, 0.1334, 0.1333, 0.1333]
+  - [0.1333, 0.60, 0.1334, 0.1333]
+  - [0.1333, 0.1333, 0.60, 0.1334]
+  - [0.1334, 0.1333, 0.1333, 0.60]
+
+# Long lag list emphasizes multi-scale temporal dependencies
+lags: [1, 2, 4, 8, 16, 32, 64]
+
+# Critical: identical instantaneous (zero-lag) mean + variance across states so static emission models (HMM) have minimal discriminative power
+stage_mean_amplitudes: [0, 0, 0, 0]
+stage_rms_scales: [1.0, 1.0, 1.0, 1.0]
+
+# Distinct AR signatures per state. Differences are concentrated at different scales.
+# StateA: strong short-memory with high lag-1 and compensating lag-2 negative coefficient.
+# StateB: energy concentrated in mid-range lags (8–16) with a mix of signs.
+# StateC: progressively increasing long-memory; largest weight at lag 64.
+# StateD: oscillatory pattern (alternating signs) producing a quasi-periodic signature.
+# Coefficient order: lags 1,2,4,8,16,32,64
+stage_coeffs:
+  - [0.85, -0.35, 0.15, 0.05, 0.02, 0.01, 0.00]   # StateA
+  - [0.10, 0.05, 0.10, 0.60, -0.30, 0.10, 0.05]   # StateB
+  - [0.05, 0.02, 0.05, 0.10, 0.20, 0.20, 0.33]    # StateC
+  - [-0.60, 0.25, -0.15, 0.10, -0.05, 0.05, -0.02] # StateD
+# All coefficient sets keep individual magnitudes moderate to reduce instability risk while ensuring distinct autocorrelation functions.
+# These patterns make per-sample distributions almost identical; discrimination requires modeling temporal structure.
+
+normalize_epoch: false
+overlap_s: 0.25
+seed: 2025

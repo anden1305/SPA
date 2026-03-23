@@ -1,0 +1,71 @@
+trainer:
+  epochs: 7500
+  learning_rate: 0.0001  # Back to proven LR
+  optimizer: adam
+  grad_clip: null
+  validate_per_epoch: 100
+  early_stopping:
+    enabled: true
+    patience: 300
+    min_delta: 0.00005
+  scheduler:
+    enabled: false
+    type: exponential
+    step_size: null
+    gamma: 0.99993
+
+validator:
+  nmi: true
+  accuracy: true
+  cross_nmi: true
+  learning_rate: true
+  state_distinctness: true
+  summary_statistics: true
+
+visualizer:
+  losses: true
+  learning_rate: true
+  pca_tripanel: true
+  confusion_matrix: true
+  state_distinctness: true
+  summary_statistics: true
+  historic_values: true
+
+dataloader:
+  num_batches: 1000000
+  batch_size: 512  # Back to smaller batch size
+  validation_batch_size: 512
+  window_size: null
+  stride: null
+  shuffle: true
+  normalize: false
+  transforms: []
+
+train_datasets:
+  - type: synthetic
+    id: spectral_wavelength_comparison11
+
+val_datasets:
+  - type: synthetic
+    id: spectral_wavelength_comparison11
+
+model:
+  type: hmm
+  covariance_type: full
+  init_strategy: random_uniform
+  init_noisy: false
+  features: false
+  params: {}
+verbose: true
+seed: 43
+results_dir: results/training/wavelength_comparison11
+run_name: hmm_wavelength_comparison11
+runs: 1
+validate_data: true
+
+wandb:
+  enabled: true
+  project: SPA
+  entity: null
+  group: wavelength_comparison11
+  tags: [hmm, spectral, wavelength]

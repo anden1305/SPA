@@ -1,0 +1,40 @@
+name: pure_24hz
+sampling_rate_hz: 128
+epoch_length_s: 4
+n_epochs: 2000
+n_stages: 1
+
+transition_matrix:
+  - [1.0]  # Single state, always stays in same state
+
+# Pure 24 Hz frequency (period = 8 samples at 128 Hz - CLEAN INTEGER!)
+frequency_bins:
+  - [24.0, 24.0]
+
+stage_band_powers:
+  - [1.0]  # Unit power
+
+stage_bin_selection_probability:
+  - [1.0]  # Always select this bin
+
+# CRITICAL: Only one sinusoid per epoch (pure tone)
+components_per_epoch: 1
+
+# No amplitude jitter for pure signals
+amplitude_jitter_range: [1.0, 1.0]
+
+# Zero mean
+stage_mean_amplitudes: [0]
+
+# Smoothing overlap
+overlap_s: 0.01
+
+# Unit RMS scale
+stage_rms_scales: [1.0]
+
+# Normalize each epoch to unit variance
+normalize_epoch: true
+
+seed: 42
+
+stage_names: [Freq24Hz]

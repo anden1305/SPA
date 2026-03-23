@@ -1,0 +1,39 @@
+name: mar_trivial_3state
+type: mar
+sampling_rate_hz: 128
+epoch_length_s: 8
+n_epochs: 300              # More data for stable learning
+n_stages: 3
+stage_names: [Fast, Medium, Slow]
+
+# Very strong self-transitions for long stable runs
+transition_matrix:
+  - [0.88, 0.06, 0.06]
+  - [0.06, 0.88, 0.06]
+  - [0.06, 0.06, 0.88]
+
+# Maximum lag contrast: short, mid, long
+lags: [1, 8, 32]
+
+# Identical instantaneous stats (pure temporal discrimination)
+stage_mean_amplitudes: [0, 0, 0]
+stage_rms_scales: [1.0, 1.0, 1.0]
+
+# Maximally different AR signatures:
+# Fast: pure AR(1) - exponential decay in ~5 samples
+# Medium: pure lag-8 - medium persistence
+# Slow: pure lag-32 - very long memory
+#
+# Coefficient order: lags [1, 8, 32]
+stage_coeffs:
+  - [0.92, 0.00, 0.00]    # Fast: strong short-term
+  - [0.00, 0.88, 0.00]    # Medium: strong mid-term
+  - [0.00, 0.00, 0.85]    # Slow: strong long-term
+# Each state is pure single-lag process at different timescales
+
+# Very low noise - let AR patterns dominate
+noise_scale: 0.3
+
+normalize_epoch: False
+overlap_s: 0.25
+seed: 9999

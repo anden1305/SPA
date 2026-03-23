@@ -1,0 +1,80 @@
+# Train MARHMM on separable MAR dataset
+# Should achieve ~90%+ accuracy due to temporal structure match
+
+verbose: true
+seed: 42
+runs: 1
+validate_data: false
+run_name: marhmm_separable_3states
+results_dir: results/training/marhmm
+
+wandb:
+  enabled: false
+  project: SPA
+  entity: null
+  group: separable_ar_experiments
+  tags: [marhmm, mar_data, separable]
+
+trainer:
+  epochs: 5000
+  learning_rate: 0.001
+  optimizer: adam
+  grad_clip: null
+  validate_per_epoch: 100
+  early_stopping:
+    enabled: true
+    patience: 50
+    min_delta: 0.0005
+  scheduler:
+    enabled: false
+    type: exponential
+    step_size: null
+    gamma: 0.99993
+
+validator:
+  nmi: true
+  accuracy: true
+  cross_nmi: true
+  learning_rate: true
+  state_distinctness: true
+  summary_statistics: true
+
+visualizer:
+  losses: true
+  learning_rate: true
+  pca_tripanel: true
+  confusion_matrix: true
+  state_distinctness: true
+  summary_statistics: true
+  historic_values: true
+
+dataloader:
+  num_batches: 1000000
+  batch_size: 350
+  validation_batch_size: 1024
+  window_size: null
+  stride: null
+  shuffle: true
+  normalize: false
+  transforms: []
+
+train_datasets:
+  - type: synthetic
+    id: mar_separable_3states
+
+val_datasets:
+  - type: synthetic
+    id: mar_separable_3states
+
+model:
+  type: marhmm
+  covariance_type: full
+  init_strategy: kmeans
+  init_noisy: false
+  features: false
+  params:
+    lags: [1, 2, 4, 8, 16]  # Match the true AR lags
+    ridge: 0.05
+    var_reg: 0.02
+    sticky_coef: 0.10
+    sticky_kappa: 0.85

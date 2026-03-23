@@ -1,0 +1,40 @@
+name: mar_extreme_temporal
+type: mar
+sampling_rate_hz: 128
+epoch_length_s: 4
+n_epochs: 150          # More epochs for better statistics
+n_stages: 3            # Reduce to 3 states for clearer separation
+stage_names: [FastDecay, SlowGrowth, Oscillatory]
+
+# Strong self-transitions to create longer runs per state
+transition_matrix:
+  - [0.85, 0.075, 0.075]
+  - [0.075, 0.85, 0.075]
+  - [0.075, 0.075, 0.85]
+
+# Use only a few key lags with MAXIMUM contrast
+lags: [1, 2, 8, 32]
+
+# CRITICAL: All states have IDENTICAL instantaneous statistics
+# Zero mean, unit variance after normalization - completely indistinguishable without temporal modeling
+stage_mean_amplitudes: [0, 0, 0]
+stage_rms_scales: [1.0, 1.0, 1.0]
+
+# Extreme AR signatures - each state lives in a different temporal regime:
+# FastDecay: Strong positive lag-1, rapid exponential decay (short memory)
+# SlowGrowth: Weak lag-1, strong long-lag persistence (long memory)
+# Oscillatory: Strong negative lag-1 and lag-2 creating oscillations (periodic)
+#
+# Coefficient order: lags [1, 2, 8, 32]
+stage_coeffs:
+  - [0.90, -0.05, 0.01, 0.00]      # FastDecay: dominated by lag-1
+  - [0.10, 0.05, 0.30, 0.50]       # SlowGrowth: dominated by lag-32
+  - [-0.70, 0.35, -0.10, 0.05]     # Oscillatory: alternating signs
+# FastDecay: autocorrelation drops off within ~3-5 samples
+# SlowGrowth: autocorrelation persists for 50+ samples
+# Oscillatory: autocorrelation oscillates with period ~4-6 samples
+# These create MAXIMALLY different power spectral densities and autocorrelation functions
+
+normalize_epoch: False  # CRITICAL: Don't normalize in generation - preserves AR structure
+overlap_s: 0.25
+seed: 3030

@@ -1,0 +1,41 @@
+name: pure_3class 
+type: mar
+sampling_rate_hz: 128
+epoch_length_s: 4
+n_epochs: 2000          # More epochs for richer statistics
+n_stages: 3
+stage_names: [Freq4Hz, Freq8Hz, Freq16Hz]
+
+# Balanced transition matrix - equal long-term stationary distribution
+transition_matrix:
+  - [0.85, 0.075, 0.075]
+  - [0.075, 0.85, 0.075]
+  - [0.075, 0.075, 0.85]
+
+# Pure AR(2) oscillators - ONLY lags [1, 2] for correct frequency generation
+lags: [1, 2]
+
+# CRITICAL: All states have IDENTICAL instantaneous statistics
+stage_mean_amplitudes: [0, 0, 0]
+stage_rms_scales: [1.0, 1.0, 1.0]
+
+# Pure AR(2) oscillators with EXACT peak frequencies:
+# AR(2): x[t] = a[1]*x[t-1] + a[2]*x[t-2] + noise
+# For frequency f: a[1] = 2*r*cos(2πf/fs), a[2] = -r²
+# Optimized r values for exact peak placement (errors < 0.05 Hz)
+#
+# Coefficient order: lags [1, 2]
+stage_coeffs:
+  - [1.904779, -0.942934]   # Freq4Hz:  r=0.971, peak=3.954 Hz (error 0.046 Hz)
+  - [1.797091, -0.945909]   # Freq8Hz:  r=0.973, peak=7.986 Hz (error 0.014 Hz)
+  - [1.355832, -0.919140]   # Freq16Hz: r=0.959, peak=15.99 Hz (error 0.012 Hz)
+# Pure AR(2) oscillators generate clean spectral peaks at target frequencies
+# HMM can use spectral/covariance differences
+# MARHMM uses temporal dynamics (lag-1, lag-2 coefficients differ between states)
+
+# Low noise to preserve AR structure
+noise_scale: 0.0
+
+normalize_epoch: true
+overlap_s: 0.001
+seed: 1234

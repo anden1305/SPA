@@ -1,0 +1,46 @@
+name: spectral_wavelength_comparison
+sampling_rate_hz: 128
+epoch_length_s: 20
+n_epochs: 1000
+n_stages: 2
+
+# Balanced transitions to get enough samples of each state
+transition_matrix:
+  - [0.90, 0.10]
+  - [0.10, 0.90]
+
+frequency_bins:
+  - [32.0, 32.0]  # Wavelength = 128/32 = 4 samples
+  - [16.0, 16.0]  # Wavelength = 128/16 = 8 samples
+
+# Each state uses only one specific frequency bin
+stage_band_powers:
+  - [1.0, 0.0]  # State 0: only 32 Hz (wavelength 4)
+  - [0.0, 1.0]  # State 1: only 16 Hz (wavelength 8)
+
+# Probability of selecting each bin per state
+stage_bin_selection_probability:
+  - [1.0, 0.0]  # State 0: always select 32 Hz
+  - [0.0, 1.0]  # State 1: always select 16 Hz
+
+# Pure single sinusoid per epoch
+components_per_epoch: 1
+
+# No amplitude jitter for clean signals
+amplitude_jitter_range: [1.0, 1.0]
+
+# Identical means across states (no DC offset difference)
+stage_mean_amplitudes: [0, 0]
+
+# Smoothing overlap for continuity
+overlap_s: 0.01
+
+# Identical RMS scales (unit amplitude)
+stage_rms_scales: [1.0, 1.0]
+
+# Normalize each epoch to unit variance so instantaneous statistics are identical
+normalize_epoch: true
+
+seed: 42
+
+stage_names: [Wave4, Wave8]

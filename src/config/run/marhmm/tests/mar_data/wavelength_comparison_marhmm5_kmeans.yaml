@@ -1,0 +1,77 @@
+trainer:
+  epochs: 2000
+  learning_rate: 0.001
+  optimizer: adam
+  grad_clip: null
+  validate_per_epoch: 100
+  early_stopping:
+    enabled: true
+    patience: 150
+    min_delta: 0.0001
+  scheduler:
+    enabled: false
+    type: exponential
+    step_size: null
+    gamma: 0.99993
+
+validator:
+  nmi: true
+  accuracy: true
+  cross_nmi: true
+  learning_rate: true
+  state_distinctness: true
+  summary_statistics: true
+
+visualizer:
+  losses: true
+  learning_rate: true
+  pca_tripanel: true
+  confusion_matrix: true
+  state_distinctness: true
+  summary_statistics: true
+  historic_values: true
+
+dataloader:
+  num_batches: 1000000
+  batch_size: 128
+  validation_batch_size: 512
+  window_size: null
+  stride: null
+  shuffle: true
+  normalize: false
+  transforms: []
+
+train_datasets:
+  - type: synthetic
+    id: spectral_wavelength_comparison5
+
+val_datasets:
+  - type: synthetic
+    id: spectral_wavelength_comparison5
+
+model:
+  type: marhmm
+  covariance_type: full
+  init_strategy: kmeans  # Smart initialization for 3 classes!
+  init_noisy: false
+  features: false
+  params:
+    lags: [2, 4, 8]  # Perfect for wavelengths 2, 4, 8
+    ridge: 0.0001  # Weak regularization
+    var_reg: 0.0001
+    sticky_coef: 0.20
+    sticky_kappa: 0.90
+
+verbose: true
+seed: 42
+results_dir: results/training/wavelength_comparison5
+run_name: marhmm_wavelength_comparison5_kmeans
+runs: 1
+validate_data: false
+
+wandb:
+  enabled: true
+  project: SPA
+  entity: null
+  group: wavelength_comparison5_kmeans
+  tags: [marhmm, spectral, wavelength, lags_2_4_8, kmeans]
