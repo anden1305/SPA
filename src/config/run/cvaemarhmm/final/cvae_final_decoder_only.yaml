@@ -214,7 +214,7 @@ model:
     strides:       [2, 2, 2, 2]
     paddings:      [3, 2, 2, 1]
     emb_dim: 4
-    decoder_only_conditioning: false
+    decoder_only_conditioning: true
     use_rms: False
     # prior
     prior: gmm
@@ -242,6 +242,6 @@ cvae:
 verbose: True
 seed: 123
 results_dir: results/training/cvae
-run_name: cvae_final_baseline
+run_name: cvae_final_decoder_only
 runs: 1
 validate_data: True

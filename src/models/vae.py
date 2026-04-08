@@ -44,7 +44,10 @@ class ConditionalVAE(nn.Module):
         self.latent_dim = params.get("latent_dim", None)
         self.enc_hidden_dims = params.get("enc_hidden_dims", None) # MLP hidden layers
         self.dec_hidden_dims = params.get("dec_hidden_dims", None) # MLP hidden layers
-        self.emb_dim = params.get("emb_dim", None)
+        self.emb_dim = params.get("emb_dim", 0)
+        self.decoder_only_conditioning = params.get("decoder_only_conditioning", False)
+        self.use_encoder_conditioning = self.emb_dim > 0 and not self.decoder_only_conditioning
+        self.use_decoder_conditioning = self.emb_dim > 0
         
         # Beta
         self.min_beta = params.get("min_beta", None)
@@ -94,7 +97,7 @@ class ConditionalVAE(nn.Module):
 
         # ----- Encoder MLP -----
         mlp = []
-        prev = self.flat_dim + self.emb_dim
+        prev = self.flat_dim + (self.emb_dim if self.use_encoder_conditioning else 0)
         for h in self.enc_hidden_dims:
             mlp += [nn.Linear(prev, h), nn.LeakyReLU(0.2)]
             prev = h
@@ -105,7 +108,7 @@ class ConditionalVAE(nn.Module):
         
         # ----- Decoder MLP -----
         mlp = []
-        prev = self.latent_dim + self.emb_dim
+        prev = self.latent_dim + (self.emb_dim if self.use_decoder_conditioning else 0)
         for h in self.dec_hidden_dims:
             mlp += [nn.Linear(prev, h), nn.LeakyReLU(0.2)]
             prev = h
@@ -189,7 +192,7 @@ class ConditionalVAE(nn.Module):
         B, S, C, F = x.shape
         
         # Get subject embeddings
-        emb = self.get_subject_embedding(subject_ids)
+        emb = self.get_subject_embedding(subject_ids) if self.use_encoder_conditioning else None
         
         # Flatten batch and sequence for independent processing
         x_flat = x.view(B * S, C, F) # (B*S, C, F)
@@ -199,7 +202,7 @@ class ConditionalVAE(nn.Module):
         h_flat = h_conv.view(B * S, -1)
         
         # Add subject embedding
-        if self.emb_dim > 0:
+        if self.use_encoder_conditioning:
             h_flat = torch.cat([h_flat, emb], dim=-1)
         
         # MLP
@@ -230,11 +233,11 @@ class ConditionalVAE(nn.Module):
         B, S, L = z.shape
         
         # Get subject embeddings
-        emb = self.get_subject_embedding(subject_ids)
+        emb = self.get_subject_embedding(subject_ids) if self.use_decoder_conditioning else None
         
         z_flat = z.view(B * S, L)
         
-        if self.emb_dim > 0:
+        if self.use_decoder_conditioning:
             h_in = torch.cat([z_flat, emb], dim=-1)
         else:
             h_in = z_flat
