@@ -163,7 +163,9 @@ class Orchestrator:
                     print(f"Error collecting training details: {e}")
                     train_details = None
                 self.visualizer.visualize_cvae(model=self.model, train_details=train_details)
-                torch.save(self.model.state_dict(), f"{self.global_config.results_dir}/{self.global_config.run_name}/cvae_final_model.pth")
+                # Save one checkpoint per run to avoid overwriting when runs > 1.
+                run_ckpt_path = Path(self.global_config.results_dir) / self.global_config.run_name / f"cvae_final_model_run{self.run_number}.pth"
+                torch.save(self.model.state_dict(), run_ckpt_path)
             
             if self.global_config.cvae.traning_pipeline in ['marhmm', 'cvae_then_marhmm']:
                 self.model.training_pipeline = 'marhmm'
@@ -232,7 +234,7 @@ class Orchestrator:
 
     def __prepare(self):
         time_str = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        self.global_config.run_name = f"{self.global_config.run_name} [{time_str}]"
+        self.global_config.run_name = f"{self.global_config.run_name}_{time_str}"
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.train_details: list[TrainDetails] = []
         self.run_number: int = 1

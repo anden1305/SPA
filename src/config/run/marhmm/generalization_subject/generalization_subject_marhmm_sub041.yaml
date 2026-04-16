@@ -1,0 +1,142 @@
+# Generalization Subject experiment: MAR-HMM on sub-041
+# Purpose: Test within-subject generalization by training on runs 1,2
+# then validating on run 3
+# Best parameters from sweep: lr=0.0001, init=random_uniform
+
+trainer:
+  epochs: 100000
+  learning_rate: 0.0001  # Best from sweep
+  optimizer: adam
+  grad_clip: null
+  validate_per_epoch: 500
+  early_stopping:
+    enabled: false
+    patience: 100
+    min_delta: 0.001
+  scheduler:
+    enabled: true
+    type: exponential
+    step_size: null
+    gamma: 0.999972
+
+validator:
+  nmi: True
+  accuracy: True
+  cross_nmi: False
+  learning_rate: True
+  state_distinctness: True
+  summary_statistics: True
+  log_likelihood: True  # Critical for generalization analysis
+
+visualizer:
+  losses: True
+  learning_rate: True
+  pca_tripanel: True
+  confusion_matrix: True
+  state_distinctness: True
+  summary_statistics: True
+  historic_values: True
+
+dataloader:
+  num_batches: 8192
+  batch_size: 32
+  validation_batch_size: 256
+  window_size: 512
+  stride: 512
+  shuffle: True
+  normalize: True
+  transforms:
+    # EEG channel transforms
+    - type: band_pass_filter
+      channel: EEG
+      params: {
+        "low_cutoff": 0.5,
+        "high_cutoff": 30,
+      }
+    - type: percentile_clipping
+      channel: EEG
+      params: {
+        "percentile": 0.5
+      }
+    - type: rms
+      channel: EEG
+      params: {}
+    - type: theta_delta_ratio
+      channel: EEG
+      params: {}
+    - type: theta_beta_ratio
+      channel: EEG
+      params: {}
+    - type: beta_delta_ratio
+      channel: EEG
+      params: {}
+    - type: theta_gamma_pac
+      channel: EEG
+      params: {}
+    - type: fft_relative_band_power
+      channel: EEG
+      params:
+        bands:
+          - [0.5, 4]
+          - [6, 9]
+          - [15, 30]
+
+    # EMG channel transforms
+    - type: percentile_clipping
+      channel: EMG
+      params: {
+        "percentile": 0.1
+      }
+    - type: rms
+      channel: EMG
+      params: {}
+
+# Train on sub-041 runs 1 and 2
+train_datasets:
+  - type: mssv
+    id: sub-041
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-041
+    run: 2
+    remove_artifact: True
+
+# Validate on sub-041 run 3
+val_datasets:
+  - type: mssv
+    id: sub-041
+    run: 3
+    remove_artifact: True
+
+model:
+  type: marhmm
+  covariance_type: full
+  init_strategy: random_uniform  # Best from sweep
+  init_noisy: false
+  features: true
+  n_states: 3
+  params:
+    lags: [1, 2, 4, 8]
+    ridge: 0.1
+    var_reg: 0.05
+    sticky_coef: 0.1
+    sticky_kappa: 0.9
+
+verbose: true
+seed: 123
+results_dir: results/generalization_subject/marhmm
+run_name: generalization_subject_marhmm_sub041
+runs: 1  # Can increase for multiple runs
+validate_data: True
+
+wandb:
+  enabled: true
+  group: generalization_subject_marhmm
+  tags:
+    - generalization
+    - within-subject
+    - marhmm
+    - mssv
+    - features
+    - sub-041
