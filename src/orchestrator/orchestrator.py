@@ -36,6 +36,34 @@ class Orchestrator:
         self.__prepare()
     
     ### public methods ###
+
+    def _load_cvae_checkpoint_if_available(self) -> bool:
+        """Load configured CVAE checkpoint if present. Returns True when loaded."""
+        checkpoint_path = self.global_config.cvae.model_checkpoint_path
+        if checkpoint_path is None:
+            return False
+
+        checkpoint = Path(checkpoint_path)
+        if not checkpoint.exists():
+            print(f"CVAE checkpoint not found at {checkpoint_path}; continuing without loading.")
+            return False
+
+        print(f"Loading CVAE model from checkpoint: {checkpoint_path}")
+        state = torch.load(checkpoint, map_location="cpu")
+        cvae_state = {k[len("cvae."):]: v for k, v in state.items() if k.startswith("cvae.")}
+        self.model.cvae.load_state_dict(cvae_state, strict=False)
+        return True
+
+    def _save_cvae_checkpoint_to_config_path(self):
+        """Save the full model state to configured CVAE checkpoint path for later reuse."""
+        checkpoint_path = self.global_config.cvae.model_checkpoint_path
+        if checkpoint_path is None:
+            return
+
+        checkpoint = Path(checkpoint_path)
+        checkpoint.parent.mkdir(parents=True, exist_ok=True)
+        torch.save(self.model.state_dict(), checkpoint)
+        print(f"Saved CVAE checkpoint to: {checkpoint_path}")
     
     def run(self):
         if self.global_config.verbose:
@@ -145,12 +173,7 @@ class Orchestrator:
             run_dir = Path(self.global_config.results_dir) / self.global_config.run_name / str(self.run_number)
         
             # CVAE training
-            if self.global_config.cvae.model_checkpoint_path is not None:
-                print(f"Loading CVAE model from checkpoint: {self.global_config.cvae.model_checkpoint_path}")
-                state = torch.load(self.global_config.cvae.model_checkpoint_path, map_location="cpu")
-                cvae_state = {k[len("cvae."):]: v for k, v in state.items() if k.startswith("cvae.")}
-                # self.model.load_state_dict(torch.load(self.global_config.cvae.model_checkpoint_path))
-                self.model.cvae.load_state_dict(cvae_state, strict=False)
+            self._load_cvae_checkpoint_if_available()
             
             
             if self.global_config.cvae.traning_pipeline in ['cvae_then_marhmm', 'cvae']:
@@ -166,6 +189,8 @@ class Orchestrator:
                 # Save one checkpoint per run to avoid overwriting when runs > 1.
                 run_ckpt_path = Path(self.global_config.results_dir) / self.global_config.run_name / f"cvae_final_model_run{self.run_number}.pth"
                 torch.save(self.model.state_dict(), run_ckpt_path)
+                # Also save to configured checkpoint path so follow-up validation can load it.
+                self._save_cvae_checkpoint_to_config_path()
             
             if self.global_config.cvae.traning_pipeline in ['marhmm', 'cvae_then_marhmm']:
                 self.model.training_pipeline = 'marhmm'
@@ -185,12 +210,12 @@ class Orchestrator:
     def predict_cvae(self):
         
         # CVAE training
-        if self.global_config.cvae.model_checkpoint_path is not None:
-            print(f"Loading CVAE model from checkpoint: {self.global_config.cvae.model_checkpoint_path}")
-            state = torch.load(self.global_config.cvae.model_checkpoint_path, map_location="cpu")
-            cvae_state = {k[len("cvae."):]: v for k, v in state.items() if k.startswith("cvae.")}
-            # self.model.load_state_dict(torch.load(self.global_config.cvae.model_checkpoint_path))
-            self.model.cvae.load_state_dict(cvae_state, strict=False)
+        loaded = self._load_cvae_checkpoint_if_available()
+        if not loaded:
+            raise FileNotFoundError(
+                "No CVAE checkpoint available for validation. "
+                "Run train_vae first or set cvae.model_checkpoint_path to an existing file."
+            )
         nmi, likelihood, y_hat, y, x_latent, x, sub_ids = self.validator.validate_cvae_gmm()
         self.visualizer.visualize_cvae_gmm(y_hat, y, x_latent, x, nmi, likelihood, sub_ids)
         print(f"GMM NMI: {nmi}, Likelihood: {likelihood}")
