@@ -1,0 +1,112 @@
+name: winning_strategy_mar
+type: mar
+sampling_rate_hz: 128
+epoch_length_s: 4
+n_epochs: 2000
+n_stages: 3
+stage_names:
+- Freq4Hz
+- Freq8Hz
+- Freq16Hz
+transition_matrix:
+- - 0.85
+  - 0.075
+  - 0.075
+- - 0.075
+  - 0.85
+  - 0.075
+- - 0.075
+  - 0.075
+  - 0.85
+lags:
+- 1
+- 2
+- 8
+- 16
+- 32
+stage_coeffs:
+- - !!python/object/apply:numpy._core.multiarray.scalar
+    - &id001 !!python/object/apply:numpy.dtype
+      args:
+      - f8
+      - false
+      - true
+      state: !!python/tuple
+      - 3
+      - <
+      - null
+      - null
+      - null
+      - -1
+      - -1
+      - 0
+    - !!binary |
+      85l+1zAk4D8=
+  - !!python/object/apply:numpy._core.multiarray.scalar
+    - *id001
+    - !!binary |
+      dKE86S9Izr8=
+  - !!python/object/apply:numpy._core.multiarray.scalar
+    - *id001
+    - !!binary |
+      sCfpbKTrPjw=
+  - !!python/object/apply:numpy._core.multiarray.scalar
+    - *id001
+    - !!binary |
+      0081TgKXtL8=
+  - !!python/object/apply:numpy._core.multiarray.scalar
+    - *id001
+    - !!binary |
+      cehHKyV1wD8=
+- - !!python/object/apply:numpy._core.multiarray.scalar
+    - *id001
+    - !!binary |
+      BCPkwByX3j8=
+  - !!python/object/apply:numpy._core.multiarray.scalar
+    - *id001
+    - !!binary |
+      rP/bZDp2zr8=
+  - !!python/object/apply:numpy._core.multiarray.scalar
+    - *id001
+    - !!binary |
+      LYAAY1C2tL8=
+  - !!python/object/apply:numpy._core.multiarray.scalar
+    - *id001
+    - !!binary |
+      QnrF3SqOwD8=
+  - !!python/object/apply:numpy._core.multiarray.scalar
+    - *id001
+    - !!binary |
+      isx8HZVemD8=
+- - !!python/object/apply:numpy._core.multiarray.scalar
+    - *id001
+    - !!binary |
+      NpCdm1if3D8=
+  - !!python/object/apply:numpy._core.multiarray.scalar
+    - *id001
+    - !!binary |
+      ZH4JBrie0r8=
+  - !!python/object/apply:numpy._core.multiarray.scalar
+    - *id001
+    - !!binary |
+      pZ95VDc9xD8=
+  - !!python/object/apply:numpy._core.multiarray.scalar
+    - *id001
+    - !!binary |
+      O8qoCcDKnT8=
+  - !!python/object/apply:numpy._core.multiarray.scalar
+    - *id001
+    - !!binary |
+      zhvmBEg3mT8=
+noise_scale: 0.3
+stage_mean_amplitudes:
+- 0
+- 0
+- 0
+stage_rms_scales:
+- 1.0
+- 1.0
+- 1.0
+normalize_epoch: true
+overlap_s: 0.01
+seed: 1234

@@ -1,0 +1,72 @@
+name: spectral_wavelength_comparison12
+sampling_rate_hz: 128
+epoch_length_s: 10  # Match MSSV data epoch length
+n_epochs: 2000  
+n_stages: 7
+
+# Balanced transitions to get enough samples of each state
+transition_matrix:
+  - [0.82, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03]  # More sticky for longer stable periods
+  - [0.03, 0.82, 0.03, 0.03, 0.03, 0.03, 0.03]
+  - [0.03, 0.03, 0.82, 0.03, 0.03, 0.03, 0.03]
+  - [0.03, 0.03, 0.03, 0.82, 0.03, 0.03, 0.03]
+  - [0.03, 0.03, 0.03, 0.03, 0.82, 0.03, 0.03]
+  - [0.03, 0.03, 0.03, 0.03, 0.03, 0.82, 0.03]
+  - [0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.82]
+  
+
+# Clean integer wavelengths: 4, 8, 16 samples
+# Corresponding frequencies at 128 Hz sampling rate
+# All well below Nyquist so HMM sees identical instantaneous statistics
+frequency_bins:
+  - [4.0, 4.0]    # 128/32 = 4 Hz  → wavelength = 32 samples  - use lag 16
+  - [8.0, 8.0]    # 128/16 = 8 Hz  → wavelength = 16 samples  - use lag 8
+  - [12.0, 12.0]  # 128/12 = 10.67 Hz → wavelength = 12 samples  - use lag 6
+  - [16.0, 16.0]  # 128/8  = 16 Hz → wavelength = 8 samples   - use lag 4
+  - [24.0, 24.0]  # 128/6 = 21.33 Hz → wavelength = 6 samples   - use lag 3
+  - [32.0, 32.0]  # 128/4  = 32 Hz → wavelength = 4 samples   - use lag 2
+  - [48.0, 48.0]  # 128/2.67 = 48 Hz → wavelength = 2.67 samples   - use lag 1.5
+
+## Recommended lags: [1,2]
+
+# Each state uses only one specific frequency bin
+stage_band_powers:
+  - [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]  # State 0: only 1 Hz (wavelength 128 samples)
+  - [0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0]  # State 1: only 2 Hz (wavelength 64 samples)
+  - [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0]  # State 2: only 4 Hz (wavelength 32 samples)
+  - [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]  # State 3: only 8 Hz (wavelength 16 samples)
+  - [0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0]  # State 4: only 16 Hz (wavelength 8 samples)
+  - [0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0]  # State 5: only 32 Hz (wavelength 4 samples)
+  - [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]  # State 6: only 64 Hz (wavelength 2 samples)
+
+# Probability of selecting each bin per state
+stage_bin_selection_probability:
+  - [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]  # State 0: always select 1 Hz
+  - [0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0]  # State 1: always select 2 Hz
+  - [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0]  # State 2: always select 4 Hz
+  - [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]  # State 3: always select 8 Hz
+  - [0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0]  # State 4: always select 16 Hz
+  - [0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0]  # State 5: always select 32 Hz
+  - [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]  # State 6: always select 64 Hz
+
+# Pure single sinusoid per epoch
+components_per_epoch: 1
+
+# No amplitude jitter for clean signals
+amplitude_jitter_range: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+
+# Identical means across states (no DC offset difference)
+stage_mean_amplitudes: [0, 0, 0, 0, 0, 0, 0]
+
+# Smoothing overlap for continuity
+overlap_s: 0.01
+
+# Identical RMS scales (unit amplitude)
+stage_rms_scales: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+
+# Normalize each epoch to unit variance so instantaneous statistics are identical
+normalize_epoch: true
+
+seed: 42
+
+stage_names: [Wave128, Wave64, Wave32, Wave16, Wave8, Wave4, Wave2]

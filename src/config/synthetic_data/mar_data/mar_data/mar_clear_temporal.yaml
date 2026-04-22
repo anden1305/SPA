@@ -1,0 +1,40 @@
+name: mar_clear_temporal
+type: mar
+sampling_rate_hz: 128
+epoch_length_s: 8
+n_epochs: 200
+n_stages: 3
+stage_names: [Fast, Medium, Slow]
+
+# Strong self-transitions for stable runs
+transition_matrix:
+  - [0.80, 0.10, 0.10]
+  - [0.10, 0.80, 0.10]
+  - [0.10, 0.10, 0.80]
+
+# Use fewer lags with MAXIMUM contrast
+lags: [1, 8, 32]
+
+# Identical instantaneous stats
+stage_mean_amplitudes: [0, 0, 0]
+stage_rms_scales: [1.0, 1.0, 1.0]
+
+# EXTREME AR patterns - pure temporal discrimination:
+# Fast: lag-1 dominates (fast decay, high frequency)
+# Medium: lag-8 dominates (medium persistence)
+# Slow: lag-32 dominates (long memory, low frequency)
+#
+# Coefficient order: lags [1, 8, 32]
+stage_coeffs:
+  - [0.90, 0.00, 0.00]    # Fast: pure AR(1) with strong coefficient
+  - [0.05, 0.85, 0.00]    # Medium: almost pure lag-8
+  - [0.03, 0.05, 0.80]    # Slow: dominated by lag-32
+# Each state is essentially a single-lag process at different timescales
+# This creates MAXIMALLY different autocorrelation and spectral signatures
+
+# LOW noise - let the AR patterns shine through
+noise_scale: 0.5
+
+normalize_epoch: False
+overlap_s: 0.25
+seed: 5050

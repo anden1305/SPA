@@ -1,0 +1,59 @@
+name: spectral_wavelength_comparison2
+sampling_rate_hz: 128
+epoch_length_s: 20
+n_epochs: 2000
+n_stages: 4
+
+# Balanced transitions to get enough samples of each state
+transition_matrix:
+  - [0.85, 0.05, 0.05, 0.05]
+  - [0.05, 0.85, 0.05, 0.05]
+  - [0.05, 0.05, 0.85, 0.05]
+  - [0.05, 0.05, 0.05, 0.85]
+
+frequency_bins:
+  - [8.0, 8.0]    # Wavelength = 128/8 = 16 samples
+  - [16.0, 16.0]  # Wavelength = 128/16 = 8 samples
+  - [32.0, 32.0]  # Wavelength = 128/32 = 4 samples
+  - [48.0, 48.0]  # Wavelength = 128/48 = 2.67 samples
+  # - [64.0, 64.0]  # Wavelength = 128/64 = 2 samples ## Nyquist frequency = fs/2 = 64 Hz
+  ## Nyquist frequency - not numerically stable to find
+  
+
+## LAGS 
+
+# Each state uses only one specific frequency bin
+stage_band_powers:
+  - [1.0, 0.0, 0.0, 0.0]  # State 0: only 128 Hz (wavelength 1)
+  - [0.0, 1.0, 0.0, 0.0]  # State 1: only 64 Hz (wavelength 2)
+  - [0.0, 0.0, 1.0, 0.0]  # State 2: only 32 Hz (wavelength 4)
+  - [0.0, 0.0, 0.0, 1.0]  # State 3: only 16 Hz (wavelength 8)
+
+# Probability of selecting each bin per state
+stage_bin_selection_probability:
+  - [1.0, 0.0, 0.0, 0.0]  # State 0: always select 128 Hz
+  - [0.0, 1.0, 0.0, 0.0]  # State 1: always select 64 Hz
+  - [0.0, 0.0, 1.0, 0.0]  # State 2: always select 32 Hz
+  - [0.0, 0.0, 0.0, 1.0]  # State 3: always select 16 Hz
+
+# Pure single sinusoid per epoch
+components_per_epoch: 1
+
+# No amplitude jitter for clean signals
+amplitude_jitter_range: [1.0, 1.0, 1.0, 1.0]
+
+# Identical means across states (no DC offset difference)
+stage_mean_amplitudes: [0, 0, 0, 0]
+
+# Smoothing overlap for continuity
+overlap_s: 0.01
+
+# Identical RMS scales (unit amplitude)
+stage_rms_scales: [1.0, 1.0, 1.0, 1.0]
+
+# Normalize each epoch to unit variance so instantaneous statistics are identical
+normalize_epoch: true
+
+seed: 42
+
+stage_names: [Wave16, Wave8, Wave4, Wave2_67]

@@ -1,0 +1,42 @@
+name: mar_true
+type: mar
+sampling_rate_hz: 128
+epoch_length_s: 4
+n_epochs: 1000          # More epochs for richer statistics
+n_stages: 3
+stage_names: [FastDecay, SlowGrowth, Oscillatory]
+
+# Balanced transition matrix - equal long-term stationary distribution
+transition_matrix:
+  - [0.80, 0.10, 0.10]
+  - [0.10, 0.80, 0.10]
+  - [0.10, 0.10, 0.80]
+
+# Key lags with maximum contrast
+lags: [1, 2, 8, 32]
+
+# CRITICAL: All states have IDENTICAL instantaneous statistics
+stage_mean_amplitudes: [0, 0, 0]
+stage_rms_scales: [1.0, 1.0, 1.0]
+
+# Enhanced AR signatures with more unique FastDecay:
+# FastDecay: VERY strong lag-1 with stronger negative lag-2 (sharp exponential decay + bounce)
+# SlowGrowth: Weak short lags, strong long-lag persistence (smooth trends)
+# Oscillatory: Strong negative lag-1 with positive lag-2 (periodic oscillations)
+#
+# Coefficient order: lags [1, 2, 8, 32]
+stage_coeffs:
+  - [0.75, -0.30, 0.03, 0.00]      # FastDecay: strong lag-1 with negative lag-2 bounce (distinctive but stable over long runs)
+  - [0.08, 0.04, 0.25, 0.55]       # SlowGrowth: dominated by lag-32, smooth buildup
+  - [-0.68, 0.32, -0.06, 0.02]     # Oscillatory: strong alternating signs (stable)
+# FastDecay: very fast decay with overshoot/undershoot pattern (highly distinctive)
+# SlowGrowth: persistent long memory, smooth evolution
+# Oscillatory: clear periodic oscillations
+# These create maximally different autocorrelation and spectral signatures
+
+# Low noise to preserve AR structure
+noise_scale: 0.3
+
+normalize_epoch: False
+overlap_s: 0.25
+seed: 1234

@@ -1,0 +1,65 @@
+name: mar_many_classes_norm
+type: mar
+sampling_rate_hz: 128
+epoch_length_s: 4
+n_epochs: 3000
+n_stages: 10
+stage_names: [AntiPersist1, AntiPersist2, LongMemory1, LongMemory2, Oscillatory1, Oscillatory2, Mixed1, Mixed2, FastDecay, SlowGrowth]
+
+transition_matrix:
+  - [0.80, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.03, 0.03]
+  - [0.02, 0.80, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.03, 0.03]
+  - [0.02, 0.02, 0.80, 0.02, 0.02, 0.02, 0.02, 0.02, 0.03, 0.03]
+  - [0.02, 0.02, 0.02, 0.80, 0.02, 0.02, 0.02, 0.02, 0.03, 0.03]
+  - [0.02, 0.02, 0.02, 0.02, 0.80, 0.02, 0.02, 0.02, 0.03, 0.03]
+  - [0.02, 0.02, 0.02, 0.02, 0.02, 0.80, 0.02, 0.02, 0.03, 0.03]
+  - [0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.80, 0.02, 0.03, 0.03]
+  - [0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.80, 0.03, 0.03]
+  - [0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.04, 0.04, 0.70, 0.04]
+  - [0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.04, 0.04, 0.04, 0.70]
+
+lags: [1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96]
+# Long + irregular lags → rich, non-obvious dynamics
+
+# ALL STAGES HAVE IDENTICAL INNOVATION VARIANCE
+noise_scale: 1.0
+
+# Critical: Force identical marginal variance AND spectrum shape (zero means)
+stage_mean_amplitudes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+stage_rms_scales: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+normalize_epoch: True
+
+# Ten AR processes with SAME PSD but different temporal structure
+stage_coeffs:
+  # Stage 0: Strong short-range anti-persistent (fBm-like Hurst ~0.15)
+  - [ 0.95, -0.50, -0.28,  0.12,  0.06, -0.10,  0.04, -0.05,  0.02, -0.04,  0.01, -0.02,  0.00]
+  
+  # Stage 1: Moderate short-range anti-persistent (Hurst ~0.25)
+  - [ 0.88, -0.40, -0.18,  0.08,  0.04, -0.06,  0.02, -0.03,  0.01, -0.02,  0.01, -0.01,  0.00]
+  
+  # Stage 2: Strong long-memory persistent (Hurst ~0.85) - scaled for stability
+  - [ 0.22,  0.15,  0.12,  0.11,  0.07,  0.04,  0.05,  0.06,  0.05,  0.04,  0.03,  0.03,  0.02]
+  
+  # Stage 3: Moderate long-memory persistent (Hurst ~0.75)
+  - [ 0.18,  0.12,  0.10,  0.08,  0.07,  0.05,  0.04,  0.03,  0.03,  0.02,  0.02,  0.01,  0.01]
+  
+  # Stage 4: High-frequency oscillatory (~10 Hz) - scaled for stability
+  - [-0.69,  0.27,  0.11, -0.06,  0.04,  0.17, -0.11,  0.06,  0.09, -0.08,  0.05, -0.04,  0.02]
+  
+  # Stage 5: Low-frequency oscillatory (~6 Hz)
+  - [-0.50,  0.15,  0.08, -0.04,  0.02,  0.12, -0.08,  0.04,  0.06, -0.05,  0.03, -0.02,  0.01]
+  
+  # Stage 6: Mixed anti-persistent + oscillatory
+  - [ 0.70, -0.35,  0.20, -0.10,  0.05,  0.12, -0.08,  0.04, -0.03,  0.02, -0.01,  0.01,  0.00]
+  
+  # Stage 7: Mixed persistent + oscillatory
+  - [ 0.15,  0.10, -0.30,  0.15,  0.08,  0.06,  0.05, -0.08,  0.04,  0.03,  0.02, -0.02,  0.01]
+  
+  # Stage 8: Fast decay (very short memory)
+  - [ 0.85, -0.38, -0.15,  0.06,  0.03, -0.04,  0.02, -0.02,  0.01, -0.01,  0.00,  0.00,  0.00]
+  
+  # Stage 9: Slow growth (intermediate memory with positive correlation)
+  - [ 0.30,  0.15,  0.10,  0.08,  0.06,  0.05,  0.04,  0.03,  0.02,  0.02,  0.01,  0.01,  0.00]
+
+overlap_s: 0.01
+seed: 42

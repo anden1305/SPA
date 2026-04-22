@@ -1,0 +1,41 @@
+name: mar_superior_temporal
+type: mar
+sampling_rate_hz: 128
+epoch_length_s: 8          # Longer epochs = more temporal evidence per sample
+n_epochs: 200              # More epochs for richer statistics
+n_stages: 3
+stage_names: [ShortMemory, MidMemory, LongMemory]
+
+# Moderate self-transitions with more frequent switching
+transition_matrix:
+  - [0.70, 0.15, 0.15]
+  - [0.15, 0.70, 0.15]
+  - [0.15, 0.15, 0.70]
+
+# Full lag spectrum [1,2,4,8,16,32,64] for maximum temporal resolution
+# More lags = MARHMM can better discriminate multi-scale patterns
+lags: [1, 2, 4, 8, 16, 32, 64]
+
+# CRITICAL: Identical instantaneous statistics - pure temporal discrimination
+stage_mean_amplitudes: [0, 0, 0]
+stage_rms_scales: [1.0, 1.0, 1.0]
+
+# Non-trivial but distinct AR signatures emphasizing different temporal scales:
+# ShortMemory: Energy at lags 1-4 (fast dynamics, decays quickly)
+# MidMemory: Energy at lags 8-16 (medium persistence, trends)
+# LongMemory: Energy spread across 16-64 (slow evolution, long autocorr)
+#
+# Coefficient order: lags [1, 2, 4, 8, 16, 32, 64]
+stage_coeffs:
+  - [0.80, -0.40, 0.20, 0.05, 0.02, 0.01, 0.00]   # ShortMemory: strong lag-1,2
+  - [0.20, 0.10, 0.15, 0.50, -0.20, 0.10, 0.05]   # MidMemory: peak at lag-8
+  - [0.08, 0.04, 0.06, 0.10, 0.18, 0.23, 0.30]    # LongMemory: peak at lag-64 (stable)
+# These create autocorrelation functions that decay at different rates
+# and have distinct spectral signatures while remaining stable
+
+# Higher noise to mask instantaneous covariance differences
+noise_scale: 2.0
+
+normalize_epoch: False  # Keep raw AR structure
+overlap_s: 0.25
+seed: 4040

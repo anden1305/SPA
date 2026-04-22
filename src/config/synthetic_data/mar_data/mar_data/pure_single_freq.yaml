@@ -1,0 +1,54 @@
+name: pure_single_freq
+sampling_rate_hz: 128
+epoch_length_s: 4
+n_epochs: 1000
+n_stages: 3
+
+transition_matrix:
+  - [0.85, 0.075, 0.075]
+  - [0.075, 0.85, 0.075]
+  - [0.075, 0.075, 0.85]
+
+# Pure single frequencies per state
+# State 0: 5 Hz (period ~26 samples at 128 Hz)
+# State 1: 10 Hz (period ~13 samples at 128 Hz)
+# State 2: 20 Hz (period ~6 samples at 128 Hz)
+frequency_bins:
+  - [5.0, 5.0]    # Bin 0: 5 Hz range
+  - [10.0, 10.0]  # Bin 1: 10 Hz range
+  - [20.0, 20.0]  # Bin 2: 20 Hz range
+
+# Each state uses only one specific frequency bin
+# State 0 -> Bin 0 (5 Hz), State 1 -> Bin 1 (10 Hz), State 2 -> Bin 2 (20 Hz)
+stage_band_powers:
+  - [1.0, 0.0, 0.0]  # State 0: only bin 0 (5 Hz)
+  - [0.0, 1.0, 0.0]  # State 1: only bin 1 (10 Hz)
+  - [0.0, 0.0, 1.0]  # State 2: only bin 2 (20 Hz)
+
+# Probability of selecting each bin per state (match band powers)
+stage_bin_selection_probability:
+  - [1.0, 0.0, 0.0]  # State 0: always select bin 0
+  - [0.0, 1.0, 0.0]  # State 1: always select bin 1
+  - [0.0, 0.0, 1.0]  # State 2: always select bin 2
+
+# CRITICAL: Only one sinusoid per epoch (pure tone)
+components_per_epoch: 1
+
+# No amplitude jitter for pure signals
+amplitude_jitter_range: [1.0, 1.0]
+
+# Identical means across states (zero offset)
+stage_mean_amplitudes: [0, 0, 0]
+
+# Smoothing overlap
+overlap_s: 0.01
+
+# Identical RMS scales (unit amplitude)
+stage_rms_scales: [1.0, 1.0, 1.0]
+
+# Normalize each epoch to unit variance for identical instantaneous statistics
+normalize_epoch: true
+
+seed: 42
+
+stage_names: [Freq5Hz, Freq10Hz, Freq20Hz]

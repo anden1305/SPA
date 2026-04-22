@@ -1,0 +1,48 @@
+name: spectral_wavelength_comparison10
+sampling_rate_hz: 128
+epoch_length_s: 20
+n_epochs: 1000
+n_stages: 3
+
+# Very sticky transitions
+transition_matrix:
+  - [0.93, 0.035, 0.035]
+  - [0.035, 0.93, 0.035]
+  - [0.035, 0.035, 0.93]
+
+# RADICAL NEW APPROACH: Use WIDELY separated wavelengths
+# Make discrimination MUCH easier - 3× spacing instead of 2×
+# Wavelengths: 4, 12, 36 samples (3×, 9× relationship)
+frequency_bins:
+  - [32.0, 32.0]      # 128/4  = 32 Hz → wavelength = 4 samples (fast)
+  - [10.666667, 10.666667]  # 128/12 = 10.67 Hz → wavelength = 12 samples (medium)
+  - [3.555556, 3.555556]    # 128/36 = 3.56 Hz → wavelength = 36 samples (slow)
+
+## OPTIMAL LAGS: [4, 12]
+## Wavelength 4:  lag 4 = 100% (full cycle) ✓✓✓, lag 12 = 300% (triple cycle) ✓
+## Wavelength 12: lag 4 = 33% (third), lag 12 = 100% (full cycle) ✓✓✓
+## Wavelength 36: lag 4 = 11% (weak), lag 12 = 33% (third) ✓✓
+## Much larger separation = easier discrimination!
+
+# Each state uses only one specific frequency bin
+stage_band_powers:
+  - [1.0, 0.0, 0.0]  # State 0: only 32 Hz (wavelength 4)
+  - [0.0, 1.0, 0.0]  # State 1: only 10.67 Hz (wavelength 12)
+  - [0.0, 0.0, 1.0]  # State 2: only 3.56 Hz (wavelength 36)
+
+# Probability of selecting each bin per state
+stage_bin_selection_probability:
+  - [1.0, 0.0, 0.0]
+  - [0.0, 1.0, 0.0]
+  - [0.0, 0.0, 1.0]
+
+components_per_epoch: 1
+amplitude_jitter_range: [1.0, 1.0, 1.0]
+stage_mean_amplitudes: [0, 0, 0]
+overlap_s: 0.01
+stage_rms_scales: [1.0, 1.0, 1.0]
+normalize_epoch: true
+
+seed: 42
+
+stage_names: [Wave4, Wave12, Wave36]

@@ -1,0 +1,55 @@
+name: spectral_wavelength_comparison4
+sampling_rate_hz: 128
+epoch_length_s: 20  # Match MSSV data epoch length
+n_epochs: 2000  # More training data to compensate for shorter epochs
+n_stages: 3
+
+# Balanced transitions to get enough samples of each state
+transition_matrix:
+  - [0.80, 0.10, 0.10]  # More sticky for longer stable periods
+  - [0.10, 0.80, 0.10]
+  - [0.10, 0.10, 0.80]
+
+# Clean integer wavelengths: 4, 8, 16 samples
+# Corresponding frequencies at 128 Hz sampling rate
+# All well below Nyquist so HMM sees identical instantaneous statistics
+frequency_bins:
+  - [8.0, 8.0]    # 128/16 = 8 Hz  → wavelength = 16 samples
+  - [16.0, 16.0]  # 128/8  = 16 Hz → wavelength = 8 samples
+  - [32.0, 32.0]  # 128/4  = 32 Hz → wavelength = 4 samples
+
+## Recommended lags: [2, 4] to capture wavelengths 4 and 8 (lag 4 = full cycle of 4, half of 8) 
+
+# Each state uses only one specific frequency bin
+stage_band_powers:
+  - [1.0, 0.0, 0.0]  # State 0: only 8 Hz (wavelength 16 samples)
+  - [0.0, 1.0, 0.0]  # State 1: only 16 Hz (wavelength 8 samples)
+  - [0.0, 0.0, 1.0]  # State 2: only 32 Hz (wavelength 4 samples)
+
+# Probability of selecting each bin per state
+stage_bin_selection_probability:
+  - [1.0, 0.0, 0.0]  # State 0: always select 8 Hz
+  - [0.0, 1.0, 0.0]  # State 1: always select 16 Hz
+  - [0.0, 0.0, 1.0]  # State 2: always select 32 Hz
+
+# Pure single sinusoid per epoch
+components_per_epoch: 1
+
+# No amplitude jitter for clean signals
+amplitude_jitter_range: [1.0, 1.0, 1.0]
+
+# Identical means across states (no DC offset difference)
+stage_mean_amplitudes: [0, 0, 0]
+
+# Smoothing overlap for continuity
+overlap_s: 0.01
+
+# Identical RMS scales (unit amplitude)
+stage_rms_scales: [1.0, 1.0, 1.0]
+
+# Normalize each epoch to unit variance so instantaneous statistics are identical
+normalize_epoch: true
+
+seed: 42
+
+stage_names: [Wave16, Wave8, Wave4]
