@@ -86,8 +86,9 @@ class MARHMM(BaseModel):
 		log_A = torch.log_softmax(self.transition_logits, dim=-1)
 		
 		log_emiss = self.__emission_log_prob(x_std)
-		# Start recursion after max_lag to avoid zero-padded artifacts
-		logp = self.__forward_algorithm(log_emiss, log_pi, log_A, start_t=self.max_lag)
+		# Start recursion after max_lag when enough timesteps exist; otherwise fall back to the last valid step.
+		start_t = min(self.max_lag, max(0, log_emiss.shape[1] - 1))
+		logp = self.__forward_algorithm(log_emiss, log_pi, log_A, start_t=start_t)
 		return self.negative_log_likelihood(x_std, logp)
 
 	def negative_log_likelihood(self, x: Tensor, logp: Tensor) -> Tensor:
