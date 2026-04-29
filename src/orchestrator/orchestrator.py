@@ -29,11 +29,16 @@ import numpy as np
 
 class Orchestrator:
     
-    def __init__(self, config_path: str, profile: bool = False):
+    def __init__(self, config_path: str, profile: bool = False, mode: str = "train", validation_tag: str | None = None):
         self.config_path = config_path
         self.profile = profile
+        self.mode = mode
+        self.validation_tag = validation_tag
         self.__set_config()
-        self.__prepare()
+        if self.mode == "validate_cvae_gmm":
+            self.__prepare_for_validation()
+        else:
+            self.__prepare()
     
     ### public methods ###
 
@@ -64,6 +69,83 @@ class Orchestrator:
         checkpoint.parent.mkdir(parents=True, exist_ok=True)
         torch.save(self.model.state_dict(), checkpoint)
         print(f"Saved CVAE checkpoint to: {checkpoint_path}")
+
+    def _resolve_validation_run_name(self) -> str | None:
+        results_dir = Path(self.global_config.results_dir)
+        base_name = self.global_config.run_name
+        direct_dir = results_dir / base_name
+        if direct_dir.exists():
+            return base_name
+        candidates = [d for d in results_dir.glob(f"{base_name}_*") if d.is_dir()]
+        if not candidates:
+            return None
+
+        def parse_timestamp(dir_path: Path) -> datetime.datetime | None:
+            suffix = dir_path.name[len(base_name) + 1:]
+            try:
+                return datetime.datetime.strptime(suffix, "%Y%m%d-%H%M%S")
+            except ValueError:
+                return None
+
+        candidates_with_ts = [(d, parse_timestamp(d)) for d in candidates]
+        with_ts = [pair for pair in candidates_with_ts if pair[1] is not None]
+        if with_ts:
+            return max(with_ts, key=lambda pair: pair[1])[0].name
+        return max(candidates, key=lambda d: d.stat().st_mtime).name
+
+    def _match_checkpoint_to_run(self, checkpoint: Path, run_dir: Path) -> str | None:
+        if not checkpoint.exists() or not run_dir.exists():
+            return None
+        candidates = list(run_dir.glob("cvae_final_model_run*.pth"))
+        if not candidates:
+            return None
+        try:
+            checkpoint_size = checkpoint.stat().st_size
+        except OSError:
+            return None
+        size_matches = [c for c in candidates if c.stat().st_size == checkpoint_size]
+        if len(size_matches) == 1:
+            return size_matches[0].name
+        if len(size_matches) > 1:
+            return max(size_matches, key=lambda c: c.stat().st_mtime).name
+        return None
+
+    def _write_validation_info(
+        self,
+        nmi: float | None = None,
+        likelihood: float | None = None,
+        output_subdir: str | None = None,
+    ):
+        run_dir = Path(self.global_config.results_dir) / self.global_config.run_name
+        info_dir = run_dir
+        if output_subdir:
+            info_dir = run_dir / "plots" / output_subdir
+        info_dir.mkdir(parents=True, exist_ok=True)
+        checkpoint_path = self.global_config.cvae.model_checkpoint_path
+        info: dict[str, object] = {
+            "results_dir": str(self.global_config.results_dir),
+            "run_name": self.global_config.run_name,
+            "model_type": self.global_config.model.type,
+            "checkpoint_path": checkpoint_path,
+            "validation_timestamp": datetime.datetime.now().strftime("%Y%m%d-%H%M%S"),
+            "validation_tag": output_subdir,
+        }
+        if checkpoint_path:
+            checkpoint = Path(checkpoint_path)
+            if checkpoint.exists():
+                stat = checkpoint.stat()
+                info["checkpoint_size"] = stat.st_size
+                info["checkpoint_mtime"] = stat.st_mtime
+                matched = self._match_checkpoint_to_run(checkpoint, run_dir)
+                if matched:
+                    info["matched_run_checkpoint"] = matched
+        if nmi is not None:
+            info["nmi"] = float(nmi)
+        if likelihood is not None:
+            info["likelihood"] = float(likelihood)
+
+        with open(info_dir / "validation_info.json", "w") as f:
+            json.dump(info, f, indent=2)
     
     def run(self):
         if self.global_config.verbose:
@@ -217,7 +299,21 @@ class Orchestrator:
                 "Run train_vae first or set cvae.model_checkpoint_path to an existing file."
             )
         nmi, likelihood, y_hat, y, x_latent, x, sub_ids = self.validator.validate_cvae_gmm()
-        self.visualizer.visualize_cvae_gmm(y_hat, y, x_latent, x, nmi, likelihood, sub_ids)
+        self.visualizer.visualize_cvae_gmm(
+            y_hat,
+            y,
+            x_latent,
+            x,
+            nmi,
+            likelihood,
+            sub_ids,
+            output_subdir=self.validation_tag,
+        )
+        self._write_validation_info(
+            nmi=nmi,
+            likelihood=likelihood,
+            output_subdir=self.validation_tag,
+        )
         print(f"GMM NMI: {nmi}, Likelihood: {likelihood}")
         
     
@@ -265,6 +361,18 @@ class Orchestrator:
         self.run_number: int = 1
         self.__make_output_dir()
         self.__save_config()
+        self.__prepare_run()
+
+    def __prepare_for_validation(self):
+        resolved_name = self._resolve_validation_run_name()
+        if resolved_name:
+            self.global_config.run_name = resolved_name
+        else:
+            time_str = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+            self.global_config.run_name = f"{self.global_config.run_name}_{time_str}"
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.train_details: list[TrainDetails] = []
+        self.run_number: int = 1
         self.__prepare_run()
 
     def __make_output_dir(self):

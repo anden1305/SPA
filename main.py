@@ -9,6 +9,11 @@ if __name__ == "__main__":
     parser.add_argument("--method", "-m", default="train", help="Method to run (train | train_vae | generate | explore_synthetic | sweep)")
     parser.add_argument("--config_path", "-c", required=True, help="Path to the configuration file")
     parser.add_argument("--profile", "-p", action="store_true", help="Enable cProfile profiling for the run (train only)")
+    parser.add_argument(
+        "--validation_tag",
+        default=None,
+        help="Optional subfolder name under plots for validate_cvae_gmm outputs.",
+    )
     args = parser.parse_args()
     method = args.method
     config_path = args.config_path
@@ -35,7 +40,7 @@ if __name__ == "__main__":
     elif method == "sweep":
         run_sweep(config_path)
     elif method == "validate_cvae_gmm":
-        orchestrator = Orchestrator(config_path, profile=args.profile)
+        orchestrator = Orchestrator(config_path, profile=args.profile, mode="validate_cvae_gmm", validation_tag=args.validation_tag)
         orchestrator.predict_cvae()
     elif method == "plot_substages":
         from scripts.substage_analysis.run_substage_analysis import run_substage_analysis

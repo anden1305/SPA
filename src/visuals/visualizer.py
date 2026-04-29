@@ -86,8 +86,10 @@ class Visualizer:
         np.savez(path / "results.npz", y_hat=y_hat, y_true=y, x_latent=x, x=x_non_norm, sub_ids=subject_ids)
     
     
-    def visualize_cvae_gmm(self, y_hat, y_true, x_latent: torch.Tensor, x: torch.Tensor, nmi, likelihood, sub_ids):
+    def visualize_cvae_gmm(self, y_hat, y_true, x_latent: torch.Tensor, x: torch.Tensor, nmi, likelihood, sub_ids, output_subdir: str | None = None):
         path = Path(self.global_config.results_dir) / self.global_config.run_name / "plots"
+        if output_subdir:
+            path = path / output_subdir
         path.mkdir(parents=True, exist_ok=True)
         y_hat = y_hat.flatten().cpu().numpy()
         y_true = y_true.flatten().cpu().numpy()
