@@ -13,18 +13,16 @@ from scipy.signal import welch
 import pyedflib
 
 
-LAB_NAME = "lab_3"
+LAB_NAME = "lab_5"
 TARGET_CHANNELS = ["EEG1", "EEG2"]
 BAND_LOW = (0.5, 2.0)
 BAND_REF = (0.5, 30.0)
 
-# Plot aesthetics
 sns.set(style="whitegrid")
 
 
 def _repo_root() -> Path:
     here = Path(__file__).resolve()
-    # scripts/noise/<this_file>.py -> repo root is 2 levels up (.. / .. / SPA)
     return here.parents[2]
 
 
@@ -50,20 +48,12 @@ def read_lab_subjects(participants_tsv: Path, lab: str,
 
 
 def list_runs_for_subject(sub_dir: Path, max_runs: Optional[int] = None) -> List[Tuple[Path, Path, Path]]:
-    """Return list of (edf_path, channels_tsv_path, events_tsv_path) for a subject.
-
-    Notes
-    -----
-    In this dataset, channels.tsv is per subject per task (no run index),
-    e.g., sub-001_task-sleep_channels.tsv. We associate it with all runs.
-    """
     eeg_dir = sub_dir / "eeg"
     if not eeg_dir.exists():
         return []
     edfs = sorted(eeg_dir.glob("*_eeg.edf"))
     if max_runs is not None:
         edfs = edfs[:max_runs]
-    # Expect a single channels.tsv per subject-task
     channels_candidates = sorted(eeg_dir.glob("*_channels.tsv"))
     channels_tsv = channels_candidates[0] if channels_candidates else None
     runs: List[Tuple[Path, Path, Path]] = []
@@ -71,10 +61,8 @@ def list_runs_for_subject(sub_dir: Path, max_runs: Optional[int] = None) -> List
         if channels_tsv is None:
             logging.warning(f"No channels.tsv for {edf}")
             continue
-        # Derive events.tsv for this run by replacing suffix
         ev_path = edf.with_name(edf.name.replace("_eeg.edf", "_events.tsv"))
         if not ev_path.exists():
-            # fallback: try glob on same run prefix
             cand = list(eeg_dir.glob(edf.stem.replace("_eeg", "") + "*_events.tsv"))
             ev_path = cand[0] if cand else ev_path
         if not ev_path.exists():
@@ -86,7 +74,6 @@ def list_runs_for_subject(sub_dir: Path, max_runs: Optional[int] = None) -> List
 
 def read_channels(channels_tsv: Path) -> List[str]:
     ch_df = pd.read_csv(channels_tsv, sep="\t")
-    # BIDS channels.tsv has a 'name' column
     return ch_df["name"].astype(str).tolist()
 
 
@@ -109,13 +96,8 @@ def _find_channel_indices(reader: pyedflib.EdfReader, wanted: List[str]) -> Dict
 def compute_relative_power(x: np.ndarray, fs: float,
                            band: Tuple[float, float],
                            ref_band: Tuple[float, float]) -> float:
-    """Compute relative power P(band)/P(ref_band) using Welch PSD.
-
-    Returns NaN if reference power is zero or signal is too short.
-    """
     if len(x) < 4:
         return float("nan")
-    # ~4s windows, at least 256 samples, at most len(x)
     target_nperseg = int(max(256, min(len(x), fs * 4)))
     try:
         f, pxx = welch(
@@ -140,7 +122,6 @@ def compute_relative_power(x: np.ndarray, fs: float,
         mask = (f >= low) & (f <= high)
         if not np.any(mask):
             return 0.0
-        # integrate PSD over frequency band -> power (numpy>=2.0 uses trapezoid)
         trap = getattr(np, "trapezoid", np.trapz)
         return float(trap(pxx[mask], f[mask]))
 
@@ -152,11 +133,6 @@ def compute_relative_power(x: np.ndarray, fs: float,
 
 
 def _load_awake_segments(events_tsv: Path) -> List[Tuple[float, float]]:
-    """Return list of (onset_sec, duration_sec) for Awake epochs only.
-
-    According to task-sleep_events.json, stage levels:
-    1 = Wake, 2 = NREM, 3 = REM, 4 = Artifact
-    """
     ev = pd.read_csv(events_tsv, sep="\t")
     if not {"onset", "duration", "stage"}.issubset(ev.columns):
         raise ValueError(f"events.tsv missing required columns in {events_tsv}")
@@ -165,7 +141,6 @@ def _load_awake_segments(events_tsv: Path) -> List[Tuple[float, float]]:
 
 
 def process_run(edf_path: Path, channels_tsv: Path, events_tsv: Path) -> Dict[str, float]:
-    """Read EDF and compute relative power for TARGET_CHANNELS during Awake epochs only."""
     try:
         available_chs = read_channels(channels_tsv)
     except Exception as e:
@@ -195,7 +170,6 @@ def process_run(edf_path: Path, channels_tsv: Path, events_tsv: Path) -> Dict[st
             fs = float(r.getSampleFrequency(idx))
             sig = r.readSignal(idx)
             x_full = np.asarray(sig, dtype=np.float64)
-            # Build concatenated Awake signal
             slices: List[np.ndarray] = []
             n = len(x_full)
             for onset_sec, dur_sec in awake_segments:
@@ -213,7 +187,6 @@ def process_run(edf_path: Path, channels_tsv: Path, events_tsv: Path) -> Dict[st
                 rel_powers[ch] = float("nan")
                 continue
             x = np.concatenate(slices, axis=0)
-            # Replace non-finite values with median
             if not np.isfinite(x).all():
                 med = float(np.nanmedian(x))
                 x = np.nan_to_num(x, nan=med, posinf=med, neginf=med)
@@ -240,7 +213,7 @@ def run_analysis(data_root: Path, out_dir: Path,
             continue
         for edf_path, ch_tsv, ev_tsv in runs:
             rel = process_run(edf_path, ch_tsv, ev_tsv)
-            run_id = edf_path.stem  # e.g., sub-038_task-sleep_run-1_eeg
+            run_id = edf_path.stem
             for ch, val in rel.items():
                 records.append({
                     "subject": sub,
@@ -251,14 +224,13 @@ def run_analysis(data_root: Path, out_dir: Path,
 
     df = pd.DataFrame.from_records(records)
     out_dir.mkdir(parents=True, exist_ok=True)
-    csv_path = out_dir / "relative_power_lab3.csv"
+    csv_path = out_dir / "relative_power_lab5.csv"
     df.to_csv(csv_path, index=False)
     logging.info(f"Wrote {csv_path}")
     return df
 
 
 def plot_bars(df: pd.DataFrame, out_dir: Path) -> None:
-    # Aggregate across runs per subject (mean)
     if df.empty:
         logging.warning("Empty dataframe; skipping plots.")
         return
@@ -267,7 +239,6 @@ def plot_bars(df: pd.DataFrame, out_dir: Path) -> None:
           .rename(columns={"relative_power_0p5_2_over_0p5_30": "relative_power"})
     )
 
-    # Sort subjects numerically
     agg["subject_num"] = agg["subject"].str.extract(r"(\d+)$").astype(int)
     agg = agg.sort_values(["subject_num", "channel"]).reset_index(drop=True)
 
@@ -276,7 +247,6 @@ def plot_bars(df: pd.DataFrame, out_dir: Path) -> None:
         if sub_df.empty:
             logging.info(f"No data for channel {ch}; skipping plot.")
             continue
-        # Threshold line and conditional coloring
         threshold = 0.2
         plot_df = sub_df.copy()
         plot_df["below_threshold"] = plot_df["relative_power"] < threshold
@@ -287,19 +257,15 @@ def plot_bars(df: pd.DataFrame, out_dir: Path) -> None:
             x="subject",
             y="relative_power",
             hue="below_threshold",
-            # Below threshold is allowed/ok -> green; above threshold is flagged -> red
             palette={True: "#55A868", False: "#C44E52"},
             dodge=False,
         )
-        # Threshold line
         ax.axhline(threshold, color="red", linestyle="--", linewidth=1.5, label=f"Threshold ({threshold})")
         ax.set_title(f"{LAB_NAME}: Relative power {ch} (0.5–2 Hz) / (0.5–30 Hz)")
         ax.set_xlabel("Subject")
         ax.set_ylabel("Relative power")
         plt.xticks(rotation=90)
-        # Improve legend labels
         handles, labels = ax.get_legend_handles_labels()
-        # seaborn adds hue legend; map labels to clearer text
         label_map = {"True": "Within limit (below)", "False": "Exceeds limit (above)"}
         labels = [label_map.get(lbl, lbl) for lbl in labels]
         ax.legend(handles, labels, title="Status", loc="upper right")
@@ -360,7 +326,7 @@ def plot_per_run(df: pd.DataFrame, out_dir: Path) -> None:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Compute relative band power (0.5–2 Hz)/(0.5–30 Hz) for lab_3 EEG channels (EEG1, EEG2)")
+    parser = argparse.ArgumentParser(description="Compute relative band power (0.5–2 Hz)/(0.5–30 Hz) for lab_5 EEG channels (EEG1, EEG2)")
     parser.add_argument("--data-root", type=str, default=None,
                         help="Path to ds006366 dataset root (default: <repo>/data/ds006366)")
     parser.add_argument("--out-dir", type=str, default=None,

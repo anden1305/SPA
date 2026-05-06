@@ -12,14 +12,13 @@ import seaborn as sns
 import pyedflib
 
 
-LAB_NAME = "lab_3"
+LAB_NAME = "lab_5"
 EMG_CHANNEL = "EMG"
 
 sns.set(style="whitegrid")
 
 
 def _repo_root() -> Path:
-    # scripts/noise/<this_file>.py -> repo root is 2 levels up
     return Path(__file__).resolve().parents[2]
 
 
@@ -45,7 +44,6 @@ def read_lab_subjects(participants_tsv: Path, lab: str,
 
 
 def list_runs_for_subject(sub_dir: Path, max_runs: Optional[int] = None) -> List[Tuple[Path, Path, Path]]:
-    """Return list of (edf_path, channels_tsv_path, events_tsv_path) for a subject."""
     eeg_dir = sub_dir / "eeg"
     if not eeg_dir.exists():
         return []
@@ -61,7 +59,6 @@ def list_runs_for_subject(sub_dir: Path, max_runs: Optional[int] = None) -> List
             continue
         ev_path = edf.with_name(edf.name.replace("_eeg.edf", "_events.tsv"))
         if not ev_path.exists():
-            # fallback: best-effort
             cand = list(eeg_dir.glob(edf.stem.replace("_eeg", "") + "*_events.tsv"))
             ev_path = cand[0] if cand else ev_path
         if not ev_path.exists():
@@ -74,13 +71,10 @@ def list_runs_for_subject(sub_dir: Path, max_runs: Optional[int] = None) -> List
 def _find_emg_index(reader: pyedflib.EdfReader) -> Optional[int]:
     labels = [str(x) for x in reader.getSignalLabels()]
     lowered = [lab.lower() for lab in labels]
-    # exact match first
     if EMG_CHANNEL in labels:
         return labels.index(EMG_CHANNEL)
-    # case-insensitive
     if EMG_CHANNEL.lower() in lowered:
         return lowered.index(EMG_CHANNEL.lower())
-    # contains fallback (e.g., 'EMG1')
     for i, lab in enumerate(lowered):
         if "emg" in lab:
             return i
@@ -117,17 +111,12 @@ def _concat_segments(x_full: np.ndarray, fs: float, segments: List[Tuple[float, 
 def _rms(x: np.ndarray) -> float:
     if x.size == 0:
         return float("nan")
-    # Replace non-finite values with 0 for a conservative RMS
     if not np.isfinite(x).all():
         x = np.nan_to_num(x, nan=0.0, posinf=0.0, neginf=0.0)
     return float(np.sqrt(np.mean(x.astype(np.float64) ** 2)))
 
 
 def process_run(edf_path: Path, events_tsv: Path) -> float:
-    """Compute EMG RMS(Awake)/RMS(NREM) for a single run.
-
-    Returns NaN if EMG not found or NREM has zero/empty signal.
-    """
     awake_segments = _load_segments(events_tsv, stage_value=1)  # 1=Wake
     nrem_segments = _load_segments(events_tsv, stage_value=2)   # 2=NREM
     if len(awake_segments) == 0 or len(nrem_segments) == 0:
@@ -180,7 +169,7 @@ def run_analysis(data_root: Path, out_dir: Path,
 
     df = pd.DataFrame.from_records(records)
     out_dir.mkdir(parents=True, exist_ok=True)
-    csv_path = out_dir / "emg_rms_awake_over_nrem_lab3.csv"
+    csv_path = out_dir / "emg_rms_awake_over_nrem_lab5.csv"
     df.to_csv(csv_path, index=False)
     logging.info(f"Wrote {csv_path}")
     return df
@@ -191,7 +180,6 @@ def plot_bars(df: pd.DataFrame, out_dir: Path) -> None:
         logging.warning("Empty dataframe; skipping plot.")
         return
     agg = df.groupby(["subject"], as_index=False)["emg_rms_awake_over_nrem"].mean()
-    # Sort subjects numerically
     agg["subject_num"] = agg["subject"].str.extract(r"(\d+)$").astype(int)
     agg = agg.sort_values(["subject_num"]).reset_index(drop=True)
 
@@ -271,7 +259,7 @@ def plot_per_run(df: pd.DataFrame, out_dir: Path) -> None:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Compute EMG RMS(Awake)/RMS(NREM) for lab_3 subjects and plot per-subject bars")
+    parser = argparse.ArgumentParser(description="Compute EMG RMS(Awake)/RMS(NREM) for lab_5 subjects and plot per-subject bars")
     parser.add_argument("--data-root", type=str, default=None,
                         help="Path to ds006366 dataset root (default: <repo>/data/ds006366)")
     parser.add_argument("--out-dir", type=str, default=None,
