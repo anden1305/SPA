@@ -18,7 +18,7 @@ module load cuda/12.8.1
 source .venv/bin/activate
 mkdir -p hpc/output/decoder_only/reliability
 
-CONFIG="src/config/run/cvaemarhmm/decoder_only/reliability/reliability_cgmvae_decoder_only_mssv_frequency.yaml"
+CONFIG="src/config/run/cvaeprior/decoder_only/reliability/reliability_cgmvae_decoder_only_mssv_frequency.yaml"
 
 python3 main.py --method train_vae --config_path ${CONFIG}
 python3 main.py --method validate_cvae_gmm --config_path ${CONFIG}

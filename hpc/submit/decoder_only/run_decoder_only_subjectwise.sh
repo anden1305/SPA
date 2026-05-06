@@ -15,7 +15,7 @@ CPUS="4"
 echo "Submitting decoder-only subjectwise jobs for ${#SUBJECTS[@]} subjects..."
 
 for subject in "${SUBJECTS[@]}"; do
-  CONFIG="src/config/run/cvaemarhmm/decoder_only/subjectwise/${subject}_cgmvae_decoder_only_mssv_frequency.yaml"
+  CONFIG="src/config/run/cvaeprior/decoder_only/subjectwise/${subject}_cgmvae_decoder_only_mssv_frequency.yaml"
   OUTPUT_DIR="hpc/output/decoder_only/subjectwise/${subject}"
 
   mkdir -p "$OUTPUT_DIR"

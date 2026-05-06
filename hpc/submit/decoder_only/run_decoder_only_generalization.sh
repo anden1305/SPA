@@ -13,7 +13,7 @@ CPUS="4"
 echo "Submitting decoder-only generalization jobs..."
 
 for subject in "${SUBJECTS[@]}"; do
-  CONFIG="src/config/run/cvaemarhmm/decoder_only/generalization/generalization_cgmvae_decoder_only_mssv_frequency_test_${subject}.yaml"
+  CONFIG="src/config/run/cvaeprior/decoder_only/generalization/generalization_cgmvae_decoder_only_mssv_frequency_test_${subject}.yaml"
   OUTPUT_DIR="hpc/output/decoder_only/generalization/${subject}"
 
   mkdir -p "$OUTPUT_DIR"
