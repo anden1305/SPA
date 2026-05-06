@@ -12,5 +12,4 @@
 # module purge
 module load cuda/12.8.1
 source .venv/bin/activate
-mkdir -p output
 python3 main.py --config src/config/run/hmm/tests/diagvsfull/test_full_synth_features.yaml

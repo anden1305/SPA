@@ -12,7 +12,6 @@
 # module purge
 module load cuda/12.8.1
 source .venv/bin/activate
-mkdir -p output
 
 # Run bidirectional cVAE with population-level generalization (leave-one-subject-out)
 # Trains on many mice (run 1 only), tests on held-out mouse (runs 2-3)
