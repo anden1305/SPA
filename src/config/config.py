@@ -73,9 +73,11 @@ class DataLoaderConfig(BaseModel):
 
 class DatasetConfig(BaseModel):
     type: str = Field(..., pattern="^(synthetic|mssv)$")
-    id: str = Field(..., description="Dataset identifier or path.")
+    id: str | None = Field(default=None, description="Dataset identifier or path.")
+    lab: str | None = Field(default=None, description="Optional lab identifier used to expand MSSV datasets by lab.")
     run: int | None = Field(default=None, ge=1)
     remove_artifact: bool = Field(False, description="Whether to remove artifacts from the dataset.")
+    quality_filter: list[str] | None = Field(default=None, description="Optional list of subject IDs (e.g., ['sub-38', 'sub-39']) to include when lab is specified. If None, all subjects in the lab are used.")
     # No hardcoded constants - dataset selection is fully configurable
     
 class CVAE(BaseModel):
@@ -97,6 +99,7 @@ class ModelConfig(BaseModel):
     init_strategy: str = Field(..., pattern="^(random_uniform|random_dirichlet|random_separated|kmeans|kmeans_pca|kmeans_pca_noisy)$", description="Initialization strategy for the model.")
     init_noisy: bool = Field(...)  # Adds Gaussian noise to initialization; noise levels hardcoded below
     features : bool = Field(..., description="Whether the model is to be used on raw or feature data.")
+    conditioning_source: str = Field(default="subject", pattern="^(subject|lab|subject_lab)$", description="Which dataset-level identifier to use for conditioning embeddings.")
     params: dict[str, Any] = Field(..., description="Model-specific parameters.")
     # MAR-HMM params (via params dict - these ARE configurable):
     #   - ridge: L2 penalty on regression coefficients (default 0.0)

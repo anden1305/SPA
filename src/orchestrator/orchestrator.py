@@ -6,6 +6,7 @@ from pathlib import Path
 import datetime
 import uuid
 import cProfile
+import pandas as pd
 import torch
 from src.config.config import GlobalConfig
 from src.data.base_dataset import BaseDataset
@@ -191,6 +192,13 @@ class Orchestrator:
                 torch.save(self.model.state_dict(), run_ckpt_path)
                 # Also save to configured checkpoint path so follow-up validation can load it.
                 self._save_cvae_checkpoint_to_config_path()
+                # Also perform GMM validation using the checkpoint we just saved so
+                # that each run has train -> validate ordering.
+                try:
+                    self.global_config.cvae.model_checkpoint_path = str(run_ckpt_path)
+                    self.predict_cvae()
+                except Exception as e:
+                    print(f"Warning: validation after CVAE run {self.run_number} failed: {e}")
             
             if self.global_config.cvae.traning_pipeline in ['marhmm', 'cvae_then_marhmm']:
                 self.model.training_pipeline = 'marhmm'
@@ -279,6 +287,9 @@ class Orchestrator:
     def get_train_datasets(self):
         datasets = []
         for config in self.global_config.train_datasets:
+            if config.type == "mssv" and config.lab is not None:
+                datasets.extend(self.__expand_mssv_lab_configs(config))
+                continue
             match config.type:
                 case "synthetic":
                     datasets.append(SyntheticDataset(config=config))
@@ -291,6 +302,9 @@ class Orchestrator:
     def get_val_datasets(self):
         datasets = []
         for config in self.global_config.val_datasets:
+            if config.type == "mssv" and config.lab is not None:
+                datasets.extend(self.__expand_mssv_lab_configs(config))
+                continue
             match config.type:
                 case "synthetic":
                     datasets.append(SyntheticDataset(config=config))
@@ -298,6 +312,35 @@ class Orchestrator:
                     datasets.append(MSSVDataset(config=config))
                 case _:
                     raise ValueError(f"Unknown dataset type: {config.type}")
+        return datasets
+
+    def __expand_mssv_lab_configs(self, config):
+        metadata_path = Path("data/ds006366_processed/metadata.csv")
+        metadata = pd.read_csv(metadata_path)
+        rows = metadata.loc[metadata["lab"] == config.lab]
+        if rows.empty:
+            raise ValueError(f"No MSSV datasets found for lab {config.lab}.")
+
+        # Apply quality filter if specified
+        if config.quality_filter is not None:
+            rows = rows[rows["participant_id"].isin(config.quality_filter)]
+            if rows.empty:
+                raise ValueError(f"No MSSV datasets found for lab {config.lab} after quality filtering. Check quality_filter subject IDs.")
+
+        datasets = []
+        for _, row in rows.iterrows():
+            datasets.append(
+                MSSVDataset(
+                    config=type(config)(
+                        type=config.type,
+                        id=str(row["participant_id"]),
+                        lab=config.lab,
+                        run=int(row["run"]),
+                        remove_artifact=config.remove_artifact,
+                        quality_filter=config.quality_filter,  # Pass through for reference
+                    )
+                )
+            )
         return datasets
 
     def __get_model(self, device: torch.device):

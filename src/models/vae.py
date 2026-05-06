@@ -26,6 +26,7 @@ class ConditionalVAE(nn.Module):
     def __initialize_parameters(self):
         params = self.global_config.model.params
         self.n_subjects = self.data_loader.get_num_subjects()
+        self.n_labs = self.data_loader.get_num_labs() if hasattr(self.data_loader, "get_num_labs") else 0
         
         # Dimensions (Hardcoded defaults as requested, but overridable via params)
         C, F, S, num_states = self.data_loader.get_vae_dims()
@@ -46,6 +47,10 @@ class ConditionalVAE(nn.Module):
         self.dec_hidden_dims = params.get("dec_hidden_dims", None) # MLP hidden layers
         self.emb_dim = params.get("emb_dim", 0)
         self.decoder_only_conditioning = params.get("decoder_only_conditioning", False)
+        self.conditioning_source = self.global_config.model.conditioning_source
+        self.use_subject_conditioning = self.conditioning_source in ("subject", "subject_lab") and self.emb_dim > 0
+        self.use_lab_conditioning = self.conditioning_source in ("lab", "subject_lab") and self.emb_dim > 0
+        self.conditioning_dim = self.emb_dim * int(self.use_subject_conditioning) + self.emb_dim * int(self.use_lab_conditioning)
         self.use_encoder_conditioning = self.emb_dim > 0 and not self.decoder_only_conditioning
         self.use_decoder_conditioning = self.emb_dim > 0
         
@@ -69,10 +74,10 @@ class ConditionalVAE(nn.Module):
         torch.manual_seed(seed)
 
     def __initialize_weights(self):
-        
-        # ----- Subject Embedding -----
-        if not self.emb_dim == 0:
+        if self.use_subject_conditioning:
             self.subject_emb = nn.Embedding(self.n_subjects, self.emb_dim)
+        if self.use_lab_conditioning:
+            self.lab_emb = nn.Embedding(self.n_labs, self.emb_dim)
         
         # ----- Encoder CNN -----
         enc_layers = []
@@ -97,7 +102,7 @@ class ConditionalVAE(nn.Module):
 
         # ----- Encoder MLP -----
         mlp = []
-        prev = self.flat_dim + (self.emb_dim if self.use_encoder_conditioning else 0)
+        prev = self.flat_dim + (self.conditioning_dim if self.use_encoder_conditioning else 0)
         for h in self.enc_hidden_dims:
             mlp += [nn.Linear(prev, h), nn.LeakyReLU(0.2)]
             prev = h
@@ -108,7 +113,7 @@ class ConditionalVAE(nn.Module):
         
         # ----- Decoder MLP -----
         mlp = []
-        prev = self.latent_dim + (self.emb_dim if self.use_decoder_conditioning else 0)
+        prev = self.latent_dim + (self.conditioning_dim if self.use_decoder_conditioning else 0)
         for h in self.dec_hidden_dims:
             mlp += [nn.Linear(prev, h), nn.LeakyReLU(0.2)]
             prev = h
@@ -166,22 +171,38 @@ class ConditionalVAE(nn.Module):
 
     # ---------- Core subroutines ----------
     
-    def get_subject_embedding(self, subject_ids):
+    def _flatten_conditioning_ids(self, conditioning_ids, index: int | None = None):
+        ids = conditioning_ids
+        if index is not None:
+            if ids.dim() < 2 or ids.shape[-1] <= index:
+                raise ValueError(
+                    f"Expected conditioning_ids with last dim >= {index + 1} for conditioning_source='{self.conditioning_source}', got shape {tuple(ids.shape)}"
+                )
+            ids = ids[..., index]
+
+        if ids.dim() == 1:
+            return ids.repeat_interleave(self.S)
+        if ids.dim() == 2:
+            return ids.view(-1)
+        raise ValueError(f"Unsupported conditioning_ids shape: {tuple(ids.shape)}")
+
+    def get_conditioning_embedding(self, conditioning_ids):
         """
-        subject_ids: (B,) or (B, S)
+        conditioning_ids: (B,), (B, S) or (B, S, 2) for subject_lab
         returns: emb with shape (B*S, emb_dim)
         """
-        B_S = subject_ids.numel()
-        if subject_ids.dim() == 1:
-            subject_ids_expanded = subject_ids.repeat_interleave(self.S)
-        elif subject_ids.dim() == 2:
-             subject_ids_expanded = subject_ids.view(-1)
-        else:
-            subject_ids_expanded = subject_ids
-        if self.emb_dim == 0:
+        if self.conditioning_dim == 0:
             return None
-        emb = self.subject_emb(subject_ids_expanded)
-        return emb
+
+        emb_parts = []
+        if self.use_subject_conditioning:
+            subject_ids = self._flatten_conditioning_ids(conditioning_ids, index=0 if self.conditioning_source == "subject_lab" else None)
+            emb_parts.append(self.subject_emb(subject_ids))
+        if self.use_lab_conditioning:
+            lab_ids = self._flatten_conditioning_ids(conditioning_ids, index=1 if self.conditioning_source == "subject_lab" else None)
+            emb_parts.append(self.lab_emb(lab_ids))
+
+        return emb_parts[0] if len(emb_parts) == 1 else torch.cat(emb_parts, dim=-1)
     
     def encode(self, x, subject_ids):
         """
@@ -192,7 +213,7 @@ class ConditionalVAE(nn.Module):
         B, S, C, F = x.shape
         
         # Get subject embeddings
-        emb = self.get_subject_embedding(subject_ids) if self.use_encoder_conditioning else None
+        emb = self.get_conditioning_embedding(subject_ids) if self.use_encoder_conditioning else None
         
         # Flatten batch and sequence for independent processing
         x_flat = x.view(B * S, C, F) # (B*S, C, F)
@@ -233,7 +254,7 @@ class ConditionalVAE(nn.Module):
         B, S, L = z.shape
         
         # Get subject embeddings
-        emb = self.get_subject_embedding(subject_ids) if self.use_decoder_conditioning else None
+        emb = self.get_conditioning_embedding(subject_ids) if self.use_decoder_conditioning else None
         
         z_flat = z.view(B * S, L)
         

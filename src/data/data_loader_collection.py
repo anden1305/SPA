@@ -31,7 +31,10 @@ class DataLoaderCollection:
         self.device = device
         self.shuffle = self.config.shuffle
         self.random_seed = self.global_config.seed
-        self.subject_map = self.get_subject_map()
+        self.conditioning_source = self.global_config.model.conditioning_source
+        self.subject_map = self._build_subject_map()
+        self.lab_map = self._build_lab_map()
+        self.conditioning_map = self.get_conditioning_map()
         self.pre_load_to_device = True
         self.x, self.y, self.sub_ids, self.x_non_norm_all = self.prepare_data()
         self.batches_per_next = self.config.num_batches
@@ -47,12 +50,21 @@ class DataLoaderCollection:
             x.append(x_dl)
             x_non_norm.append(x_dl_non_norm)
             y.append(y_dl)
-            
-            # Create sub_ids array matching x_dl shape (except feature dim)
-            sub_id = self.subject_map[dl.dataset.get_id()]
-            # x_dl shape: (Batch, Time, Feature) -> sub_ids shape: (Batch, Time, 1)
-            sub_id_arr = np.full((x_dl.shape[0], x_dl.shape[1]), sub_id, dtype=np.int64)
-            sub_ids.append(sub_id_arr)
+
+            subject_id = self.subject_map[dl.dataset.get_id()]
+            lab_id = self.lab_map[dl.dataset.get_id()]
+
+            if self.conditioning_source == "subject":
+                cond_arr = np.full((x_dl.shape[0], x_dl.shape[1]), subject_id, dtype=np.int64)
+            elif self.conditioning_source == "lab":
+                cond_arr = np.full((x_dl.shape[0], x_dl.shape[1]), lab_id, dtype=np.int64)
+            elif self.conditioning_source == "subject_lab":
+                cond_arr = np.empty((x_dl.shape[0], x_dl.shape[1], 2), dtype=np.int64)
+                cond_arr[..., 0] = subject_id
+                cond_arr[..., 1] = lab_id
+            else:
+                raise ValueError(f"Unknown conditioning_source: {self.conditioning_source}")
+            sub_ids.append(cond_arr)
         
         x_all = np.concatenate(x, axis=0)
         y_all = np.concatenate(y, axis=0)
@@ -130,15 +142,88 @@ class DataLoaderCollection:
     
     def has_features_enabled(self):
         return self.data_loaders[0].has_features_enabled()
-    
+
     def get_num_subjects(self) -> int:
-        return 92
-    
-    def get_subject_map(self) -> list[int]:
-        # Returns list mapping subject ID to index
-        subject_ids = set([ds.get_id() for ds in self.datasets])
-        subject_to_id = {subject_id: int(re.search(r'\d+', subject_id).group()) for subject_id in subject_ids}
-        return subject_to_id
+        return len(self.get_subject_labels())
+
+    def get_num_labs(self) -> int:
+        return len(self.get_lab_labels())
+
+    def _sort_labels(self, labels: set[str]) -> list[str]:
+        def sort_key(value: str):
+            match = re.search(r'\d+', value)
+            return (int(match.group()) if match else value, value)
+
+        return sorted(labels, key=sort_key)
+
+    def get_subject_labels(self) -> list[str]:
+        labels = set()
+        for ds in self.datasets:
+            subject = ds.get_id()
+            if subject is None:
+                raise ValueError(f"Dataset {ds} is missing subject id required for subject conditioning.")
+            labels.add(str(subject))
+        return self._sort_labels(labels)
+
+    def get_lab_labels(self) -> list[str]:
+        labels = set()
+        for ds in self.datasets:
+            lab = ds.get_lab()
+            if lab is None:
+                raise ValueError(f"Dataset {ds} is missing lab metadata required for lab conditioning.")
+            labels.add(str(lab))
+        return self._sort_labels(labels)
+
+    def get_conditioning_labels(self) -> list[str]:
+        if self.conditioning_source == "subject":
+            return self.get_subject_labels()
+        if self.conditioning_source == "lab":
+            return self.get_lab_labels()
+        if self.conditioning_source == "subject_lab":
+            subject_labels = self.get_subject_labels()
+            lab_labels = self.get_lab_labels()
+            return [f"{subject}|{lab}" for subject in subject_labels for lab in lab_labels]
+        raise ValueError(f"Unknown conditioning_source: {self.conditioning_source}")
+
+    def _build_subject_map(self) -> dict[str, int]:
+        labels = self.get_subject_labels()
+        label_to_id = {label: idx for idx, label in enumerate(labels)}
+        mapping: dict[str, int] = {}
+        for ds in self.datasets:
+            subject = ds.get_id()
+            if subject is None:
+                raise ValueError(f"Dataset {ds} is missing subject id required for subject conditioning.")
+            mapping[ds.get_id()] = label_to_id[str(subject)]
+        return mapping
+
+    def _build_lab_map(self) -> dict[str, int]:
+        labels = self.get_lab_labels()
+        label_to_id = {label: idx for idx, label in enumerate(labels)}
+        mapping: dict[str, int] = {}
+        for ds in self.datasets:
+            lab = ds.get_lab()
+            if lab is None:
+                raise ValueError(f"Dataset {ds} is missing lab metadata required for lab conditioning.")
+            mapping[ds.get_id()] = label_to_id[str(lab)]
+        return mapping
+
+    def get_conditioning_map(self) -> dict[str, int]:
+        if self.conditioning_source == "subject":
+            return self.subject_map
+        if self.conditioning_source == "lab":
+            return self.lab_map
+        if self.conditioning_source == "subject_lab":
+            return self.subject_map
+        raise ValueError(f"Unknown conditioning_source: {self.conditioning_source}")
+
+    def get_subject_map(self) -> dict[str, int]:
+        return self.subject_map
+
+    def get_lab_map(self) -> dict[str, int]:
+        return self.lab_map
+
+    def get_conditioning_source(self) -> str:
+        return self.conditioning_source
     
     def __iter__(self) -> "DataLoaderCollection":
         # Reset cursor and (optionally) shuffle order for a new pass

@@ -80,6 +80,9 @@ class BaseDataset(ABC):
     def get_id(self):
         return self.id
 
+    def get_lab(self):
+        return self.config.get('lab', None)
+
     ###### ABSTRACT METHODS ######
 
     @abstractmethod

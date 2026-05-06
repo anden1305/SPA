@@ -37,6 +37,11 @@ class Visualizer:
         self.model = model
         self.config = self.global_config.visualizer
         self.validator = validator
+
+    def _subject_ids_for_export(self, ids: torch.Tensor) -> np.ndarray:
+        if ids.dim() >= 3 and ids.shape[-1] >= 2:
+            ids = ids[..., 0]
+        return ids.flatten().cpu().numpy()
     
     ####### GENERAL METHODS #######
     
@@ -82,7 +87,7 @@ class Visualizer:
         if self.config.learning_rate:
             self.__plot_learning_rate(train_details)
         y_hat = train_details.get_trained_predictions()
-        subject_ids = subject_ids.flatten().cpu().numpy()
+        subject_ids = self._subject_ids_for_export(subject_ids)
         np.savez(path / "results.npz", y_hat=y_hat, y_true=y, x_latent=x, x=x_non_norm, sub_ids=subject_ids)
     
     
@@ -92,7 +97,7 @@ class Visualizer:
         y_hat = y_hat.flatten().cpu().numpy()
         y_true = y_true.flatten().cpu().numpy()
         x_latent = x_latent.detach().cpu().numpy()
-        sub_ids = sub_ids.flatten().cpu().numpy()
+        sub_ids = self._subject_ids_for_export(sub_ids)
         self.__plot_pca_tripanel(None, x=x_latent, y=y_true, overwrite_path=path, pred_y=y_hat)
         # write a txt file with nmi and likelihood
         with open(path / "metrics.txt", "w") as f:

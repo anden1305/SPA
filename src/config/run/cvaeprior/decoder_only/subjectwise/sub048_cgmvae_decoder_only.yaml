@@ -1,0 +1,127 @@
+trainer:
+  epochs: 80
+  learning_rate: 0.0003
+  optimizer: adam
+  grad_clip: 0.5
+  validate_per_epoch: 1
+  early_stopping:
+    enabled: false
+    patience: 100
+    min_delta: 0.001
+  scheduler:
+    enabled: false
+    type: exponential
+    step_size: Null
+    gamma: 0.99
+validator:
+  nmi: True
+  accuracy: True
+  cross_nmi: True
+  learning_rate: True
+  state_distinctness: True
+  summary_statistics: True
+  log_likelihood: True
+visualizer:
+  losses: True
+  learning_rate: True
+  pca_tripanel: True
+  confusion_matrix: True
+  state_distinctness: True
+  summary_statistics: True
+  historic_values: True
+dataloader:
+  num_batches: 64 # EXPERIMENTAL
+  batch_size: 128
+  validation_batch_size: 128
+  window_size: 512
+  stride: 512
+  sequence_length: 1
+  shuffle: True
+  normalize: True
+  use_legacy: False
+  transforms: []
+
+train_datasets:
+  - type: mssv
+    id: sub-048
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-048
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-048
+    run: 3
+    remove_artifact: True
+
+val_datasets:
+  - type: mssv
+    id: sub-048
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-048
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-048
+    run: 3
+    remove_artifact: True
+
+model:
+  type: cvae_marhmm
+  covariance_type: full
+  init_strategy: random_uniform # EXPERIMENTAL
+  init_noisy: true
+  features: false
+  params:
+    
+    # MARHMM parameters
+    lags: [1, 2, 4]
+    ridge: 0.1
+    var_reg: 0.05
+    sticky_coef: 0.1
+    sticky_kappa: 0.9
+    
+    # CVAE parameters
+    # weights
+    latent_dim: 8 # FIXED
+    enc_hidden_dims: [256, 128] # FIXED
+    dec_hidden_dims: [128, 256] # FIXED
+    conv_channels: [32, 64, 128, 128] # FIXED
+    kernel_sizes:  [7, 5, 5, 3] # FIXED
+    strides:       [2, 2, 2, 2] # FIXED
+    paddings:      [3, 2, 2, 1] # FIXED
+    emb_dim: 4 # FIXED
+    decoder_only_conditioning: true # FIXED
+    use_rms: False # FIXED
+    # prior
+    prior: gmm # FIXED
+    min_beta: 0.01 # FIXED
+    max_beta: 1.0 # FIXED
+    beta_warmup_epochs: 0 # FIXED
+    beta_slowdown_epochs: 0 # FIXED
+    gmm_warmup_epochs: 0 # FIXED
+    free_nats_per_dim: 0.00 # FIXED
+    no_beta_epochs: 10 # FIXED
+
+cvae:
+  normalize_global: False # FIXED
+  pre_normalize: False # FIXED
+  post_normalize: True # FIXED
+  percentile_clip_channels: False # FIXED
+  perform_hanning_window: False # FIXED
+  band_pass_filter_fft: True # FIXED
+  band_pass_freqs: [[null, 20.0], [null, 20.0], [5.0, 60.0]] # FIXED
+  band_pass_filter_type: frequency_domain # FIXED
+  traning_pipeline: cvae
+  model_checkpoint_path: results/decoder_only/cvae_final_decoder_only/cvae_decoder_only_model.pth
+  reinit_marhmm: false
+
+verbose: True
+seed: 123
+results_dir: results/decoder_only/subjectwise/cgmvae_decoder_only
+run_name: sub048_cgmvae_decoder_only_mssv_frequency
+runs: 3
+validate_data: True
