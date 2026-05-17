@@ -6,7 +6,7 @@ set -euo pipefail
 CONFIG="src/config/run/cvaeprior/lab_conditioning/subjectwise/sub-038_cgmvae_lab_conditioning_mssv_frequency.yaml"
 OUTPUT_DIR="hpc/output/lab_conditioning/subjectwise"
 
-QUEUE="gpuv100"
+QUEUE="gpua100"
 WALLTIME="4:00"
 MEM="5GB"
 CPUS="4"

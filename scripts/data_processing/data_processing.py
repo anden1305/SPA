@@ -163,7 +163,7 @@ def load_stage_labels(path: str, n_samples: int, fs: int) -> np.ndarray:
 
 def extract_data(participant_data: pd.DataFrame):
     metadata = []
-    for participant in participant_data.iloc:
+    for _, participant in participant_data.iterrows():
         participant_id: str = participant['participant_id']
         lab = participant['lab']
         num_runs = participant['num_runs']
@@ -180,7 +180,10 @@ def extract_data(participant_data: pd.DataFrame):
             run = i+1
             new_path = NEW_DATA_DIR / participant_id / str(run)
             new_path.mkdir(parents=True, exist_ok=True)
-            edf_path = participant[f'path_eeg_{run}']
+            edf_path = participant.get(f'path_eeg_{run}')
+            events_path = participant.get(f'path_events_{run}')
+            if pd.isna(edf_path) or pd.isna(events_path):
+                continue
             signals = extract_signals_from_edf(edf_path)
             samples = None
             for signal in signals:
@@ -189,7 +192,6 @@ def extract_data(participant_data: pd.DataFrame):
                 if not samples:
                     samples = len(signal_data)
                 np.save(signal_path, np.asarray(signal_data, dtype=np.float32))
-            events_path = participant[f'path_events_{run}']
             labels = load_stage_labels(events_path, n_samples=samples, fs=128)
             new_events_path = new_path / "labels.npy"
             np.save(new_events_path, np.asarray(labels, dtype=np.int16))
@@ -216,7 +218,7 @@ def extract_data(participant_data: pd.DataFrame):
     return pd.DataFrame(metadata)
 
 def save_csv(dataframe: pd.DataFrame, filename: str):
-    dataframe.to_csv(NEW_DATA_DIR / filename)
+    dataframe.to_csv(NEW_DATA_DIR / filename, index=False)
 
 if __name__ == "__main__":
     

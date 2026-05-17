@@ -5,7 +5,7 @@
 set -euo pipefail
 
 LABS=("lab2" "lab3" "lab5")
-QUEUE="gpuv100"
+QUEUE="gpua100"
 WALLTIME="4:00"
 MEM="5GB"
 CPUS="4"
