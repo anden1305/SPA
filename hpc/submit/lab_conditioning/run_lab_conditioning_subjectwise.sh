@@ -19,7 +19,7 @@ bsub <<EOF
 #!/bin/bash
 #BSUB -J lab_cond_subj
 #BSUB -q ${QUEUE}
-#BSUB -W ${WALLTIME}
+#BSUB -W ${WALLTIME}   
 #BSUB -n ${CPUS}
 #BSUB -R "span[hosts=1]"
 #BSUB -R "rusage[mem=${MEM}]"
