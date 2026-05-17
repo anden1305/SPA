@@ -177,7 +177,7 @@ class Orchestrator:
             self._load_cvae_checkpoint_if_available()
             
             
-            if self.global_config.cvae.traning_pipeline in ['cvae_then_marhmm', 'cvae']:
+            if self.global_config.cvae.training_pipeline in ['cvae_then_marhmm', 'cvae']:
                 self.model.training_pipeline = 'cvae'
                 self.trainer.train()
                 self.validator.validate_cvae()
@@ -200,7 +200,7 @@ class Orchestrator:
                 except Exception as e:
                     print(f"Warning: validation after CVAE run {self.run_number} failed: {e}")
             
-            if self.global_config.cvae.traning_pipeline in ['marhmm', 'cvae_then_marhmm']:
+            if self.global_config.cvae.training_pipeline in ['marhmm', 'cvae_then_marhmm']:
                 self.model.training_pipeline = 'marhmm'
                 self.__prepare_run(ignore_model=True)
                 self.model.data_loader = self.train_loader

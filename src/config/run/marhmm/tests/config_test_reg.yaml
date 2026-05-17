@@ -193,7 +193,7 @@ cvae:  # Not using CVAE here
   perform_hanning_window: false
   band_pass_filter_fft: false
   reinit_marhmm: false
-  traning_pipeline: "marhmm"
+  training_pipeline: "marhmm"
 
 verbose: true
 seed: 123  # Will auto-increment for each run

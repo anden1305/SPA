@@ -163,7 +163,7 @@ cvae:
   band_pass_filter_fft: True # FIXED
   band_pass_freqs: [[null, 20.0], [null, 20.0], [5.0, 60.0]] # FIXED
   band_pass_filter_type: frequency_domain # FIXED
-  traning_pipeline: marhmm
+  training_pipeline: marhmm
   model_checkpoint_path: results/substages/cvaemarhmm_new/substages_marhmm_7 [20260205-130745]/cvaehmm_final_model.pth
   reinit_marhmm: True
 

@@ -89,7 +89,7 @@ class CVAE(BaseModel):
     band_pass_filter_fft: bool = Field(..., description="Whether to apply band-pass filtering in the FFT domain.")
     band_pass_freqs: list[list] | None = Field(default=None, description="List of [low, high] frequency pairs for band-pass filtering per channel.")
     band_pass_filter_type: str | None = Field(default=None, pattern="^(frequency_domain|time_domain)$", description="Type of band-pass filter to apply.")
-    traning_pipeline: str = Field(..., pattern="^(cvae|marhmm|cvae_then_marhmm)$", description="Training pipeline to use.")
+    training_pipeline: str = Field(..., pattern="^(cvae|marhmm|cvae_then_marhmm)$", description="Training pipeline to use.")
     model_checkpoint_path: str | None = Field(default=None, description="Path to a pre-trained CVAE model checkpoint.")
     reinit_marhmm: bool = Field(..., description="Whether to reinitialize MAR-HMM after CVAE training.")
     

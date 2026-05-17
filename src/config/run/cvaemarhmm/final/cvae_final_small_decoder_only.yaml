@@ -101,7 +101,7 @@ cvae:
   band_pass_filter_fft: True # FIXED
   band_pass_freqs: [[null, 20.0], [null, 20.0], [5.0, 60.0]] # FIXED
   band_pass_filter_type: frequency_domain # FIXED
-  traning_pipeline: cvae
+  training_pipeline: cvae
   model_checkpoint_path: results/training/cvae/model_checkpoints/cvae_final_small_decoder_only.pt
   reinit_marhmm: false
 
