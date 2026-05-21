@@ -14,6 +14,7 @@ from src.preprocessing.theta_delta_pac import ThetaDeltaPAC
 from src.preprocessing.theta_gamma_pac import ThetaGammaPAC
 from src.preprocessing.duty_cycle import DutyCycle
 from src.preprocessing.helpers.base_transform import BaseTransform
+from src.preprocessing.raw_window_preprocessing import RawWindowPreprocessing
 from src.preprocessing.vae_preprocessing import VAEPreprocessing
 from src.preprocessing.fft_band_power import FFTBandPower
 from src.preprocessing.fft_log_power import FFTLogPower
@@ -67,14 +68,24 @@ class DataLoader(Iterator):
         assert self.config.sequence_length is not None, "sequence_length must be set for non-legacy data loading."
         
         # create preprocessing object
-        vae_preprocessing = VAEPreprocessing(
-            self.global_config,
-            window_size=self.config.window_size,
-            stride=self.config.stride,
-            sequence_length=self.config.sequence_length,
-            normalize=self.normalize,
-            sampling_rate=self.dataset.get_sampling_rate()
-        )
+        if getattr(self.global_config.cvae, "feature_pipeline", "fft") == "raw_cnn":
+            vae_preprocessing = RawWindowPreprocessing(
+                self.global_config,
+                window_size=self.config.window_size,
+                stride=self.config.stride,
+                sequence_length=self.config.sequence_length,
+                normalize=self.normalize,
+                sampling_rate=self.dataset.get_sampling_rate(),
+            )
+        else:
+            vae_preprocessing = VAEPreprocessing(
+                self.global_config,
+                window_size=self.config.window_size,
+                stride=self.config.stride,
+                sequence_length=self.config.sequence_length,
+                normalize=self.normalize,
+                sampling_rate=self.dataset.get_sampling_rate(),
+            )
         # save transforms
         self.transforms = {'EEG': [vae_preprocessing], 'EMG': [vae_preprocessing]}
         self.feature_names = []

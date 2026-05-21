@@ -54,6 +54,8 @@ def _apply_wandb_config(base_cfg: GlobalConfig, wb_cfg: Dict[str, Any]) -> Globa
         "model.init_strategy": str,
         "model.init_noisy": bool,
         "model.covariance_type": str,
+        "model.params.max_beta": float,
+        "dataloader.num_batches": int,
     }
 
     # Work on a full dict snapshot to preserve all required fields
@@ -81,6 +83,50 @@ def _apply_wandb_config(base_cfg: GlobalConfig, wb_cfg: Dict[str, Any]) -> Globa
 
     # Reconstruct a validated config
     return GlobalConfig.model_validate(merged)
+
+
+def _unique_sweep_results_dir(cfg: GlobalConfig, run_id: str) -> GlobalConfig:
+    """Suffix results_dir and run_name so parallel sweep agents do not clobber checkpoints."""
+    merged = cfg.model_dump()
+    merged["results_dir"] = f"{cfg.results_dir}/{run_id}"
+    merged["run_name"] = f"{cfg.run_name}_{run_id}"
+    return GlobalConfig.model_validate(merged)
+
+
+def _run_orchestrator(orch: Any) -> None:
+    if orch.global_config.cvae.training_pipeline == "cvae":
+        orch.train_cvae()
+    else:
+        orch.run()
+
+
+def _aggregate_sweep_metric(
+    orch: Any,
+    *,
+    metric_name: str,
+    metric_goal: str,
+) -> tuple[float | None, int | None]:
+    best_val: float | None = None
+    best_run_number: int | None = None
+    for td in getattr(orch, "train_details", []) or []:
+        current_val: float | None = None
+        if metric_name.startswith("val/"):
+            key = metric_name.split("/", 1)[1]
+            v = td.get_peak_validation(key)
+            current_val = float(v) if isinstance(v, (int, float)) else None
+        elif metric_name == "train/total_loss":
+            if td.losses:
+                last_epoch = max(td.losses.keys())
+                current_val = float(td.losses[last_epoch])
+        if current_val is None:
+            continue
+        if best_val is None:
+            best_val, best_run_number = current_val, td.run_number
+        elif (metric_goal == "maximize" and current_val > best_val) or (
+            metric_goal == "minimize" and current_val < best_val
+        ):
+            best_val, best_run_number = current_val, td.run_number
+    return best_val, best_run_number
 
 
 def run_sweep(sweep_yaml_path: str) -> None:
@@ -126,33 +172,14 @@ def run_sweep(sweep_yaml_path: str) -> None:
         # Import after backend is set so Visualizer uses Agg
         from src.orchestrator.orchestrator import Orchestrator
         wandb.init(project=project, entity=entity, group=group, tags=tags)
-        # Apply sweep overrides and run orchestrator ONCE; it will handle cfg.runs repeats internally
         cfg = _apply_wandb_config(base_cfg, dict(wandb.config))
+        cfg = _unique_sweep_results_dir(cfg, wandb.run.id)
         tmp_yaml = _write_temp_yaml(cfg)
         orch = Orchestrator(str(tmp_yaml))
-        orch.run()
-
-        # Aggregate best-of across orchestrator runs
-        best_val: float | None = None
-        best_run_number: int | None = None
-        for td in getattr(orch, 'train_details', []) or []:
-            current_val: float | None = None
-            if metric_name.startswith("val/"):
-                key = metric_name.split("/", 1)[1]
-                v = td.get_trained_validations().get(key)
-                current_val = float(v) if isinstance(v, (int, float)) else None
-            elif metric_name == "train/total_loss":
-                if td.losses:
-                    last_epoch = max(td.losses.keys())
-                    current_val = float(td.losses[last_epoch])
-
-            if current_val is None:
-                continue
-            if best_val is None:
-                best_val, best_run_number = current_val, td.run_number
-            else:
-                if (metric_goal == "maximize" and current_val > best_val) or (metric_goal == "minimize" and current_val < best_val):
-                    best_val, best_run_number = current_val, td.run_number
+        _run_orchestrator(orch)
+        best_val, best_run_number = _aggregate_sweep_metric(
+            orch, metric_name=metric_name, metric_goal=metric_goal
+        )
 
         # Log the aggregated result as the sweep metric
         if best_val is not None:
@@ -223,34 +250,23 @@ def run_agent_only(sweep_yaml_path: str, sweep_id: str | None = None, trials_per
         except Exception:
             pass
         from src.orchestrator.orchestrator import Orchestrator
-        wandb.init(project=project, entity=entity)
+        wb_settings = base_cfg.wandb
+        group = getattr(wb_settings, "group", None) if wb_settings is not None else None
+        tags = getattr(wb_settings, "tags", None) if wb_settings is not None else None
+        wandb.init(project=project, entity=entity, group=group, tags=tags)
         cfg = _apply_wandb_config(base_cfg, dict(wandb.config))
+        cfg = _unique_sweep_results_dir(cfg, wandb.run.id)
         tmp_yaml = _write_temp_yaml(cfg)
         orch = Orchestrator(str(tmp_yaml))
-        orch.run()
-        # Aggregate best-of and write summary as in run_sweep
-        best_val: float | None = None
-        best_run_number: int | None = None
+        _run_orchestrator(orch)
         metric_spec = sweep_spec.get("metric") or {}
-        metric_name: str = metric_spec.get("name") or ("val/nmi" if getattr(base_cfg.validator, "nmi", False) else "train/total_loss")
-        metric_goal: str = metric_spec.get("goal", "maximize")
-        for td in getattr(orch, 'train_details', []) or []:
-            current_val: float | None = None
-            if metric_name.startswith("val/"):
-                key = metric_name.split("/", 1)[1]
-                v = td.get_trained_validations().get(key)
-                current_val = float(v) if isinstance(v, (int, float)) else None
-            elif metric_name == "train/total_loss":
-                if td.losses:
-                    last_epoch = max(td.losses.keys())
-                    current_val = float(td.losses[last_epoch])
-            if current_val is None:
-                continue
-            if best_val is None:
-                best_val, best_run_number = current_val, td.run_number
-            else:
-                if (metric_goal == "maximize" and current_val > best_val) or (metric_goal == "minimize" and current_val < best_val):
-                    best_val, best_run_number = current_val, td.run_number
+        metric_name = metric_spec.get("name") or (
+            "val/nmi" if getattr(base_cfg.validator, "nmi", False) else "train/total_loss"
+        )
+        metric_goal = metric_spec.get("goal", "maximize")
+        best_val, best_run_number = _aggregate_sweep_metric(
+            orch, metric_name=metric_name, metric_goal=metric_goal
+        )
         if best_val is not None:
             wandb.summary[metric_name] = float(best_val)
             wandb.summary["aggregate/best_run_number"] = best_run_number

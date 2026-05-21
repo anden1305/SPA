@@ -8,6 +8,14 @@ from sklearn.cluster import KMeans
 
 from src.config.config import GlobalConfig
 from src.data.data_loader_collection import DataLoaderCollection
+from src.models.hmm_gmm_prior import (
+    estimate_transition_logits_from_paths,
+    forward_log_marginal,
+    gaussian_log_prob_diag,
+    init_sticky_transition_logits,
+    viterbi_decode,
+)
+from src.models.temporal_front import build_temporal_front, build_temporal_front_decoder
 
 class ConditionalVAE(nn.Module):
     def __init__(
@@ -34,6 +42,21 @@ class ConditionalVAE(nn.Module):
         self.C = C
         self.F = F
         self.num_states = num_states
+
+        self.feature_pipeline = getattr(self.global_config.cvae, "feature_pipeline", "fft")
+        self.use_raw_cnn = self.feature_pipeline == "raw_cnn"
+        self.F_time = F if self.use_raw_cnn else None
+        # Story A: learn a spectral front-end from raw windows, reconstruct in that feature space.
+        self.raw_cnn_recon_domain = params.get("raw_cnn_recon_domain", "spectral")
+        self.raw_cnn_detach_target = bool(params.get("raw_cnn_detach_target", True))
+        self.raw_cnn_fft_anchor_weight = float(params.get("raw_cnn_fft_anchor_weight", 0.0))
+        self.raw_cnn_fft_anchor_decay_epochs = int(params.get("raw_cnn_fft_anchor_decay_epochs", 0))
+
+        self.front_channels = params.get("front_channels", [32, 32])
+        self.front_kernels = params.get("front_kernels", [15, 7])
+        self.front_strides = params.get("front_strides", [2, 2])
+        self.front_paddings = params.get("front_paddings", [7, 3])
+        self.front_pool_kernel = params.get("front_pool_kernel", 2)
         
         # Convolutional config
         self.conv_channels = params.get("conv_channels", None)
@@ -63,11 +86,19 @@ class ConditionalVAE(nn.Module):
         self.no_beta_epochs = params.get("no_beta_epochs", None)
         
         # Prior
-        self.prior = params.get("prior", "warm_gmm") # "standard", "gmm" or "warm_gmm"
-        self.gmm_warmup_epochs = params.get("gmm_warmup_epochs", 50) # only for "warm_gmm"
+        self.prior = params.get("prior", "warm_gmm")  # standard | gmm | warm_gmm | hmm_gmm | warm_hmm_gmm
+        self.gmm_warmup_epochs = params.get("gmm_warmup_epochs", 50)  # warm_gmm / warm_hmm_gmm
         self.gmm_warmup_initialized = False
         self.free_nats_per_dim = params.get("free_nats_per_dim", 0.02)
         self.num_gmm_states = params.get("num_gmm_states", self.num_states)
+
+        # HMM-GMM prior (only used when prior in {"hmm_gmm", "warm_hmm_gmm"})
+        self.hmm_warmup_epochs = params.get("hmm_warmup_epochs", self.gmm_warmup_epochs)
+        self.hmm_transition_ramp_epochs = int(params.get("hmm_transition_ramp_epochs", 0))
+        self.hmm_sticky_kappa = float(params.get("hmm_sticky_kappa", 0.9))
+        self.hmm_estimate_transitions = bool(params.get("hmm_estimate_transitions", True))
+        self.hmm_transitions_initialized = False
+        self.hmm_transitions_initialized_at_hmm = False
         
         # Set torch random seed for reproducibility
         seed = self.global_config.seed
@@ -78,11 +109,45 @@ class ConditionalVAE(nn.Module):
             self.subject_emb = nn.Embedding(self.n_subjects, self.emb_dim)
         if self.use_lab_conditioning:
             self.lab_emb = nn.Embedding(self.n_labs, self.emb_dim)
+
+        self.front_end = None
+        self.front_decoder = None
+        self._front_lens: list[int] = []
+        self.front_feature_channels: int | None = None
+        self.front_feature_length: int | None = None
+
+        if self.use_raw_cnn:
+            self.front_end, self._front_lens, enc_in_ch = build_temporal_front(
+                in_channels=self.C,
+                input_length=self.F_time,
+                channels=self.front_channels,
+                kernels=self.front_kernels,
+                strides=self.front_strides,
+                paddings=self.front_paddings,
+                pool_kernel=self.front_pool_kernel,
+            )
+            if self.raw_cnn_recon_domain == "time":
+                self.front_decoder = build_temporal_front_decoder(
+                    out_channels=self.C,
+                    channels=self.front_channels,
+                    kernels=self.front_kernels,
+                    strides=self.front_strides,
+                    paddings=self.front_paddings,
+                    pool_kernel=self.front_pool_kernel,
+                    front_lens=self._front_lens,
+                )
+            enc_in_ch = enc_in_ch
+            enc_in_len = self._front_lens[-1]
+            self.front_feature_channels = enc_in_ch
+            self.front_feature_length = enc_in_len
+        else:
+            enc_in_ch = self.C
+            enc_in_len = self.F
         
         # ----- Encoder CNN -----
         enc_layers = []
-        in_ch = self.C
-        L = self.F
+        in_ch = enc_in_ch
+        L = enc_in_len
         self._lens = [L]  # store lengths through encoder (for decoder)
         for i, (out_ch, k, s, p) in enumerate(zip(self.conv_channels, self.kernel_sizes, self.strides, self.paddings)):
             enc_layers.append(nn.Conv1d(in_ch, out_ch, kernel_size=k, stride=s, padding=p))
@@ -95,7 +160,7 @@ class ConditionalVAE(nn.Module):
 
         # Flat dim via dummy pass (still fine)
         with torch.no_grad():
-            dummy = torch.zeros(1, self.C, self.F)
+            dummy = torch.zeros(1, enc_in_ch, enc_in_len)
             out = self.encoder_cnn(dummy)
             self.flat_dim = out.view(1, -1).shape[1]
             self.conv_out_shape = out.shape[1:]  # (ch, len)
@@ -146,7 +211,7 @@ class ConditionalVAE(nn.Module):
                     f"target={target_L}, base={base}, stride={s} -> output_padding={out_pad}"
                 )
 
-            out_ch = self.C if i == len(rev_channels) - 1 else rev_channels[i + 1]
+            out_ch = enc_in_ch if i == len(rev_channels) - 1 else rev_channels[i + 1]
             dec_layers.append(nn.ConvTranspose1d(in_ch, out_ch, kernel_size=k, stride=s, padding=p, output_padding=out_pad))
             if not (i == len(rev_channels) - 1):
                 dec_layers.append(nn.LeakyReLU(0.2))
@@ -155,11 +220,22 @@ class ConditionalVAE(nn.Module):
         self.decoder_cnn = nn.Sequential(*dec_layers)
         
         
-        # GMM prior parameters (unchanged)
-        if self.prior in ("gmm","warm_gmm"):
+        # GMM prior parameters (shared by GMM and HMM-GMM priors).
+        # `prior_logits` doubles as mixture weights (GMM) or initial state log-probs (HMM).
+        if self.prior in ("gmm", "warm_gmm", "hmm_gmm", "warm_hmm_gmm"):
             self.prior_logits = nn.Parameter(torch.zeros(self.num_gmm_states, device=self.device))
             self.prior_means = nn.Parameter(torch.randn(self.num_gmm_states, self.latent_dim))
             self.prior_logvars = nn.Parameter(torch.zeros(self.num_gmm_states, self.latent_dim, device=self.device))
+
+        # HMM-GMM only: transition matrix logits.
+        if self.prior in ("hmm_gmm", "warm_hmm_gmm"):
+            self.prior_transition_logits = nn.Parameter(
+                init_sticky_transition_logits(
+                    self.num_gmm_states,
+                    self.hmm_sticky_kappa,
+                    device=self.device,
+                )
+            )
 
         self.to(self.device)
 
@@ -216,10 +292,12 @@ class ConditionalVAE(nn.Module):
         emb = self.get_conditioning_embedding(subject_ids) if self.use_encoder_conditioning else None
         
         # Flatten batch and sequence for independent processing
-        x_flat = x.view(B * S, C, F) # (B*S, C, F)
-        
-        # CNN
-        h_conv = self.encoder_cnn(x_flat) # (B*S, last_ch, last_len)
+        x_flat = x.view(B * S, C, F)  # (B*S, C, F) — F is time length when raw_cnn
+
+        if self.use_raw_cnn:
+            x_flat = self.front_end(x_flat)
+
+        h_conv = self.encoder_cnn(x_flat)  # (B*S, last_ch, last_len)
         h_flat = h_conv.view(B * S, -1)
         
         # Add subject embedding
@@ -269,12 +347,19 @@ class ConditionalVAE(nn.Module):
         # Reshape for CNN
         h_conv_in = h_flat.view(B * S, *self.conv_out_shape)
         
-        # CNN Transpose
         x_recon_flat = self.decoder_cnn(h_conv_in)
-        
-        # Reshape back
-        x_recon = x_recon_flat.view(B, S, self.C, self.F)
-        
+
+        if self.use_raw_cnn and self.raw_cnn_recon_domain == "time":
+            x_recon_flat = self.front_decoder(x_recon_flat)
+
+        if self.use_raw_cnn and self.raw_cnn_recon_domain == "spectral":
+            out_C = self.front_feature_channels
+            out_F = self.front_feature_length
+        else:
+            out_C = self.C
+            out_F = self.F_time if self.use_raw_cnn else self.F
+        x_recon = x_recon_flat.view(B, S, out_C, out_F)
+
         return x_recon
     
     def forward(self, x, subject_ids):
@@ -300,7 +385,38 @@ class ConditionalVAE(nn.Module):
         Compute VAE loss: reconstruction + KL divergence.
         """
         # Reconstruction loss (MSE)
-        recon_loss = F.mse_loss(x_recon, x, reduction='mean')
+        if self.use_raw_cnn and self.raw_cnn_recon_domain == "spectral":
+            B, S, C, F_time = x.shape
+            x_flat = x.view(B * S, C, F_time)
+            target_spec = self.front_end(x_flat)
+            target_spec = target_spec.view(
+                B, S, self.front_feature_channels, self.front_feature_length
+            )
+            if self.raw_cnn_detach_target:
+                target_spec = target_spec.detach()
+            recon_loss = F.mse_loss(x_recon, target_spec, reduction='mean')
+            if self.raw_cnn_fft_anchor_weight > 0.0:
+                with torch.no_grad():
+                    fft_power = torch.log1p(torch.abs(torch.fft.rfft(x, dim=-1)).pow(2))
+                    fft_power = fft_power.mean(dim=2)
+                    fft_power = F.interpolate(
+                        fft_power.reshape(B * S, 1, -1),
+                        size=self.front_feature_length,
+                        mode="linear",
+                        align_corners=False,
+                    ).reshape(B, S, self.front_feature_length)
+                recon_spec_mean = x_recon.mean(dim=2)
+                anchor_loss = F.mse_loss(recon_spec_mean, fft_power, reduction='mean')
+                anchor_w = self.raw_cnn_fft_anchor_weight
+                if self.raw_cnn_fft_anchor_decay_epochs > 0:
+                    decay = max(
+                        0.0,
+                        1.0 - (float(epoch) / float(self.raw_cnn_fft_anchor_decay_epochs)),
+                    )
+                    anchor_w *= decay
+                recon_loss = recon_loss + anchor_w * anchor_loss
+        else:
+            recon_loss = F.mse_loss(x_recon, x, reduction='mean')
         # Regularization loss
         if self.prior == "gmm":
             reg_loss = self.gmm_prior(logvar, mu, z)
@@ -308,6 +424,12 @@ class ConditionalVAE(nn.Module):
             reg_loss = self.standard_prior(logvar, mu)
         elif self.prior == "warm_gmm":
             reg_loss = self.warm_gmm_prior(logvar, mu, z, epoch)
+        elif self.prior == "hmm_gmm":
+            reg_loss = self.hmm_gmm_prior(logvar, mu, z)
+        elif self.prior == "warm_hmm_gmm":
+            reg_loss = self.warm_hmm_gmm_prior(logvar, mu, z, epoch)
+        else:
+            raise ValueError(f"Unknown prior '{self.prior}'.")
         reg_loss = self.regularization_loss(reg_loss, epoch)
         return recon_loss, reg_loss
     
@@ -322,6 +444,136 @@ class ConditionalVAE(nn.Module):
                 self.prior_logits.copy_(logits)
             self.gmm_warmup_initialized = True
         return self.gmm_prior(logvar, mu, z)
+
+    # ------------------------------------------------------------------ #
+    # HMM-GMM prior (temporal)                                           #
+    # ------------------------------------------------------------------ #
+
+    def _log_q_per_step(self, mu: torch.Tensor, logvar: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
+        """log q(z_t | x_t) for diagonal Gaussian encoder. Returns (B, T)."""
+        return -0.5 * (
+            math.log(2 * math.pi) + logvar + (z - mu).pow(2) / logvar.exp()
+        ).sum(dim=-1)
+
+    def _gmm_log_p_per_step(self, z: torch.Tensor) -> torch.Tensor:
+        """log p_GMM(z_t) = log sum_k pi_k N(z_t | mu_k, sigma_k). Returns (B, T)."""
+        log_emit = gaussian_log_prob_diag(z, self.prior_means, self.prior_logvars)  # (B,T,K)
+        log_mix = F.log_softmax(self.prior_logits, dim=0).view(1, 1, -1)
+        return torch.logsumexp(log_emit + log_mix, dim=-1)
+
+    def _kl_with_free_bits(self, kl_per_seq: torch.Tensor, T: int) -> torch.Tensor:
+        """Free-bits on time-averaged sequence KL (same per-step scale as ``gmm_prior``)."""
+        kl_mean = kl_per_seq / float(T)
+        free_nats_total = float(self.free_nats_per_dim) * self.latent_dim
+        return torch.clamp(kl_mean, min=free_nats_total).mean()
+
+    def hmm_gmm_prior(self, logvar: torch.Tensor, mu: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
+        """KL with HMM-GMM sequence prior: KL[q || p_HMM(z_{1:T})].
+
+        z, mu, logvar shapes: (B, T, L). Returns scalar.
+        """
+        if z.dim() != 3:
+            raise ValueError(f"hmm_gmm_prior expects z of shape (B,T,L); got {tuple(z.shape)}")
+        B, T, _ = z.shape
+
+        log_q = self._log_q_per_step(mu, logvar, z).sum(dim=-1)              # (B,)
+        log_emit = gaussian_log_prob_diag(z, self.prior_means, self.prior_logvars)
+        log_pi = F.log_softmax(self.prior_logits, dim=0)
+        log_A = F.log_softmax(self.prior_transition_logits, dim=-1)
+        log_p_seq = forward_log_marginal(log_emit, log_pi, log_A)             # (B,)
+
+        kl_per_seq = log_q - log_p_seq                                        # (B,)
+        return self._kl_with_free_bits(kl_per_seq, T)
+
+    def gmm_sequence_prior(self, logvar: torch.Tensor, mu: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
+        """KL with i.i.d. GMM prior summed over time (same scale as HMM prior)."""
+        if z.dim() != 3:
+            raise ValueError(f"gmm_sequence_prior expects z of shape (B,T,L); got {tuple(z.shape)}")
+        B, T, _ = z.shape
+
+        log_q = self._log_q_per_step(mu, logvar, z).sum(dim=-1)              # (B,)
+        log_p = self._gmm_log_p_per_step(z).sum(dim=-1)                       # (B,)
+        kl_per_seq = log_q - log_p
+        return self._kl_with_free_bits(kl_per_seq, T)
+
+    def warm_hmm_gmm_prior(
+        self,
+        logvar: torch.Tensor,
+        mu: torch.Tensor,
+        z: torch.Tensor,
+        epoch: int,
+    ) -> torch.Tensor:
+        """Warm schedule: standard -> KMeans GMM init -> GMM seq -> HMM-GMM (optional ramp)."""
+        # Phase 1: standard Gaussian KL while encoder warms up.
+        if epoch < self.gmm_warmup_epochs:
+            return self.standard_prior(logvar, mu)
+
+        # Phase boundary: initialise GMM emissions (and optionally A) once.
+        if not self.gmm_warmup_initialized:
+            means, logvars, logits = self.__get_kmeans_centroids()
+            with torch.no_grad():
+                self.prior_means.copy_(means)
+                self.prior_logvars.copy_(logvars)
+                self.prior_logits.copy_(logits)
+            self.gmm_warmup_initialized = True
+
+        # Phase 2: i.i.d. GMM over time (sequence-scaled to match later phase).
+        if epoch < self.hmm_warmup_epochs:
+            return self.gmm_sequence_prior(logvar, mu, z)
+
+        # Estimate transitions from current encoder means when HMM phase starts.
+        if (
+            self.hmm_estimate_transitions
+            and not self.hmm_transitions_initialized_at_hmm
+        ):
+            self.__init_hmm_transitions()
+            self.hmm_transitions_initialized_at_hmm = True
+            self.hmm_transitions_initialized = True
+
+        # Phase 3: HMM-GMM, optionally blended with GMM-seq to ease the transition.
+        if self.hmm_transition_ramp_epochs > 0:
+            ramp_progress = (epoch - self.hmm_warmup_epochs) / float(self.hmm_transition_ramp_epochs)
+            alpha = max(0.0, min(1.0, ramp_progress))
+        else:
+            alpha = 1.0
+
+        if alpha >= 1.0:
+            return self.hmm_gmm_prior(logvar, mu, z)
+        if alpha <= 0.0:
+            return self.gmm_sequence_prior(logvar, mu, z)
+
+        return (1.0 - alpha) * self.gmm_sequence_prior(logvar, mu, z) + alpha * self.hmm_gmm_prior(
+            logvar, mu, z
+        )
+
+    @torch.no_grad()
+    def __init_hmm_transitions(self, max_points: int = 200_000):
+        """Estimate (pi, A) from Viterbi-like argmax assignments on encoder mu sequences."""
+        was_training = self.training
+        self.eval()
+
+        x, _, subject_ids = self.data_loader.get_all_data()
+        x = x.to(self.device)
+        mu, _ = self.encode(x, subject_ids=subject_ids)  # (B, T, L)
+
+        # Per-step argmax under current GMM emissions (ignores transitions for init).
+        log_emit = gaussian_log_prob_diag(mu, self.prior_means, self.prior_logvars)
+        log_mix = F.log_softmax(self.prior_logits, dim=0).view(1, 1, -1)
+        assign = (log_emit + log_mix).argmax(dim=-1)  # (B, T)
+
+        if assign.shape[1] < 2:
+            # Sequence length 1: fall back to sticky init (no transitions to estimate).
+            log_A = init_sticky_transition_logits(
+                self.num_gmm_states, self.hmm_sticky_kappa, device=self.device
+            )
+            self.prior_transition_logits.copy_(log_A)
+            self.train(was_training)
+            return
+
+        log_pi_est, log_A_est = estimate_transition_logits_from_paths(assign, self.num_gmm_states)
+        self.prior_logits.copy_(log_pi_est)
+        self.prior_transition_logits.copy_(log_A_est)
+        self.train(was_training)
     
     def __get_kmeans_centroids(self, max_points: int = 200_000):
         """
@@ -451,11 +703,17 @@ class ConditionalVAE(nn.Module):
             return torch.tensor(0.0, device=self.device)
         elif self.no_beta_epochs and epoch <= self.no_beta_epochs:
             return torch.tensor(0.0, device=self.device)
-        elif epoch <= self.beta_warmup_epochs:
-            self.beta = min(self.max_beta, self.min_beta + (self.max_beta - self.min_beta) * epoch / (self.beta_warmup_epochs-self.no_beta_epochs)) if self.beta_warmup_epochs else self.max_beta
+        elif self.beta_warmup_epochs and epoch <= self.beta_warmup_epochs:
+            # Ramp beta from min_beta -> max_beta AFTER the no-beta phase.
+            warm_start = self.no_beta_epochs or 0
+            warm_span = max(1, self.beta_warmup_epochs - warm_start)
+            warm_progress = min(1.0, max(0.0, float(epoch - warm_start) / float(warm_span)))
+            self.beta = self.min_beta + (self.max_beta - self.min_beta) * warm_progress
         elif self.beta_slowdown_epochs and epoch > self.beta_warmup_epochs:
             excess_epochs = epoch - self.beta_warmup_epochs
             self.beta = max(self.min_beta, self.max_beta - (self.max_beta - self.min_beta) * excess_epochs / self.beta_slowdown_epochs)
+        else:
+            self.beta = self.max_beta
         reg = self.beta * reg_loss
         return reg
     
@@ -493,11 +751,16 @@ class ConditionalVAE(nn.Module):
             y: (B, S) LongTensor of predicted component indices
             likelihood: (B, S) Tensor of chosen likelihood quantity (see likelihood_type)
         """
-        if self.prior not in ("gmm", "warm_gmm"):
-            raise ValueError(f"predict_gmm_labels requires a GMM prior, got prior='{self.prior}'.")
+        # Marginal per-step GMM assignment uses emission params shared with HMM-GMM priors.
+        if self.prior not in ("gmm", "warm_gmm", "hmm_gmm", "warm_hmm_gmm"):
+            raise ValueError(
+                f"predict_gmm_labels requires a GMM or HMM-GMM emission prior, got prior='{self.prior}'."
+            )
 
-        # If warm_gmm and not initialized, optionally initialize from current encoder means.
-        if self.prior == "warm_gmm" and (not getattr(self, "gmm_warmup_initialized", False)):
+        # If warm_* and not initialized, optionally initialize from current encoder means.
+        if self.prior in ("warm_gmm", "warm_hmm_gmm") and (
+            not getattr(self, "gmm_warmup_initialized", False)
+        ):
             if not initialize_if_needed:
                 raise RuntimeError(
                     "GMM prior not initialized (warm_gmm). "
@@ -575,4 +838,42 @@ class ConditionalVAE(nn.Module):
         log_pz = log_pz_flat.view(B, S)
         log_pz = log_pz.mean()
 
+        return y, log_pz, mu
+
+    @torch.no_grad()
+    def predict_hmm_labels(
+        self,
+        x: torch.Tensor,
+        subject_ids: torch.Tensor,
+        *,
+        use_mu: bool = True,
+    ):
+        """Viterbi-decode HMM-GMM state path on the latent sequence.
+
+        Args:
+            x: (B, T, C, F)
+            subject_ids: (B,) or (B, T)
+            use_mu: deterministic mu vs sampled z.
+
+        Returns:
+            y:      (B, T) LongTensor of state indices
+            log_pz: scalar mean log p(z_{1:T}) under the HMM prior
+            mu:     (B, T, L) deterministic latent mean
+        """
+        if self.prior not in ("hmm_gmm", "warm_hmm_gmm"):
+            raise ValueError(
+                f"predict_hmm_labels requires an HMM-GMM prior, got prior='{self.prior}'."
+            )
+
+        self.eval()
+        x = x.to(self.device)
+        mu, logvar = self.encode(x, subject_ids=subject_ids)
+        z = mu if use_mu else self.reparameterize(mu, logvar)
+
+        log_emit = gaussian_log_prob_diag(z, self.prior_means, self.prior_logvars)
+        log_pi = F.log_softmax(self.prior_logits, dim=0)
+        log_A = F.log_softmax(self.prior_transition_logits, dim=-1)
+
+        y = viterbi_decode(log_emit, log_pi, log_A)
+        log_pz = forward_log_marginal(log_emit, log_pi, log_A).mean()
         return y, log_pz, mu

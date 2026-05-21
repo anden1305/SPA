@@ -1,0 +1,12 @@
+# v2: narrow lr around usual 0.0003, num_batches 32 vs 64, max_beta fixed at 1.0 in base.
+# Peak val/cvae_latent_kmeans_nmi across epochs and seeds (see wandb_sweep_runner fix).
+method: grid
+metric:
+  name: val/cvae_latent_kmeans_nmi
+  goal: maximize
+parameters:
+  trainer.learning_rate:
+    values: [0.00025, 0.0003, 0.00035]
+  dataloader.num_batches:
+    values: [32, 64]
+base_config: src/config/run/cvaeprior/decoder_only_lab_2_subject_conditioning/sweep/reliability_sweep_base_v2.yaml

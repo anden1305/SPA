@@ -14,6 +14,7 @@ from src.models.base_model import BaseModel
 from src.models.cvae_mar_hmm import CVAEMARHMM
 from src.orchestrator.train_details import TrainDetails
 from src.helpers.state_distinctness import compute_state_distinctness
+from src.validation.hmmgmm_metrics import latent_autocorr, state_switch_rate
 
 
 class Validator:
@@ -43,6 +44,12 @@ class Validator:
         xt, yt, sub_ids = self.data_loader.get_all_data()
         with torch.no_grad():
             if type(self.model) == CVAEMARHMM:
+                if (
+                    getattr(self.model, "training_pipeline", None) == "cvae"
+                    or self.global_config.cvae.training_pipeline == "cvae"
+                ):
+                    self.validate_cvae_epoch(epoch)
+                    return
                 predst = self.model.predict(xt, sub_ids)
             else:
                 predst = self.model.predict(xt)
@@ -242,23 +249,81 @@ class Validator:
         x, y, sub_ids = self.data_loader.get_all_data()
         self.model.prepare_for_inference()
         with torch.no_grad():
-            x_latent = self.model.get_latent_representation(x, sub_ids)
-            x_latent = x_latent.reshape(-1, x_latent.shape[-1])
+            x_latent_seq = self.model.get_latent_representation(x, sub_ids)  # (B,T,L)
+            x_latent = x_latent_seq.reshape(-1, x_latent_seq.shape[-1])
         n_clusters = len(torch.unique(y))
         nmi = self.__calculate_kmeans_nmi(x_latent, y, n_clusters)
         self.validations[epoch]['cvae_latent_kmeans_nmi'] = nmi
         print(f"CVAE Latent KMeans NMI: {nmi:.4f}")
+
+        # Trajectory metrics whenever sequence_length > 1; cheap and prior-agnostic.
+        if x_latent_seq.dim() == 3 and x_latent_seq.shape[1] > 1:
+            try:
+                autocorr = latent_autocorr(x_latent_seq, lag=1)
+                self.validations[epoch]['latent_autocorr_lag1'] = autocorr
+                print(f"Latent autocorr (lag 1): {autocorr:.4f}")
+            except Exception as e:
+                print(f"Skipping latent autocorr: {e}")
+
+        # Prior-specific Viterbi switch rate when an HMM-GMM prior is in use.
+        prior_name = getattr(self.model.cvae, 'prior', None)
+        if prior_name in ('hmm_gmm', 'warm_hmm_gmm'):
+            try:
+                with torch.no_grad():
+                    y_hmm, _, _ = self.model.cvae.predict_hmm_labels(x, sub_ids)
+                self.validations[epoch]['hmm_switch_rate_per100'] = state_switch_rate(y_hmm)
+                print(f"HMM Viterbi switch rate (per 100): "
+                      f"{self.validations[epoch]['hmm_switch_rate_per100']:.4f}")
+            except Exception as e:
+                print(f"Skipping HMM switch rate: {e}")
+
         self.model.prepare_for_training()
     
+    @staticmethod
+    def _log_prior_label_stats(y_hat: torch.Tensor, y_true: torch.Tensor, prefix: str) -> None:
+        yh = y_hat.detach().cpu().numpy().ravel()
+        yt = y_true.detach().cpu().numpy().ravel()
+        print(
+            f"{prefix} labels: pred unique={np.unique(yh).tolist()} "
+            f"(n={len(np.unique(yh))}), true unique={np.unique(yt).tolist()} "
+            f"(n={len(np.unique(yt))})"
+        )
+
     def validate_cvae_gmm(self):
         assert type(self.model) == CVAEMARHMM, "Model must be of type CVAEMARHMM to validate CVAE latent representations."
         x, y, sub_ids = self.data_loader.get_all_data()
         x_non_norm = self.data_loader.get_non_normalized_data()
         self.model.prepare_for_inference()
         with torch.no_grad():
-            x_latent, y_hat, likelihood = self.model.predict_gmm(x, sub_ids)
+            x_latent, y_hat, likelihood = self.model.predict_gmm(
+                x, sub_ids, initialize_if_needed=True
+            )
+        self._log_prior_label_stats(y_hat, y, "GMM marginal")
         nmi = calculate_nmi(y_hat.detach().cpu().numpy().flatten(), y.detach().cpu().numpy().flatten())
-        return nmi, likelihood, y_hat, y, x_latent, x_non_norm, sub_ids
+        gmm_switch = state_switch_rate(y_hat) if y_hat.dim() == 2 and y_hat.shape[1] > 1 else 0.0
+        print(f"GMM marginal switch rate (per 100): {gmm_switch:.4f}")
+        return nmi, likelihood, y_hat, y, x_latent, x_non_norm, sub_ids, gmm_switch
+
+    def validate_cvae_hmm(self):
+        """Parallel of ``validate_cvae_gmm`` for the HMM-GMM prior (Viterbi labels)."""
+        assert type(self.model) == CVAEMARHMM, "Model must be of type CVAEMARHMM."
+        x, y, sub_ids = self.data_loader.get_all_data()
+        x_non_norm = self.data_loader.get_non_normalized_data()
+        self.model.prepare_for_inference()
+        with torch.no_grad():
+            y_hat, log_pz, mu = self.model.cvae.predict_hmm_labels(x, sub_ids)
+            gmm_switch = 0.0
+            try:
+                _, y_gmm, _ = self.model.predict_gmm(x, sub_ids)
+                self._log_prior_label_stats(y_gmm, y, "GMM marginal")
+                gmm_switch = state_switch_rate(y_gmm)
+            except Exception as e:
+                print(f"Skipping GMM marginal comparison: {e}")
+        self._log_prior_label_stats(y_hat, y, "HMM Viterbi")
+        nmi = calculate_nmi(y_hat.detach().cpu().numpy().flatten(), y.detach().cpu().numpy().flatten())
+        switch_rate = state_switch_rate(y_hat)
+        print(f"HMM switch rate (per 100): {switch_rate:.4f}; GMM marginal (per 100): {gmm_switch:.4f}")
+        return nmi, log_pz, y_hat, y, mu, x_non_norm, sub_ids, switch_rate, gmm_switch
     
     ####### HELPER METHODS #######
     

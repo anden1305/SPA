@@ -1,0 +1,10 @@
+method: grid
+metric:
+  name: val/cvae_latent_kmeans_nmi
+  goal: maximize
+parameters:
+  trainer.learning_rate:
+    values: [0.0002, 0.0003, 0.0005]
+  model.params.max_beta:
+    values: [0.5, 1.0]
+base_config: src/config/run/cvaeprior/decoder_only_lab_5_subject_conditioning/sweep/reliability_sweep_base.yaml

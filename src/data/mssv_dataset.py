@@ -62,17 +62,26 @@ class MSSVDataset(BaseDataset):
         config['epoch_length'] = 4
         config['n_stages'] = 4 if not config['lab'] in ('lab_2', 'lab_4') else 3
         config['stage_names'] = ['Awake', 'NREM', 'REM', 'Artifact'] if not config['lab'] in ('lab_2', 'lab_4') else ['Awake', 'NREM', 'REM']
-        signals = []
+        available = []
         if metadata['EEG1']:
-            signals.append('EEG1')
+            available.append('EEG1')
         if metadata['EEG2']:
-            signals.append('EEG2')
+            available.append('EEG2')
         if metadata['EEG3']:
-            signals.append('EEG3')
+            available.append('EEG3')
         if metadata['EEG4']:
-            signals.append('EEG4')
+            available.append('EEG4')
         if metadata['EMG']:
-            signals.append('EMG')
+            available.append('EMG')
+        if self.dataset_config.signals is not None:
+            signals = [s for s in self.dataset_config.signals if s in available]
+            if not signals:
+                raise ValueError(
+                    f"No requested signals {self.dataset_config.signals} available for "
+                    f"{self.id} run {self.run} (available: {available})"
+                )
+        else:
+            signals = available
         config['n_channels'] = len(signals)
         config['signals'] = signals
         config['run'] = self.run

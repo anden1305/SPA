@@ -38,6 +38,17 @@ class TrainDetails:
     def get_trained_validations(self):
         return self.validations[max(self.validations.keys())]
 
+    def get_peak_validation(self, key: str) -> float | None:
+        """Best value of ``key`` across all validation epochs (for sweep / peak-NMI reporting)."""
+        best: float | None = None
+        for epoch_vals in self.validations.values():
+            v = epoch_vals.get(key)
+            if isinstance(v, (int, float)):
+                fv = float(v)
+                if best is None or fv > best:
+                    best = fv
+        return best
+
     def get_initial_predictions(self):
         return np.asarray(self.predictions[min(self.predictions.keys())]).reshape(-1)
     

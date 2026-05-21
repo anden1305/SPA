@@ -78,9 +78,18 @@ class DatasetConfig(BaseModel):
     run: int | None = Field(default=None, ge=1)
     remove_artifact: bool = Field(False, description="Whether to remove artifacts from the dataset.")
     quality_filter: list[str] | None = Field(default=None, description="Optional list of subject IDs (e.g., ['sub-38', 'sub-39']) to include when lab is specified. If None, all subjects in the lab are used.")
+    signals: list[str] | None = Field(
+        default=None,
+        description="Optional signal names to load (e.g. ['EEG1', 'EEG2', 'EMG']). When set, only these signals are used if present in metadata. Use for cross-lab experiments where labs have different channel counts.",
+    )
     # No hardcoded constants - dataset selection is fully configurable
     
 class CVAE(BaseModel):
+    feature_pipeline: str = Field(
+        default="fft",
+        pattern="^(fft|raw_cnn)$",
+        description="Input features: hand-crafted FFT (fft) or raw windows + learnable CNN front (raw_cnn).",
+    )
     normalize_global: bool = Field(..., description="Whether to normalize globally.")
     pre_normalize: bool = Field(..., description="Whether to apply pre-normalization.")
     post_normalize: bool = Field(..., description="Whether to apply post-normalization.")

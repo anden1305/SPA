@@ -1,0 +1,145 @@
+trainer:
+  epochs: 80
+  learning_rate: 0.0003
+  optimizer: adam
+  grad_clip: 0.5
+  validate_per_epoch: 1
+  early_stopping:
+    enabled: false
+    patience: 100
+    min_delta: 0.001
+  scheduler:
+    enabled: false
+    type: exponential
+    step_size: Null
+    gamma: 0.99
+validator:
+  nmi: True
+  accuracy: True
+  cross_nmi: False
+  learning_rate: True
+  state_distinctness: True
+  summary_statistics: True
+  log_likelihood: True
+visualizer:
+  losses: True
+  learning_rate: True
+  pca_tripanel: True
+  confusion_matrix: True
+  state_distinctness: True
+  summary_statistics: True
+  historic_values: True
+dataloader:
+  num_batches: 64
+  batch_size: 128
+  validation_batch_size: 128
+  window_size: 512
+  stride: 512
+  sequence_length: 1
+  shuffle: True
+  normalize: True
+  use_legacy: False
+  transforms: []
+
+train_datasets:
+  - type: mssv
+    id: sub-071
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-071
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-072
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-072
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-077
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-077
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-080
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-080
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-081
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-081
+    run: 2
+    remove_artifact: True
+
+val_datasets:
+  - type: mssv
+    id: sub-076
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-076
+    run: 2
+    remove_artifact: True
+
+model:
+  type: cvae_marhmm
+  covariance_type: full
+  init_strategy: random_uniform
+  init_noisy: true
+  features: false
+  params:
+    lags: [1, 2, 4]
+    ridge: 0.1
+    var_reg: 0.05
+    sticky_coef: 0.1
+    sticky_kappa: 0.9
+    latent_dim: 8
+    enc_hidden_dims: [256, 128]
+    dec_hidden_dims: [128, 256]
+    conv_channels: [32, 64, 128, 128]
+    kernel_sizes:  [7, 5, 5, 3]
+    strides:       [2, 2, 2, 2]
+    paddings:      [3, 2, 2, 1]
+    emb_dim: 4
+    decoder_only_conditioning: true
+    use_rms: False
+    prior: gmm
+    min_beta: 0.01
+    max_beta: 1.0
+    beta_warmup_epochs: 0
+    beta_slowdown_epochs: 0
+    gmm_warmup_epochs: 0
+    free_nats_per_dim: 0.00
+    no_beta_epochs: 10
+
+cvae:
+  normalize_global: False
+  pre_normalize: False
+  post_normalize: True
+  percentile_clip_channels: False
+  perform_hanning_window: False
+  band_pass_filter_fft: True
+  band_pass_freqs: [[null, 20.0], [null, 20.0], [5.0, 60.0]]
+  band_pass_filter_type: frequency_domain
+  training_pipeline: cvae
+  model_checkpoint_path: results/decoder_only/generalization/cgmvae_decoder_only_lab_2/sub076/cvae_final_model.pth
+  reinit_marhmm: false
+
+verbose: True
+seed: 123
+results_dir: results/decoder_only/generalization/cgmvae_decoder_only_lab_2
+run_name: generalization_cgmvae_decoder_only_subject_conditioning_sub076
+runs: 3
+validate_data: True

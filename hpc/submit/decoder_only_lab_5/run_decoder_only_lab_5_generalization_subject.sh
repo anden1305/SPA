@@ -1,26 +1,26 @@
 #!/bin/bash
-### Lab-conditioning cGMVAE population generalization experiments
-### One job per held-out test subject config.
+### Decoder-only lab-5 cGMVAE generalization_subject experiments (subject conditioning)
+### One job per held-out subject config.
 
 set -euo pipefail
 
-SUBJECTS=("sub039" "sub041" "sub048")
+SUBJECTS=("sub088" "sub089" "sub092")
 QUEUE="gpuv100"
-WALLTIME="4:00"
-MEM="5GB"
+WALLTIME="8:00"
+MEM="6GB"
 CPUS="4"
 
-echo "Submitting lab-conditioning generalization jobs..."
+echo "Submitting decoder-only lab-5 generalization_subject jobs..."
 
 for subject in "${SUBJECTS[@]}"; do
-  CONFIG="src/config/run/cvaeprior/lab_conditioning/generalization/generalization_cgmvae_lab_conditioning_mssv_frequency_test_${subject}.yaml"
-  OUTPUT_DIR="hpc/output/lab_conditioning/generalization/${subject}"
+  CONFIG="src/config/run/cvaeprior/decoder_only_lab_5_subject_conditioning/generalization_subject/generalization_subject_cgmvae_decoder_only_subject_conditioning_${subject}.yaml"
+  OUTPUT_DIR="hpc/output/decoder_only_lab_5/generalization_subject/${subject}"
 
   mkdir -p "$OUTPUT_DIR"
 
   bsub <<EOF
 #!/bin/bash
-#BSUB -J lab_cond_gen_${subject}
+#BSUB -J dec_only_l5_gs_${subject}
 #BSUB -q ${QUEUE}
 #BSUB -W ${WALLTIME}
 #BSUB -n ${CPUS}

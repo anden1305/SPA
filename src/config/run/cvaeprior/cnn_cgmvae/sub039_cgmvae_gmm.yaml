@@ -1,0 +1,137 @@
+# CNN-front cGMVAE on sub-039 (seq_len=1, GMM prior).
+trainer:
+  epochs: 80
+  learning_rate: 0.0003
+  optimizer: adam
+  grad_clip: 0.5
+  validate_per_epoch: 1
+  early_stopping:
+    enabled: false
+    patience: 100
+    min_delta: 0.001
+  scheduler:
+    enabled: false
+    type: exponential
+    step_size: Null
+    gamma: 0.99
+validator:
+  nmi: True
+  accuracy: True
+  cross_nmi: False
+  learning_rate: True
+  state_distinctness: True
+  summary_statistics: True
+  log_likelihood: True
+visualizer:
+  losses: True
+  learning_rate: True
+  pca_tripanel: True
+  confusion_matrix: True
+  state_distinctness: True
+  summary_statistics: True
+  historic_values: True
+dataloader:
+  num_batches: 32
+  batch_size: 64
+  validation_batch_size: 64
+  window_size: 512
+  stride: 512
+  sequence_length: 1
+  shuffle: True
+  normalize: True
+  use_legacy: False
+  transforms: []
+
+train_datasets:
+  - type: mssv
+    id: sub-039
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-039
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-039
+    run: 3
+    remove_artifact: True
+
+val_datasets:
+  - type: mssv
+    id: sub-039
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-039
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-039
+    run: 3
+    remove_artifact: True
+
+model:
+  type: cvae_marhmm
+  covariance_type: full
+  init_strategy: random_uniform
+  init_noisy: true
+  features: false
+  conditioning_source: subject
+  params:
+    lags: [1, 2, 4]
+    ridge: 0.1
+    var_reg: 0.05
+    sticky_coef: 0.1
+    sticky_kappa: 0.9
+
+    latent_dim: 8
+    enc_hidden_dims: [256, 128]
+    dec_hidden_dims: [128, 256]
+    conv_channels: [32, 64, 128, 128]
+    kernel_sizes:  [7, 5, 5, 3]
+    strides:       [2, 2, 2, 2]
+    paddings:      [3, 2, 2, 1]
+    emb_dim: 4
+    decoder_only_conditioning: true
+    use_rms: False
+
+    front_channels: [32, 32]
+    front_kernels: [15, 7]
+    front_strides: [2, 2]
+    front_paddings: [7, 3]
+    front_pool_kernel: 2
+    raw_cnn_recon_domain: spectral
+    raw_cnn_detach_target: true
+    raw_cnn_fft_anchor_weight: 0.1
+    raw_cnn_fft_anchor_decay_epochs: 60
+
+    prior: gmm
+    num_gmm_states: 3
+    min_beta: 0.01
+    max_beta: 0.25
+    beta_warmup_epochs: 50
+    beta_slowdown_epochs: 0
+    gmm_warmup_epochs: 0
+    free_nats_per_dim: 0.02
+    no_beta_epochs: 15
+
+cvae:
+  feature_pipeline: raw_cnn
+  normalize_global: False
+  pre_normalize: False
+  post_normalize: False
+  percentile_clip_channels: False
+  perform_hanning_window: False
+  band_pass_filter_fft: false
+  band_pass_freqs: [[null, 20.0], [null, 20.0], [5.0, 60.0]]
+  band_pass_filter_type: frequency_domain
+  training_pipeline: cvae
+  model_checkpoint_path: results/cnn_cgmvae/smoke_sub039_ae_20260519-170128/cvae_final_model_run1.pth
+  reinit_marhmm: false
+
+verbose: True
+seed: 123
+results_dir: results/cnn_cgmvae
+run_name: sub039_cgmvae_gmm
+runs: 1
+validate_data: True

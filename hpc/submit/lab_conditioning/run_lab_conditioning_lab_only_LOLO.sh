@@ -30,10 +30,12 @@ for lab in "${LABS[@]}"; do
 #BSUB -e ${OUTPUT_DIR}/%J.err
 #BSUB -gpu "num=1:mode=exclusive_process"
 
+cd /work3/s204070/SPA || exit 1
 module load cuda/12.8.1
 source .venv/bin/activate
 
-python3 main.py --method train --config_path ${CONFIG}
+python3 main.py --method train_vae --config_path ${CONFIG}
+python3 main.py --method validate_cvae_gmm --config_path ${CONFIG}
 EOF
 
   echo "Submitted: ${lab}"

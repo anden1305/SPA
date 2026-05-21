@@ -1,0 +1,22 @@
+---
+description: DTU HPC — login node vs compute; bsub vs linuxsh
+alwaysApply: true
+---
+
+# HPC (DTU)
+
+**Do not run heavy work on the login node** (`hpclogin*`). Login is for editing, git, and `bsub` submission only.
+
+| Task | Where |
+|------|--------|
+| Train / validate / **pytest** / data loading at scale | **Compute node** |
+| Interactive shell on compute | `linuxsh` then `cd /work3/s204070/SPA` and `source .venv/bin/activate` |
+| Batch jobs | `bsub < hpc/submit/...` (scripts must `cd` to repo root) |
+
+**Prefer `bsub` over long interactive runs** when a submit script exists (`hpc/submit/hmmgmm/`, etc.).
+
+**Never run `pytest` on the login node** — not even a single test file. Use `bsub < hpc/submit/run_pytest.sh` or an interactive compute shell (`linuxsh`, then activate venv and run pytest there).
+
+**Do not** start full training, multi-epoch smoke, or validation on the login node either.
+
+After code changes that affect training, point the user to the matching submit script rather than re-running old checkpoints.

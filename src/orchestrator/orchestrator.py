@@ -53,6 +53,14 @@ class Orchestrator:
         state = torch.load(checkpoint, map_location="cpu")
         cvae_state = {k[len("cvae."):]: v for k, v in state.items() if k.startswith("cvae.")}
         self.model.cvae.load_state_dict(cvae_state, strict=False)
+        # Warm-up flags are not in the checkpoint; restore from loaded prior weights.
+        cvae = self.model.cvae
+        prior = getattr(cvae, "prior", None)
+        if prior in ("warm_gmm", "warm_hmm_gmm", "gmm", "hmm_gmm") and "prior_means" in cvae_state:
+            cvae.gmm_warmup_initialized = True
+        if prior in ("warm_hmm_gmm", "hmm_gmm") and "prior_transition_logits" in cvae_state:
+            cvae.hmm_transitions_initialized = True
+            cvae.hmm_transitions_initialized_at_hmm = True
         return True
 
     def _save_cvae_checkpoint_to_config_path(self):
@@ -67,6 +75,11 @@ class Orchestrator:
         print(f"Saved CVAE checkpoint to: {checkpoint_path}")
     
     def run(self):
+        if self.global_config.cvae.training_pipeline == "cvae":
+            raise ValueError(
+                "Config uses cvae.training_pipeline='cvae'. Use --method train_vae "
+                "(then validate_cvae_gmm), not --method train."
+            )
         if self.global_config.verbose:
             self.__initial_print()
         if self.global_config.validate_data:
@@ -170,6 +183,7 @@ class Orchestrator:
             self.global_config.seed += 1
             self.model.reset()
             self.trainer.reset()
+            self.validator.reset()
             # self.validator.validate(epoch=0)  
             run_dir = Path(self.global_config.results_dir) / self.global_config.run_name / str(self.run_number)
         
@@ -195,7 +209,17 @@ class Orchestrator:
                 # Also perform GMM validation using the checkpoint we just saved so
                 # that each run has train -> validate ordering.
                 try:
-                    self.global_config.cvae.model_checkpoint_path = str(run_ckpt_path)
+                    best_path = self.trainer.get_best_kmeans_checkpoint_path()
+                    if best_path is not None:
+                        best_ep = getattr(self.trainer, "_best_kmeans_epoch", None)
+                        ep_disp = (best_ep + 1) if best_ep is not None else "?"
+                        print(
+                            f"Validating with best KMeans-NMI checkpoint: {best_path} "
+                            f"(epoch {ep_disp})"
+                        )
+                        self.global_config.cvae.model_checkpoint_path = str(best_path)
+                    else:
+                        self.global_config.cvae.model_checkpoint_path = str(run_ckpt_path)
                     self.predict_cvae()
                 except Exception as e:
                     print(f"Warning: validation after CVAE run {self.run_number} failed: {e}")
@@ -216,17 +240,28 @@ class Orchestrator:
     
     
     def predict_cvae(self):
-        
-        # CVAE training
         loaded = self._load_cvae_checkpoint_if_available()
         if not loaded:
             raise FileNotFoundError(
                 "No CVAE checkpoint available for validation. "
                 "Run train_vae first or set cvae.model_checkpoint_path to an existing file."
             )
-        nmi, likelihood, y_hat, y, x_latent, x, sub_ids = self.validator.validate_cvae_gmm()
-        self.visualizer.visualize_cvae_gmm(y_hat, y, x_latent, x, nmi, likelihood, sub_ids)
-        print(f"GMM NMI: {nmi}, Likelihood: {likelihood}")
+        prior = getattr(self.model.cvae, "prior", "gmm")
+        if prior in ("hmm_gmm", "warm_hmm_gmm"):
+            nmi, log_pz, y_hat, y, mu, x, sub_ids, switch_rate, gmm_switch = (
+                self.validator.validate_cvae_hmm()
+            )
+            self.visualizer.visualize_cvae_hmm(y_hat, y, mu, x, nmi, log_pz, sub_ids, switch_rate)
+            print(
+                f"HMM-GMM NMI: {nmi}, log p(z_{{1:T}}): {log_pz}, "
+                f"HMM switch (per 100): {switch_rate}, GMM marginal switch (per 100): {gmm_switch}"
+            )
+        else:
+            nmi, likelihood, y_hat, y, x_latent, x, sub_ids, gmm_switch = (
+                self.validator.validate_cvae_gmm()
+            )
+            self.visualizer.visualize_cvae_gmm(y_hat, y, x_latent, x, nmi, likelihood, sub_ids)
+            print(f"GMM NMI: {nmi}, Likelihood: {likelihood}, switch rate (per 100): {gmm_switch}")
         
     
     ### private methods ###
@@ -338,6 +373,7 @@ class Orchestrator:
                         run=int(row["run"]),
                         remove_artifact=config.remove_artifact,
                         quality_filter=config.quality_filter,  # Pass through for reference
+                        signals=config.signals,
                     )
                 )
             )

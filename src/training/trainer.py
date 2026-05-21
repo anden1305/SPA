@@ -27,6 +27,8 @@ class Trainer:
         self.current_epoch = 0
         self.validator = validator
         self.early_stopping = create_early_stopper(self.config, self.global_config.verbose)
+        self._best_kmeans_nmi = -1.0
+        self._best_kmeans_epoch: int | None = None
     
     def __init_optimizer(self):
         if self.config.optimizer == "adam":
@@ -70,6 +72,8 @@ class Trainer:
             config=self.global_config.model_dump(),
         )
         self.__init_training()
+        self._best_kmeans_nmi = -1.0
+        self._best_kmeans_epoch = None
         for epoch in range(self.config.epochs):
             self.current_epoch = epoch
             for x, _, sub_ids in self.data_loader:
@@ -93,6 +97,7 @@ class Trainer:
             if self.config.validate_per_epoch > 0 and (epoch + 1) % self.config.validate_per_epoch == 0:
                 if isinstance(self.model, CVAEMARHMM) and self.model.training_pipeline == 'cvae':
                     self.validator.validate_cvae_epoch(epoch)
+                    self._maybe_save_best_kmeans_checkpoint(epoch)
                 else:
                     self.validator.validate_epoch(epoch, self.optimizer)
             lr = self.optimizer.param_groups[0].get('lr')
@@ -127,8 +132,32 @@ class Trainer:
         assert self.losses, "Training has not been run yet."
         return self.losses
     
+    def _maybe_save_best_kmeans_checkpoint(self, epoch: int) -> None:
+        """Save CVAE weights when latent KMeans NMI improves (pre-collapse checkpoint)."""
+        metrics = self.validator.validations.get(epoch, {})
+        nmi = metrics.get("cvae_latent_kmeans_nmi")
+        if nmi is None or nmi <= self._best_kmeans_nmi:
+            return
+        self._best_kmeans_nmi = float(nmi)
+        self._best_kmeans_epoch = epoch
+        out_dir = Path(self.global_config.results_dir) / self.global_config.run_name
+        out_dir.mkdir(parents=True, exist_ok=True)
+        path = out_dir / "cvae_best_kmeans_nmi.pth"
+        torch.save(self.model.state_dict(), path)
+        if self.global_config.verbose:
+            print(
+                f"Saved best KMeans-NMI checkpoint (NMI={nmi:.4f}, epoch={epoch + 1}) to {path}",
+                flush=True,
+            )
+
+    def get_best_kmeans_checkpoint_path(self) -> Path | None:
+        path = Path(self.global_config.results_dir) / self.global_config.run_name / "cvae_best_kmeans_nmi.pth"
+        return path if path.exists() else None
+
     def reset(self):
         self.current_epoch = 0
+        self._best_kmeans_nmi = -1.0
+        self._best_kmeans_epoch = None
         if self.config.early_stopping:
             self.early_stopping = create_early_stopper(self.config, self.global_config.verbose)
         else:

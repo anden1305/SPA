@@ -45,6 +45,10 @@ train_datasets:
   - type: mssv
     lab: lab_2
     remove_artifact: True
+    signals:
+      - EEG1
+      - EEG3
+      - EMG
     quality_filter:
       - sub-071
       - sub-072
@@ -55,6 +59,10 @@ train_datasets:
   - type: mssv
     lab: lab_3
     remove_artifact: True
+    signals:
+      - EEG1
+      - EEG2
+      - EMG
     quality_filter:
       - sub-038
       - sub-039
@@ -71,6 +79,10 @@ val_datasets:
   - type: mssv
     lab: lab_5
     remove_artifact: True
+    signals:
+      - EEG1
+      - EEG2
+      - EMG
     quality_filter:
       - sub-087
       - sub-088

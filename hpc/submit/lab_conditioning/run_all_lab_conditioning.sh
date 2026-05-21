@@ -8,20 +8,6 @@ mkdir -p hpc/output/lab_conditioning
 echo "Submitting Lab-Conditioning Experiments..."
 echo "=========================================="
 
-echo ""
-echo "Subjectwise Experiments:"
-echo "------------------------"
-bash hpc/submit/lab_conditioning/run_lab_conditioning_subjectwise.sh
-
-echo ""
-echo "Reliability Experiments:"
-echo "------------------------"
-bash hpc/submit/lab_conditioning/run_lab_conditioning_reliability.sh
-
-echo ""
-echo "Generalization Experiments:"
-echo "---------------------------"
-bash hpc/submit/lab_conditioning/run_lab_conditioning_generalization.sh
 
 echo ""
 echo "Lab-Only LOLO Experiments:"
@@ -32,6 +18,11 @@ echo ""
 echo "Lab+Subject LOLO Experiments:"
 echo "-----------------------------"
 bash hpc/submit/lab_conditioning/run_lab_conditioning_lab_and_subject_LOLO.sh
+
+echo ""
+echo "Lab+Subject LOLO Experiments:"
+echo "-----------------------------"
+bash hpc/submit/lab_conditioning/run_lab_conditioning_subject_only_LOLO.sh
 
 echo ""
 echo "=========================================="

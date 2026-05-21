@@ -91,10 +91,6 @@ train_datasets:
     id: sub-092
     run: 2
     remove_artifact: True
-  - type: mssv
-    id: sub-092
-    run: 3
-    remove_artifact: True
 
 val_datasets:
   - type: mssv
@@ -144,10 +140,6 @@ val_datasets:
   - type: mssv
     id: sub-092
     run: 2
-    remove_artifact: True
-  - type: mssv
-    id: sub-092
-    run: 3
     remove_artifact: True
 
 model:

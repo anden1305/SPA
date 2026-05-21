@@ -105,8 +105,45 @@ class Visualizer:
             f.write(f"Likelihood: {likelihood}\n")
         # write y_hat, y_true, x_latent to npz
         np.savez(path / "results.npz", y_hat=y_hat, y_true=y_true, x_latent=x_latent, x=x, sub_ids=sub_ids)
-        
-    
+
+    def visualize_cvae_hmm(
+        self,
+        y_hat,
+        y_true,
+        mu: torch.Tensor,
+        x: torch.Tensor,
+        nmi,
+        log_pz,
+        sub_ids,
+        switch_rate: float,
+    ):
+        path = Path(self.global_config.results_dir) / self.global_config.run_name / "plots"
+        path.mkdir(parents=True, exist_ok=True)
+        y_hat_np = y_hat.flatten().cpu().numpy()
+        y_true_np = y_true.flatten().cpu().numpy()
+        x_latent = mu.reshape(-1, mu.shape[-1]).detach().cpu().numpy()
+        sub_ids = self._subject_ids_for_export(sub_ids)
+        self.__plot_pca_tripanel(None, x=x_latent, y=y_true_np, overwrite_path=path, pred_y=y_hat_np)
+        with open(path / "metrics.txt", "w") as f:
+            f.write(f"NMI: {nmi}\n")
+            f.write(f"log p(z_1:T): {log_pz}\n")
+            f.write(f"HMM switch rate (per 100): {switch_rate}\n")
+            n_pred = len(np.unique(y_hat_np))
+            f.write(f"Predicted unique states: {n_pred}\n")
+        np.savez(
+            path / "results.npz",
+            y_hat=y_hat_np,
+            y_true=y_true_np,
+            x_latent=x_latent,
+            x=x,
+            sub_ids=sub_ids,
+        )
+        if type(self.model) == CVAEMARHMM:
+            try:
+                self.visualize_hmmgmm_trajectory(self.model, path)
+            except Exception as e:
+                print(f"Skipping HMM-GMM trajectory plot: {e}")
+
     def visualize_runs(self, train_details: list[TrainDetails], validations: dict[str, Any]):
         path = Path(self.global_config.results_dir) / self.global_config.run_name / "plots"
         path.mkdir(parents=True, exist_ok=True)
@@ -132,6 +169,48 @@ class Visualizer:
         self.__plot_feature_statistics(path=path)
         self.__plot_state_distinctness(path=path)
         self.__plot_pca_tripanel(train_details, x=x_latent, y=y, overwrite_path=path)
+
+        # Extra: temporal latent trajectory plot when an HMM-GMM prior is active.
+        if getattr(model.cvae, 'prior', None) in ('hmm_gmm', 'warm_hmm_gmm'):
+            try:
+                self.visualize_hmmgmm_trajectory(model, path)
+            except Exception as e:
+                print(f"Skipping HMM-GMM trajectory plot: {e}")
+
+    def visualize_hmmgmm_trajectory(self, model: CVAEMARHMM, path: Path):
+        """PCA scatter of the first validation sequence coloured by Viterbi state.
+
+        Saves to ``<path>/hmmgmm_trajectory.png``.
+        """
+        from sklearn.decomposition import PCA
+
+        x, _, sub_ids = self.data_loader.get_all_data()
+        if x.dim() != 4 or x.shape[1] < 2:
+            return  # need a temporal axis
+        model.prepare_for_inference()
+        with torch.no_grad():
+            y_hmm, _, mu = model.cvae.predict_hmm_labels(x, sub_ids)
+        mu_seq = mu[0].detach().cpu().numpy()   # (T, L)
+        labels = y_hmm[0].detach().cpu().numpy()  # (T,)
+
+        if mu_seq.shape[1] >= 2:
+            coords = PCA(n_components=2).fit_transform(mu_seq)
+        else:
+            coords = np.stack([mu_seq[:, 0], np.arange(mu_seq.shape[0]).astype(float)], axis=1)
+
+        fig, ax = plt.subplots(figsize=(7, 5))
+        scatter = ax.scatter(
+            coords[:, 0], coords[:, 1], c=labels, cmap='tab10', s=20, edgecolors='black', linewidths=0.2
+        )
+        ax.plot(coords[:, 0], coords[:, 1], color='gray', alpha=0.4, linewidth=0.8)
+        ax.set_title('cHMMGMVAE latent trajectory (val seq 0)')
+        ax.set_xlabel('PC1')
+        ax.set_ylabel('PC2')
+        cbar = fig.colorbar(scatter, ax=ax)
+        cbar.set_label('Viterbi state')
+        fig.tight_layout()
+        fig.savefig(path / 'hmmgmm_trajectory.png', dpi=150)
+        plt.close(fig)
     
     ####### HELPER METHODS #######
     
