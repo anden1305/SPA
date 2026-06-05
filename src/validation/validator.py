@@ -14,7 +14,24 @@ from src.models.base_model import BaseModel
 from src.models.cvae_mar_hmm import CVAEMARHMM
 from src.orchestrator.train_details import TrainDetails
 from src.helpers.state_distinctness import compute_state_distinctness
-from src.validation.hmmgmm_metrics import latent_autocorr, state_switch_rate
+from src.validation.hmmgmm_metrics import (
+    checkpoint_score,
+    entropy_norm,
+    latent_autocorr,
+    state_switch_rate,
+)
+
+# Post-train prior predictions (GMM marginal or HMM Viterbi) — paper / sweep objective.
+PRIOR_PRED_NMI_KEY = "prior_pred_nmi"
+PRIOR_PRED_VALIDATION_EPOCH = 10**9
+PRIOR_PRED_NMI_SWEEP_METRIC = "val/prior_pred_nmi"
+
+
+def record_prior_pred_nmi_on_train_details(train_details: Any, nmi: float) -> None:
+    """Attach post-train prior-prediction NMI for sweep aggregation and validations.json."""
+    train_details.validations[PRIOR_PRED_VALIDATION_EPOCH] = {
+        PRIOR_PRED_NMI_KEY: float(nmi),
+    }
 
 
 class Validator:
@@ -265,19 +282,64 @@ class Validator:
             except Exception as e:
                 print(f"Skipping latent autocorr: {e}")
 
-        # Prior-specific Viterbi switch rate when an HMM-GMM prior is in use.
-        prior_name = getattr(self.model.cvae, 'prior', None)
-        if prior_name in ('hmm_gmm', 'warm_hmm_gmm'):
-            try:
-                with torch.no_grad():
-                    y_hmm, _, _ = self.model.cvae.predict_hmm_labels(x, sub_ids)
-                self.validations[epoch]['hmm_switch_rate_per100'] = state_switch_rate(y_hmm)
-                print(f"HMM Viterbi switch rate (per 100): "
-                      f"{self.validations[epoch]['hmm_switch_rate_per100']:.4f}")
-            except Exception as e:
-                print(f"Skipping HMM switch rate: {e}")
+        self._validate_cvae_prior_metrics(epoch, x, y, sub_ids)
 
         self.model.prepare_for_training()
+
+    def _validate_cvae_prior_metrics(
+        self,
+        epoch: int,
+        x: torch.Tensor,
+        y: torch.Tensor,
+        sub_ids: torch.Tensor,
+    ) -> None:
+        """Prior predictions, collapse metrics, and thesis checkpoint score S(e)."""
+        k_pred = self.data_loader.get_num_states()
+        prior_name = getattr(self.model.cvae, "prior", None)
+        cs_cfg = self.global_config.trainer.checkpoint_score
+        beta = cs_cfg.beta
+
+        with torch.no_grad():
+            val_nll, _ = self.model.forward(x, sub_ids, epoch)
+        log_likelihood = float(-val_nll.item())
+        self.validations[epoch]["log_likelihood"] = log_likelihood
+
+        try:
+            with torch.no_grad():
+                if prior_name in ("hmm_gmm", "warm_hmm_gmm"):
+                    y_hat, _, _ = self.model.cvae.predict_hmm_labels(x, sub_ids)
+                else:
+                    _, y_hat, _ = self.model.predict_gmm(
+                        x, sub_ids, initialize_if_needed=True
+                    )
+        except Exception as e:
+            print(f"Skipping CVAE prior metrics at epoch {epoch + 1}: {e}")
+            return
+
+        y_np = y.detach().cpu().numpy().flatten()
+        preds_np = y_hat.detach().cpu().numpy().flatten()
+        prior_nmi = float(calculate_nmi(preds_np, y_np))
+        ent_norm = entropy_norm(preds_np, k_pred)
+        score = checkpoint_score(log_likelihood, ent_norm, beta=beta)
+
+        self.validations[epoch][PRIOR_PRED_NMI_KEY] = prior_nmi
+        self.validations[epoch]["entropy_norm"] = ent_norm
+        self.validations[epoch]["checkpoint_score"] = score
+        self.validations[epoch]["n_unique_pred_states"] = int(len(np.unique(preds_np)))
+
+        if y_hat.dim() == 2 and y_hat.shape[1] > 1:
+            switch = state_switch_rate(y_hat)
+            self.validations[epoch]["prior_switch_rate_per100"] = switch
+        else:
+            self.validations[epoch]["prior_switch_rate_per100"] = 0.0
+
+        if self.global_config.verbose:
+            sw = self.validations[epoch]["prior_switch_rate_per100"]
+            print(
+                f"Prior val — NMI: {prior_nmi:.4f}, log-lik: {log_likelihood:.4f}, "
+                f"H_norm: {ent_norm:.4f}, S: {score:.4f}, n_states: "
+                f"{self.validations[epoch]['n_unique_pred_states']}, switch/100: {sw:.4f}"
+            )
     
     @staticmethod
     def _log_prior_label_stats(y_hat: torch.Tensor, y_true: torch.Tensor, prefix: str) -> None:

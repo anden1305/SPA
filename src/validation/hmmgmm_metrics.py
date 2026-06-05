@@ -1,6 +1,7 @@
-"""Trajectory metrics for HMM-GMM-VAE latent sequences."""
+"""Trajectory and collapse metrics for HMM-GMM-VAE."""
 from __future__ import annotations
 
+import numpy as np
 import torch
 
 
@@ -50,4 +51,43 @@ def latent_autocorr(mu: torch.Tensor, lag: int = 1) -> float:
     return float(rho.item())
 
 
-__all__ = ["state_switch_rate", "latent_autocorr"]
+def state_entropy(predictions: np.ndarray, num_states: int) -> float:
+    """Shannon entropy (nats) of the empirical state histogram."""
+    counts = np.bincount(predictions.astype(int), minlength=num_states)
+    total = counts.sum()
+    if total == 0:
+        return 0.0
+    probs = counts / total
+    entropy = 0.0
+    for p in probs:
+        if p > 0:
+            entropy -= p * np.log(p)
+    return float(entropy)
+
+
+def entropy_norm(predictions: np.ndarray, k_pred: int) -> float:
+    """H(Y_hat) / log(K_pred) in [0, 1]; 0 = single-state collapse."""
+    if k_pred <= 1:
+        return 0.0
+    h_max = np.log(k_pred)
+    if h_max <= 0:
+        return 0.0
+    return state_entropy(predictions, k_pred) / h_max
+
+
+def checkpoint_score(
+    log_likelihood: float,
+    entropy_norm_val: float,
+    beta: float = 0.9,
+) -> float:
+    """Thesis composite S(e) = beta * omega + (1 - beta) * H_norm."""
+    return float(beta * log_likelihood + (1.0 - beta) * entropy_norm_val)
+
+
+__all__ = [
+    "state_switch_rate",
+    "latent_autocorr",
+    "state_entropy",
+    "entropy_norm",
+    "checkpoint_score",
+]

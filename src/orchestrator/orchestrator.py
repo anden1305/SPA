@@ -22,7 +22,10 @@ from src.models.cvae_mar_hmm import CVAEMARHMM
 from src.models.vae import ConditionalVAE
 from src.orchestrator.train_details import TrainDetails
 from src.training.trainer import Trainer
-from src.validation.validator import Validator
+from src.validation.validator import (
+    Validator,
+    record_prior_pred_nmi_on_train_details,
+)
 from src.helpers.profiling import write_cprofile_outputs
 from src.visuals.visualizer import Visualizer
 import matplotlib.pyplot as plt
@@ -129,6 +132,9 @@ class Orchestrator:
         if manifest.exists():
             path = Path(manifest.read_text().strip())
             return path if path.exists() else None
+        score = ckpt_dir / "cvae_best_checkpoint_score.pth"
+        if score.exists():
+            return score
         best = ckpt_dir / "cvae_best_kmeans_nmi.pth"
         if best.exists():
             return best
@@ -286,22 +292,44 @@ class Orchestrator:
                 run_ckpt_path = ckpt_dir / "cvae_final_model.pth"
                 torch.save(self.model.state_dict(), run_ckpt_path)
                 self._save_cvae_checkpoint_to_config_path()
+                prior_nmi: float | None = None
                 try:
-                    validation_ckpt = self.trainer.get_best_kmeans_checkpoint_path() or run_ckpt_path
-                    if validation_ckpt == self.trainer.get_best_kmeans_checkpoint_path():
+                    cs_enabled = self.global_config.trainer.checkpoint_score.enabled
+                    score_ckpt = self.trainer.get_best_checkpoint_score_path()
+                    kmeans_ckpt = self.trainer.get_best_kmeans_checkpoint_path()
+                    if cs_enabled and score_ckpt is not None:
+                        validation_ckpt = score_ckpt
+                        best_ep = getattr(self.trainer, "_best_checkpoint_score_epoch", None)
+                        print(
+                            f"Validating with best checkpoint-score: {validation_ckpt} "
+                            f"(epoch {(best_ep + 1) if best_ep is not None else '?'})"
+                        )
+                    elif kmeans_ckpt is not None:
+                        validation_ckpt = kmeans_ckpt
                         best_ep = getattr(self.trainer, "_best_kmeans_epoch", None)
-                        ep_disp = (best_ep + 1) if best_ep is not None else "?"
                         print(
                             f"Validating with best KMeans-NMI checkpoint: {validation_ckpt} "
-                            f"(epoch {ep_disp})"
+                            f"(epoch {(best_ep + 1) if best_ep is not None else '?'})"
                         )
                     else:
+                        validation_ckpt = run_ckpt_path
                         print(f"Validating with final run checkpoint: {validation_ckpt}")
                     (ckpt_dir / "validation_checkpoint.txt").write_text(str(validation_ckpt))
                     self._load_cvae_checkpoint_from(validation_ckpt)
-                    self.predict_cvae()
+                    prior_nmi = self.predict_cvae()
+                    if train_details is not None and prior_nmi is not None:
+                        record_prior_pred_nmi_on_train_details(train_details, prior_nmi)
+                        self.__save_info(train_details=train_details)
                 except Exception as e:
                     print(f"Warning: validation after CVAE run {self.run_number} failed: {e}")
+                finally:
+                    from src.validation.validator import PRIOR_PRED_NMI_KEY
+
+                    extra: dict[str, float | int] = {}
+                    if prior_nmi is not None:
+                        extra["val/prior_pred_nmi"] = prior_nmi
+                        extra[PRIOR_PRED_NMI_KEY] = prior_nmi
+                    self.trainer.finalize_wandb(extra)
             
             if self.global_config.cvae.training_pipeline in ['marhmm', 'cvae_then_marhmm']:
                 self.model.training_pipeline = 'marhmm'
@@ -320,7 +348,11 @@ class Orchestrator:
         self._summarize_cvae_run_metrics()
     
     
-    def predict_cvae(self):
+    def predict_cvae(self) -> float | None:
+        """Validate CVAE with the prior's predictions (GMM marginal or HMM Viterbi).
+
+        Returns validation NMI (same quantity written to ``plots/metrics.txt``).
+        """
         loaded = self._load_cvae_checkpoint_if_available()
         if not loaded:
             raise FileNotFoundError(
@@ -348,6 +380,7 @@ class Orchestrator:
                 y_hat, y, x_latent, x, nmi, likelihood, sub_ids, run_number=self.run_number
             )
             print(f"GMM NMI: {nmi}, Likelihood: {likelihood}, switch rate (per 100): {gmm_switch}")
+        return float(nmi)
 
     def validate_all_cvae_runs(self):
         """GMM-validate every per-run checkpoint under the current run_name (no retraining)."""

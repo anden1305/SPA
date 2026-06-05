@@ -29,6 +29,9 @@ class Trainer:
         self.early_stopping = create_early_stopper(self.config, self.global_config.verbose)
         self._best_kmeans_nmi = -1.0
         self._best_kmeans_epoch: int | None = None
+        self._best_checkpoint_score = float("-inf")
+        self._best_checkpoint_score_epoch: int | None = None
+        self._experiment_logger = None
         self.results_run_subdir: str | None = None
 
     def _checkpoint_dir(self) -> Path:
@@ -77,6 +80,7 @@ class Trainer:
         if self.global_config.verbose:
             self.__print_training_start()
         logger = create_logger(self.global_config)
+        self._experiment_logger = logger
         logger.start(
             run_name=self.global_config.run_name,
             config=self.global_config.model_dump(),
@@ -84,6 +88,8 @@ class Trainer:
         self.__init_training()
         self._best_kmeans_nmi = -1.0
         self._best_kmeans_epoch = None
+        self._best_checkpoint_score = float("-inf")
+        self._best_checkpoint_score_epoch = None
         for epoch in range(self.config.epochs):
             self.current_epoch = epoch
             skipped_batches = 0
@@ -143,6 +149,7 @@ class Trainer:
                 if isinstance(self.model, CVAEMARHMM) and self.model.training_pipeline == 'cvae':
                     self.validator.validate_cvae_epoch(epoch)
                     self._maybe_save_best_kmeans_checkpoint(epoch)
+                    self._maybe_save_best_checkpoint_score(epoch)
                 else:
                     self.validator.validate_epoch(epoch, self.optimizer)
             lr = self.optimizer.param_groups[0].get('lr')
@@ -162,7 +169,14 @@ class Trainer:
             self.epoch_regularization_losses.clear()
             if self.global_config.verbose:
                 self.__print_epoch()
-        logger.finish()
+        self._log_wandb_training_summary()
+        if self._experiment_logger is not None:
+            defer = (
+                isinstance(self.model, CVAEMARHMM)
+                and self.model.training_pipeline == "cvae"
+            )
+            if not defer:
+                self.finalize_wandb()
     
     def train_profiled(self, out_dir: str | Path, *, basename: str = "train", sort: str = "cumulative") -> None:
         prof = cProfile.Profile()
@@ -197,10 +211,62 @@ class Trainer:
         path = self._checkpoint_dir() / "cvae_best_kmeans_nmi.pth"
         return path if path.exists() else None
 
+    def _checkpoint_score_warmup_epoch(self) -> int:
+        frac = self.config.checkpoint_score.warmup_frac
+        return int(frac * self.config.epochs)
+
+    def _maybe_save_best_checkpoint_score(self, epoch: int) -> None:
+        if not self.config.checkpoint_score.enabled:
+            return
+        if epoch < self._checkpoint_score_warmup_epoch():
+            return
+        metrics = self.validator.validations.get(epoch, {})
+        score = metrics.get("checkpoint_score")
+        if score is None or score <= self._best_checkpoint_score:
+            return
+        self._best_checkpoint_score = float(score)
+        self._best_checkpoint_score_epoch = epoch
+        path = self._checkpoint_dir() / "cvae_best_checkpoint_score.pth"
+        torch.save(self.model.state_dict(), path)
+        if self.global_config.verbose:
+            print(
+                f"Saved best checkpoint-score S={score:.4f} (epoch={epoch + 1}) to {path}",
+                flush=True,
+            )
+
+    def get_best_checkpoint_score_path(self) -> Path | None:
+        path = self._checkpoint_dir() / "cvae_best_checkpoint_score.pth"
+        return path if path.exists() else None
+
+    def _log_wandb_training_summary(self) -> None:
+        logger = self._experiment_logger
+        if logger is None:
+            return
+        summary: dict[str, float | int] = {}
+        if self._best_kmeans_epoch is not None:
+            summary["val/best_kmeans_nmi"] = self._best_kmeans_nmi
+            summary["val/best_kmeans_nmi_epoch"] = self._best_kmeans_epoch + 1
+        if self._best_checkpoint_score_epoch is not None:
+            summary["val/best_checkpoint_score"] = self._best_checkpoint_score
+            summary["val/best_checkpoint_score_epoch"] = self._best_checkpoint_score_epoch + 1
+        if summary:
+            logger.update_summary(summary)
+
+    def finalize_wandb(self, extra_summary: dict[str, float | int] | None = None) -> None:
+        logger = self._experiment_logger
+        if logger is None:
+            return
+        if extra_summary:
+            logger.update_summary(extra_summary)
+        logger.finish()
+        self._experiment_logger = None
+
     def reset(self):
         self.current_epoch = 0
         self._best_kmeans_nmi = -1.0
         self._best_kmeans_epoch = None
+        self._best_checkpoint_score = float("-inf")
+        self._best_checkpoint_score_epoch = None
         if self.config.early_stopping:
             self.early_stopping = create_early_stopper(self.config, self.global_config.verbose)
         else:

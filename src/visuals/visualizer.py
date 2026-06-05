@@ -46,6 +46,11 @@ class Visualizer:
             ids = ids[..., 0]
         return ids.flatten().cpu().numpy()
 
+    def _save_results_npz(self, path: Path, **arrays) -> None:
+        if not self.config.save_results_npz:
+            return
+        np.savez(path / "results.npz", **arrays)
+
     def _plots_path(self, run_number: int | None = None) -> Path:
         """Per-run plot directory when run_number is set (avoids overwriting multi-seed CVAE runs)."""
         base = Path(self.global_config.results_dir) / self.global_config.run_name
@@ -98,7 +103,9 @@ class Visualizer:
             self.__plot_learning_rate(train_details)
         y_hat = train_details.get_trained_predictions()
         subject_ids = self._subject_ids_for_export(subject_ids)
-        np.savez(path / "results.npz", y_hat=y_hat, y_true=y, x_latent=x, x=x_non_norm, sub_ids=subject_ids)
+        self._save_results_npz(
+            path, y_hat=y_hat, y_true=y, x_latent=x, x=x_non_norm, sub_ids=subject_ids
+        )
     
     
     def visualize_cvae_gmm(self, y_hat, y_true, x_latent: torch.Tensor, x: torch.Tensor, nmi, likelihood, sub_ids, run_number: int | None = None):
@@ -107,13 +114,14 @@ class Visualizer:
         y_true = y_true.flatten().cpu().numpy()
         x_latent = x_latent.detach().cpu().numpy()
         sub_ids = self._subject_ids_for_export(sub_ids)
-        self.__plot_pca_tripanel(None, x=x_latent, y=y_true, overwrite_path=path, pred_y=y_hat)
-        # write a txt file with nmi and likelihood
+        if self.config.pca_tripanel:
+            self.__plot_pca_tripanel(None, x=x_latent, y=y_true, overwrite_path=path, pred_y=y_hat)
         with open(path / "metrics.txt", "w") as f:
             f.write(f"NMI: {nmi}\n")
             f.write(f"Likelihood: {likelihood}\n")
-        # write y_hat, y_true, x_latent to npz
-        np.savez(path / "results.npz", y_hat=y_hat, y_true=y_true, x_latent=x_latent, x=x, sub_ids=sub_ids)
+        self._save_results_npz(
+            path, y_hat=y_hat, y_true=y_true, x_latent=x_latent, x=x, sub_ids=sub_ids
+        )
 
     def visualize_cvae_hmm(
         self,
@@ -132,22 +140,23 @@ class Visualizer:
         y_true_np = y_true.flatten().cpu().numpy()
         x_latent = mu.reshape(-1, mu.shape[-1]).detach().cpu().numpy()
         sub_ids = self._subject_ids_for_export(sub_ids)
-        self.__plot_pca_tripanel(None, x=x_latent, y=y_true_np, overwrite_path=path, pred_y=y_hat_np)
+        if self.config.pca_tripanel:
+            self.__plot_pca_tripanel(None, x=x_latent, y=y_true_np, overwrite_path=path, pred_y=y_hat_np)
         with open(path / "metrics.txt", "w") as f:
             f.write(f"NMI: {nmi}\n")
             f.write(f"log p(z_1:T): {log_pz}\n")
             f.write(f"HMM switch rate (per 100): {switch_rate}\n")
             n_pred = len(np.unique(y_hat_np))
             f.write(f"Predicted unique states: {n_pred}\n")
-        np.savez(
-            path / "results.npz",
+        self._save_results_npz(
+            path,
             y_hat=y_hat_np,
             y_true=y_true_np,
             x_latent=x_latent,
             x=x,
             sub_ids=sub_ids,
         )
-        if type(self.model) == CVAEMARHMM:
+        if type(self.model) == CVAEMARHMM and self.config.pca_tripanel:
             try:
                 self.visualize_hmmgmm_trajectory(self.model, path)
             except Exception as e:
