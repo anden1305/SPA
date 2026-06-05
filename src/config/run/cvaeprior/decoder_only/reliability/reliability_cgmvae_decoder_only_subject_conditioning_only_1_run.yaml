@@ -30,7 +30,7 @@ visualizer:
   summary_statistics: True
   historic_values: True
 dataloader:
-  num_batches: 64
+  num_batches: 64 # EXPERIMENTAL
   batch_size: 128
   validation_batch_size: 128
   window_size: 512
@@ -192,9 +192,10 @@ val_datasets:
 model:
   type: cvae_marhmm
   covariance_type: full
-  init_strategy: random_uniform
+  init_strategy: random_uniform # EXPERIMENTAL
   init_noisy: true
   features: false
+  conditioning_source: subject
   params:
     
     # MARHMM parameters
@@ -206,26 +207,28 @@ model:
     
     # CVAE parameters
     # weights
-    latent_dim: 8
-    enc_hidden_dims: [256, 128]
-    dec_hidden_dims: [128, 256]
-    conv_channels: [32, 64, 128, 128]
-    kernel_sizes:  [7, 5, 5, 3]
-    strides:       [2, 2, 2, 2]
-    paddings:      [3, 2, 2, 1]
-    emb_dim: 4
-    use_rms: False
+    latent_dim: 8 # FIXED
+    enc_hidden_dims: [256, 128] # FIXED
+    dec_hidden_dims: [128, 256] # FIXED
+    conv_channels: [32, 64, 128, 128] # FIXED
+    kernel_sizes:  [7, 5, 5, 3] # FIXED
+    strides:       [2, 2, 2, 2] # FIXED
+    paddings:      [3, 2, 2, 1] # FIXED
+    emb_dim: 4 # FIXED
+    decoder_only_conditioning: true # FIXED
+    use_rms: False # FIXED
     # prior
-    prior: gmm
-    min_beta: 0.01
-    max_beta: 1.0
-    beta_warmup_epochs: 0
-    beta_slowdown_epochs: 0
-    gmm_warmup_epochs: 0
-    free_nats_per_dim: 0.00
-    no_beta_epochs: 10
+    prior: gmm # FIXED
+    min_beta: 0.01 # FIXED
+    max_beta: 1.0 # FIXED
+    beta_warmup_epochs: 0 # FIXED
+    beta_slowdown_epochs: 0 # FIXED
+    gmm_warmup_epochs: 0 # FIXED
+    free_nats_per_dim: 0.00 # FIXED
+    no_beta_epochs: 10 # FIXED
 
 cvae:
+  feature_pipeline: fft
   normalize_global: False # FIXED
   pre_normalize: False # FIXED
   post_normalize: True # FIXED
@@ -234,13 +237,17 @@ cvae:
   band_pass_filter_fft: True # FIXED
   band_pass_freqs: [[null, 20.0], [null, 20.0], [5.0, 60.0]] # FIXED
   band_pass_filter_type: frequency_domain # FIXED
-  traning_pipeline: cvae_then_marhmm
+  traning_pipeline: cvae
+  # Read-only seed weights (sorted 0..N-1 subject indices). Not overwritten by reliability finetune.
+  pretrained_checkpoint_path: results/decoder_only/cvae_final_decoder_only/cvae_decoder_only_model.pth
   model_checkpoint_path: null
-  reinit_marhmm: False
+  save_pretrained_checkpoint: false
+  reinit_marhmm: false
 
 verbose: True
 seed: 123
-results_dir: results/training/cvae
-run_name: cvae_final
-runs: 1
+results_dir: results/decoder_only/reliability/cgmvae_decoder_only
+run_name: reliability_cgmvae_decoder_only_mssv_frequency
+append_run_timestamp: true
+runs: 10
 validate_data: True
