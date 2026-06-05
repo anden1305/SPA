@@ -1,0 +1,265 @@
+# Thesis-style reliability: lab_3 mice only, subject + decoder-only conditioning.
+# Matches reliability_cgmvae_decoder_only_subject_conditioning.yaml (seq1, batch 128,
+# train=val cohort, 10 runs) but uses warm_hmm_gmm prior and chmm tune-winner model
+# hyperparams (5bkceef8) with subject conditioning (not subject_lab).
+#
+# Compare Pred. NMI to table row "cGMVAE Prior Decoder" (~0.725 subject scope).
+# After train_vae: HMM Viterbi validation via predict_cvae (automatic).
+
+trainer:
+  epochs: 80
+  learning_rate: 0.0014
+  optimizer: adam
+  grad_clip: 0.5
+  validate_per_epoch: 1
+  early_stopping:
+    enabled: false
+    patience: 100
+    min_delta: 0.001
+  scheduler:
+    enabled: false
+    type: exponential
+    step_size: Null
+    gamma: 0.99
+
+validator:
+  nmi: True
+  accuracy: True
+  cross_nmi: True
+  learning_rate: True
+  state_distinctness: True
+  summary_statistics: True
+  log_likelihood: True
+
+visualizer:
+  losses: True
+  learning_rate: True
+  pca_tripanel: True
+  confusion_matrix: True
+  state_distinctness: True
+  summary_statistics: True
+  historic_values: True
+
+dataloader:
+  num_batches: 64
+  batch_size: 128
+  validation_batch_size: 128
+  window_size: 512
+  stride: 512
+  sequence_length: 1
+  shuffle: True
+  normalize: True
+  use_legacy: False
+  transforms: []
+
+train_datasets:
+  - type: mssv
+    id: sub-038
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-038
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-039
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-039
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-039
+    run: 3
+    remove_artifact: True
+  - type: mssv
+    id: sub-041
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-041
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-041
+    run: 3
+    remove_artifact: True
+  - type: mssv
+    id: sub-043
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-048
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-048
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-048
+    run: 3
+    remove_artifact: True
+  - type: mssv
+    id: sub-054
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-054
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-056
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-059
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-060
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-069
+    run: 1
+    remove_artifact: True
+
+val_datasets:
+  - type: mssv
+    id: sub-038
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-038
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-039
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-039
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-039
+    run: 3
+    remove_artifact: True
+  - type: mssv
+    id: sub-041
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-041
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-041
+    run: 3
+    remove_artifact: True
+  - type: mssv
+    id: sub-043
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-048
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-048
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-048
+    run: 3
+    remove_artifact: True
+  - type: mssv
+    id: sub-054
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-054
+    run: 2
+    remove_artifact: True
+  - type: mssv
+    id: sub-056
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-059
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-060
+    run: 1
+    remove_artifact: True
+  - type: mssv
+    id: sub-069
+    run: 1
+    remove_artifact: True
+
+model:
+  type: cvae_marhmm
+  covariance_type: full
+  init_strategy: random_uniform
+  init_noisy: true
+  features: false
+  conditioning_source: subject
+  params:
+    lags: [1, 2, 4]
+    ridge: 0.18
+    var_reg: 0.016
+    sticky_coef: 0.1
+    sticky_kappa: 0.9
+    # latent 8 / emb 4: match cvae_baseline so pretrained checkpoint loads
+    latent_dim: 8
+    enc_hidden_dims: [256, 128]
+    dec_hidden_dims: [128, 256]
+    conv_channels: [32, 64, 128, 128]
+    kernel_sizes: [7, 5, 5, 3]
+    strides: [2, 2, 2, 2]
+    paddings: [3, 2, 2, 1]
+    emb_dim: 4
+    decoder_only_conditioning: true
+    use_rms: False
+    prior: warm_hmm_gmm
+    num_gmm_states: 3
+    gmm_warmup_epochs: 18
+    hmm_warmup_epochs: 37
+    hmm_transition_ramp_epochs: 18
+    hmm_sticky_kappa: 0.86
+    hmm_estimate_transitions: true
+    min_beta: 0.016
+    max_beta: 1.0
+    beta_schedule: anneal
+    beta_cyclical_period_epochs: 40
+    beta_warmup_epochs: 0
+    beta_slowdown_epochs: 0
+    free_nats_per_dim: 0.0
+    no_beta_epochs: 10
+
+cvae:
+  feature_pipeline: fft
+  normalize_global: False
+  pre_normalize: False
+  post_normalize: True
+  percentile_clip_channels: False
+  perform_hanning_window: False
+  band_pass_filter_fft: True
+  band_pass_freqs: [[null, 20.0], [null, 20.0], [5.0, 60.0]]
+  band_pass_filter_type: frequency_domain
+  training_pipeline: cvae
+  pretrained_checkpoint_path: results/decoder_only/cvae_final_decoder_only/cvae_decoder_only_model.pth
+  model_checkpoint_path: null
+  save_pretrained_checkpoint: false
+  reinit_marhmm: false
+
+verbose: True
+seed: 123
+results_dir: results/decoder_only/reliability/chmmgmvae_decoder_only_lab3
+run_name: reliability_chmmgmvae_decoder_only_lab3_thesis_style
+append_run_timestamp: true
+runs: 10
+validate_data: True

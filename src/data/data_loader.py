@@ -108,6 +108,7 @@ class DataLoader(Iterator):
         # flip axis 0 and 1 if data is raw
         if x.shape[0] == 1:
             x = x.transpose(1, 0, 2)
+        x_non_norm = x.copy()
         # normalize data
         if self.normalize:
             x = (x - x.mean(axis=(0,1))) / x.std(axis=(0,1))
@@ -121,15 +122,19 @@ class DataLoader(Iterator):
             raise ValueError(f"Dataset size {x.shape[0]} is smaller than batch size {batch_size}.")
         # trim data to have full batches only
         x = x[:num_full_batches * batch_size]
+        x_non_norm = x_non_norm[:num_full_batches * batch_size]
         y = y[:num_full_batches * batch_size * x.shape[1]]
         # reshape data so that each batch is a continuous segment of the original data
         x = x.reshape((num_full_batches, batch_size*x.shape[1], x.shape[2]))
+        x_non_norm = x_non_norm.reshape((num_full_batches, batch_size*x_non_norm.shape[1], x_non_norm.shape[2]))
         y = y.reshape((num_full_batches, y.shape[0] // num_full_batches))
         # make data contiguous in memory
         x = np.ascontiguousarray(x)
+        x_non_norm = np.ascontiguousarray(x_non_norm)
         y = np.ascontiguousarray(y)
         # store data
         self.data = (x, y)
+        self.x_non_norm = x_non_norm
         self.__print_data_info()
 
     def __init_transforms(self, transform_configs: list[TransformsConfig]):

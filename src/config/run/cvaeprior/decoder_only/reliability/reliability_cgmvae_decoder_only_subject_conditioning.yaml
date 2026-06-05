@@ -195,6 +195,7 @@ model:
   init_strategy: random_uniform # EXPERIMENTAL
   init_noisy: true
   features: false
+  conditioning_source: subject
   params:
     
     # MARHMM parameters
@@ -227,6 +228,7 @@ model:
     no_beta_epochs: 10 # FIXED
 
 cvae:
+  feature_pipeline: fft
   normalize_global: False # FIXED
   pre_normalize: False # FIXED
   post_normalize: True # FIXED
@@ -236,12 +238,16 @@ cvae:
   band_pass_freqs: [[null, 20.0], [null, 20.0], [5.0, 60.0]] # FIXED
   band_pass_filter_type: frequency_domain # FIXED
   training_pipeline: cvae
-  model_checkpoint_path: results/decoder_only/cvae_final_decoder_only/cvae_decoder_only_model.pth
+  # Read-only seed weights (sorted 0..N-1 subject indices). Not overwritten by reliability finetune.
+  pretrained_checkpoint_path: results/decoder_only/cvae_final_decoder_only/cvae_decoder_only_model.pth
+  model_checkpoint_path: null
+  save_pretrained_checkpoint: false
   reinit_marhmm: false
 
 verbose: True
 seed: 123
 results_dir: results/decoder_only/reliability/cgmvae_decoder_only
 run_name: reliability_cgmvae_decoder_only_mssv_frequency
+append_run_timestamp: true
 runs: 10
 validate_data: True

@@ -1,0 +1,52 @@
+---
+description: HPC bsub — keep user informed; never block on long queues
+alwaysApply: true
+---
+
+# HPC job communication (bsub / batch)
+
+When submitting or monitoring batch jobs, **the user stays in control**. Do not leave them in limbo.
+
+## Before submitting
+
+- Say **what** will run (script path, job count, queue/walltime if known).
+- List **where outputs go** before `bsub`:
+  - **LSF logs:** path pattern with `%J` → e.g. `hpc/output/cv4fold/vae/<JOBID>.out` and `.err` under repo root.
+  - **Science results:** `results_dir` / `run_name` from the YAML (timestamped subdir after train).
+- If the user did not ask to submit, **ask** or give the exact command — do not submit silently unless they explicitly requested it.
+
+## After submitting
+
+- Report each **JOBID** and **job name** (`bjobs` / script stdout).
+- Give **copy-paste monitor commands** (do not run long polls yourself):
+
+```bash
+bjobs -u $USER                    # queue status
+bjobs -J <job_name>               # one job family
+tail -f hpc/output/.../<JOBID>.out
+```
+
+- State that **PEND can last hours** on busy queues; the agent does not wait for completion unless the user asks to check status once.
+
+## While jobs run
+
+- **Do not** loop `sleep` / `Await` for minutes waiting for batch jobs to finish.
+- **Do not** background a long poll and disappear without telling the user what to run and where logs live.
+- If checking status: one quick `bjobs` or `tail` snapshot, then report findings and hand control back.
+
+## When jobs finish (user or one-off check)
+
+- Point to **LSF log** (`*.out` / `*.err`) for errors.
+- Point to **result directory** (e.g. `results/cv4fold/.../<run_name>_<timestamp>/`) and any postprocess artifacts (`per_mouse/`, `val_nmi_by_lab.csv`, `summary.csv`).
+- If postprocess is manual, list the exact commands once.
+
+## Project conventions (SPA)
+
+| Job type | LSF stdout/stderr | Training results |
+|----------|-------------------|------------------|
+| cv4fold VAE | `hpc/output/cv4fold/vae/%J.out` | `results/cv4fold/<experiment>/<model>/joint/fold_k/<run_name>_*` |
+| cv4fold HMM raw | `hpc/output/cv4fold/hmm_raw/%J.out` | same pattern under `results/cv4fold/` |
+| preprocessing audit | `preprocessing_audit_%J.out` (repo root or script dir) | `results/preprocessing_audit/` |
+| pytest | `hpc/submit/run_pytest.sh` output path in script | n/a |
+
+Walltime and queue are set per submit script; mention them when submitting.

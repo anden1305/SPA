@@ -2,6 +2,7 @@
 
 import copy
 import json
+import re
 from pathlib import Path
 import datetime
 import uuid
@@ -38,22 +39,47 @@ class Orchestrator:
     
     ### public methods ###
 
-    def _load_cvae_checkpoint_if_available(self) -> bool:
-        """Load configured CVAE checkpoint if present. Returns True when loaded."""
-        checkpoint_path = self.global_config.cvae.model_checkpoint_path
-        if checkpoint_path is None:
-            return False
+    def _pretrained_checkpoint_path(self) -> Path | None:
+        """Checkpoint used to seed each train_vae run (never written unless explicitly enabled)."""
+        raw = self.global_config.cvae.pretrained_checkpoint_path
+        if raw is None:
+            raw = self.global_config.cvae.model_checkpoint_path
+        return Path(raw) if raw else None
 
-        checkpoint = Path(checkpoint_path)
-        if not checkpoint.exists():
-            print(f"CVAE checkpoint not found at {checkpoint_path}; continuing without loading.")
-            return False
+    def _remap_subject_embedding_state(self, cvae_state: dict) -> dict:
+        """Map legacy subject_emb rows (sub-NNN index) onto current 0..N-1 conditioning indices."""
+        key = "subject_emb.weight"
+        if key not in cvae_state or not hasattr(self.model.cvae, "subject_emb"):
+            return cvae_state
 
-        print(f"Loading CVAE model from checkpoint: {checkpoint_path}")
-        state = torch.load(checkpoint, map_location="cpu")
-        cvae_state = {k[len("cvae."):]: v for k, v in state.items() if k.startswith("cvae.")}
+        old_emb = cvae_state[key]
+        new_n = self.model.cvae.subject_emb.num_embeddings
+        if old_emb.shape[0] == new_n:
+            return cvae_state
+
+        subject_map = self.train_loader.get_subject_map()
+        new_emb = torch.zeros((new_n, old_emb.shape[1]), dtype=old_emb.dtype)
+        for subject_id, new_idx in subject_map.items():
+            match = re.search(r"\d+", str(subject_id))
+            if not match:
+                continue
+            old_idx = int(match.group())
+            if 0 <= old_idx < old_emb.shape[0]:
+                new_emb[new_idx] = old_emb[old_idx]
+
+        remapped = dict(cvae_state)
+        remapped[key] = new_emb
+        if self.global_config.verbose:
+            print(
+                f"Remapped subject_emb from {old_emb.shape[0]} rows (legacy indices) "
+                f"to {new_n} rows (sorted dataset indices).",
+                flush=True,
+            )
+        return remapped
+
+    def _apply_cvae_state(self, cvae_state: dict) -> None:
+        cvae_state = self._remap_subject_embedding_state(cvae_state)
         self.model.cvae.load_state_dict(cvae_state, strict=False)
-        # Warm-up flags are not in the checkpoint; restore from loaded prior weights.
         cvae = self.model.cvae
         prior = getattr(cvae, "prior", None)
         if prior in ("warm_gmm", "warm_hmm_gmm", "gmm", "hmm_gmm") and "prior_means" in cvae_state:
@@ -61,18 +87,65 @@ class Orchestrator:
         if prior in ("warm_hmm_gmm", "hmm_gmm") and "prior_transition_logits" in cvae_state:
             cvae.hmm_transitions_initialized = True
             cvae.hmm_transitions_initialized_at_hmm = True
+
+    def _load_cvae_checkpoint_from(self, checkpoint_path: Path | str) -> bool:
+        checkpoint = Path(checkpoint_path)
+        if not checkpoint.exists():
+            print(f"CVAE checkpoint not found at {checkpoint}; continuing without loading.")
+            return False
+
+        print(f"Loading CVAE model from checkpoint: {checkpoint}")
+        state = torch.load(checkpoint, map_location="cpu")
+        cvae_state = {k[len("cvae."):]: v for k, v in state.items() if k.startswith("cvae.")}
+        if not cvae_state:
+            print(f"No cvae.* keys in checkpoint {checkpoint}; skipping load.")
+            return False
+        self._apply_cvae_state(cvae_state)
         return True
 
-    def _save_cvae_checkpoint_to_config_path(self):
-        """Save the full model state to configured CVAE checkpoint path for later reuse."""
-        checkpoint_path = self.global_config.cvae.model_checkpoint_path
-        if checkpoint_path is None:
-            return
+    def _load_cvae_checkpoint_if_available(self) -> bool:
+        """Load checkpoint for validation: explicit model_checkpoint_path, else per-run dir."""
+        if self.global_config.cvae.model_checkpoint_path:
+            return self._load_cvae_checkpoint_from(self.global_config.cvae.model_checkpoint_path)
 
-        checkpoint = Path(checkpoint_path)
+        if self.run_number is not None:
+            run_ckpt = self._resolve_run_validation_checkpoint(
+                Path(self.global_config.results_dir)
+                / self.global_config.run_name
+                / str(self.run_number)
+                / "checkpoints"
+            )
+            if run_ckpt is not None:
+                return self._load_cvae_checkpoint_from(run_ckpt)
+
+        pretrained = self._pretrained_checkpoint_path()
+        if pretrained is not None:
+            return self._load_cvae_checkpoint_from(pretrained)
+        return False
+
+    @staticmethod
+    def _resolve_run_validation_checkpoint(ckpt_dir: Path) -> Path | None:
+        manifest = ckpt_dir / "validation_checkpoint.txt"
+        if manifest.exists():
+            path = Path(manifest.read_text().strip())
+            return path if path.exists() else None
+        best = ckpt_dir / "cvae_best_kmeans_nmi.pth"
+        if best.exists():
+            return best
+        final = ckpt_dir / "cvae_final_model.pth"
+        return final if final.exists() else None
+
+    def _save_cvae_checkpoint_to_config_path(self):
+        """Optionally mirror the latest finetuned weights to a global path (off by default)."""
+        if not self.global_config.cvae.save_pretrained_checkpoint:
+            return
+        target = self.global_config.cvae.pretrained_checkpoint_path or self.global_config.cvae.model_checkpoint_path
+        if target is None:
+            return
+        checkpoint = Path(target)
         checkpoint.parent.mkdir(parents=True, exist_ok=True)
         torch.save(self.model.state_dict(), checkpoint)
-        print(f"Saved CVAE checkpoint to: {checkpoint_path}")
+        print(f"Saved CVAE checkpoint to configured path: {target}")
     
     def run(self):
         if self.global_config.cvae.training_pipeline == "cvae":
@@ -186,10 +259,15 @@ class Orchestrator:
             self.validator.reset()
             # self.validator.validate(epoch=0)  
             run_dir = Path(self.global_config.results_dir) / self.global_config.run_name / str(self.run_number)
-        
-            # CVAE training
-            self._load_cvae_checkpoint_if_available()
-            
+            run_dir.mkdir(parents=True, exist_ok=True)
+            ckpt_dir = run_dir / "checkpoints"
+            ckpt_dir.mkdir(parents=True, exist_ok=True)
+            self.trainer.results_run_subdir = str(self.run_number)
+
+            # CVAE training — always seed from read-only pretrained weights when configured.
+            pretrained = self._pretrained_checkpoint_path()
+            if pretrained is not None:
+                self._load_cvae_checkpoint_from(pretrained)
             
             if self.global_config.cvae.training_pipeline in ['cvae_then_marhmm', 'cvae']:
                 self.model.training_pipeline = 'cvae'
@@ -200,26 +278,27 @@ class Orchestrator:
                 except Exception as e:
                     print(f"Error collecting training details: {e}")
                     train_details = None
-                self.visualizer.visualize_cvae(model=self.model, train_details=train_details)
-                # Save one checkpoint per run to avoid overwriting when runs > 1.
-                run_ckpt_path = Path(self.global_config.results_dir) / self.global_config.run_name / f"cvae_final_model_run{self.run_number}.pth"
+                if train_details is not None:
+                    self.__save_info(train_details=train_details)
+                self.visualizer.visualize_cvae(
+                    model=self.model, train_details=train_details, run_number=self.run_number
+                )
+                run_ckpt_path = ckpt_dir / "cvae_final_model.pth"
                 torch.save(self.model.state_dict(), run_ckpt_path)
-                # Also save to configured checkpoint path so follow-up validation can load it.
                 self._save_cvae_checkpoint_to_config_path()
-                # Also perform GMM validation using the checkpoint we just saved so
-                # that each run has train -> validate ordering.
                 try:
-                    best_path = self.trainer.get_best_kmeans_checkpoint_path()
-                    if best_path is not None:
+                    validation_ckpt = self.trainer.get_best_kmeans_checkpoint_path() or run_ckpt_path
+                    if validation_ckpt == self.trainer.get_best_kmeans_checkpoint_path():
                         best_ep = getattr(self.trainer, "_best_kmeans_epoch", None)
                         ep_disp = (best_ep + 1) if best_ep is not None else "?"
                         print(
-                            f"Validating with best KMeans-NMI checkpoint: {best_path} "
+                            f"Validating with best KMeans-NMI checkpoint: {validation_ckpt} "
                             f"(epoch {ep_disp})"
                         )
-                        self.global_config.cvae.model_checkpoint_path = str(best_path)
                     else:
-                        self.global_config.cvae.model_checkpoint_path = str(run_ckpt_path)
+                        print(f"Validating with final run checkpoint: {validation_ckpt}")
+                    (ckpt_dir / "validation_checkpoint.txt").write_text(str(validation_ckpt))
+                    self._load_cvae_checkpoint_from(validation_ckpt)
                     self.predict_cvae()
                 except Exception as e:
                     print(f"Warning: validation after CVAE run {self.run_number} failed: {e}")
@@ -237,6 +316,8 @@ class Orchestrator:
                 train_details = self.__collect_training_details()
                 self.visualizer.visualize(train_details=train_details)
                 torch.save(self.model.state_dict(), f"{self.global_config.results_dir}/{self.global_config.run_name}/cvaehmm_final_model.pth")
+
+        self._summarize_cvae_run_metrics()
     
     
     def predict_cvae(self):
@@ -244,14 +325,17 @@ class Orchestrator:
         if not loaded:
             raise FileNotFoundError(
                 "No CVAE checkpoint available for validation. "
-                "Run train_vae first or set cvae.model_checkpoint_path to an existing file."
+                "Run train_vae first, set cvae.model_checkpoint_path, or use validate_cvae_all_runs "
+                "with a saved config.json (append_run_timestamp: false)."
             )
         prior = getattr(self.model.cvae, "prior", "gmm")
         if prior in ("hmm_gmm", "warm_hmm_gmm"):
             nmi, log_pz, y_hat, y, mu, x, sub_ids, switch_rate, gmm_switch = (
                 self.validator.validate_cvae_hmm()
             )
-            self.visualizer.visualize_cvae_hmm(y_hat, y, mu, x, nmi, log_pz, sub_ids, switch_rate)
+            self.visualizer.visualize_cvae_hmm(
+                y_hat, y, mu, x, nmi, log_pz, sub_ids, switch_rate, run_number=self.run_number
+            )
             print(
                 f"HMM-GMM NMI: {nmi}, log p(z_{{1:T}}): {log_pz}, "
                 f"HMM switch (per 100): {switch_rate}, GMM marginal switch (per 100): {gmm_switch}"
@@ -260,9 +344,73 @@ class Orchestrator:
             nmi, likelihood, y_hat, y, x_latent, x, sub_ids, gmm_switch = (
                 self.validator.validate_cvae_gmm()
             )
-            self.visualizer.visualize_cvae_gmm(y_hat, y, x_latent, x, nmi, likelihood, sub_ids)
+            self.visualizer.visualize_cvae_gmm(
+                y_hat, y, x_latent, x, nmi, likelihood, sub_ids, run_number=self.run_number
+            )
             print(f"GMM NMI: {nmi}, Likelihood: {likelihood}, switch rate (per 100): {gmm_switch}")
-        
+
+    def validate_all_cvae_runs(self):
+        """GMM-validate every per-run checkpoint under the current run_name (no retraining)."""
+        base = Path(self.global_config.results_dir) / self.global_config.run_name
+        run_dirs = sorted(
+            (p for p in base.iterdir() if p.is_dir() and p.name.isdigit()),
+            key=lambda p: int(p.name),
+        )
+        if not run_dirs:
+            raise FileNotFoundError(f"No numbered run directories under {base}")
+
+        summary_rows = []
+        for run_dir in run_dirs:
+            run_num = int(run_dir.name)
+            ckpt_dir = run_dir / "checkpoints"
+            validation_ckpt = self._resolve_run_validation_checkpoint(ckpt_dir)
+            if validation_ckpt is None:
+                print(f"Skipping run {run_num}: no checkpoint in {ckpt_dir}")
+                continue
+            self.run_number = run_num
+            self.model.reset()
+            self._load_cvae_checkpoint_from(validation_ckpt)
+            self.predict_cvae()
+            metrics_path = run_dir / "plots" / "metrics.txt"
+            if metrics_path.exists():
+                summary_rows.append({"run": run_num, "checkpoint": str(validation_ckpt), **self._parse_metrics_txt(metrics_path)})
+
+        self._write_cvae_reliability_summary(summary_rows)
+
+    def _summarize_cvae_run_metrics(self) -> None:
+        base = Path(self.global_config.results_dir) / self.global_config.run_name
+        rows = []
+        for run_dir in sorted((p for p in base.iterdir() if p.is_dir() and p.name.isdigit()), key=lambda p: int(p.name)):
+            metrics_path = run_dir / "plots" / "metrics.txt"
+            if not metrics_path.exists():
+                continue
+            ckpt_dir = run_dir / "checkpoints"
+            validation_ckpt = self._resolve_run_validation_checkpoint(ckpt_dir)
+            row = {"run": int(run_dir.name), "checkpoint": str(validation_ckpt) if validation_ckpt else ""}
+            row.update(self._parse_metrics_txt(metrics_path))
+            rows.append(row)
+        self._write_cvae_reliability_summary(rows)
+
+    def _write_cvae_reliability_summary(self, summary_rows: list[dict]) -> None:
+        if not summary_rows:
+            return
+        summary_path = Path(self.global_config.results_dir) / self.global_config.run_name / "reliability_summary.csv"
+        pd.DataFrame(summary_rows).to_csv(summary_path, index=False)
+        print(f"Wrote per-run validation summary to {summary_path}")
+
+    @staticmethod
+    def _parse_metrics_txt(path: Path) -> dict:
+        out: dict = {}
+        for line in path.read_text().splitlines():
+            if ":" not in line:
+                continue
+            key, val = line.split(":", 1)
+            key = key.strip().lower().replace(" ", "_")
+            try:
+                out[key] = float(val.strip())
+            except ValueError:
+                out[key] = val.strip()
+        return out
     
     ### private methods ###
     
@@ -301,8 +449,9 @@ class Orchestrator:
         self.visualizer = Visualizer(data_loader=self.val_loader, config=self.global_config, model=self.model, validator=self.validator)
 
     def __prepare(self):
-        time_str = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        self.global_config.run_name = f"{self.global_config.run_name}_{time_str}"
+        if self.global_config.append_run_timestamp:
+            time_str = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+            self.global_config.run_name = f"{self.global_config.run_name}_{time_str}"
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.train_details: list[TrainDetails] = []
         self.run_number: int = 1

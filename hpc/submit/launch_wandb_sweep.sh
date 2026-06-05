@@ -17,6 +17,9 @@ WALLTIME=${4:-12:00}
 ### default is gpuv100, but options are [gpuv100, gpua100, gpua10, gpul40s]
 ### bqueues | grep -i gpu
 QUEUE=${5:-gpuv100}
+SWEEP_MEM="${SWEEP_MEM:-8GB}"
+SWEEP_SLOTS="${SWEEP_SLOTS:-4}"
+PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
 ### bjobs -p
 
 ABS_SWEEP_YAML=$(realpath "$SWEEP_YAML")
@@ -67,8 +70,8 @@ bsub -J "wandb_sweep_agent[1-${NUM_AGENTS}]" \
   -q "$QUEUE" \
   -o "$OUTPUT_DIR/sweep_${SWEEP_ID}_job_%J_agent_%I.out" \
   -e "$OUTPUT_DIR/sweep_${SWEEP_ID}_job_%J_agent_%I.err" \
-  -n 4 \
-  -R "rusage[mem=5GB]" \
+  -n "${SWEEP_SLOTS}" \
+  -R "rusage[mem=${SWEEP_MEM}]" \
   -R "span[hosts=1]" \
   -W "$WALLTIME" \
   -gpu "num=1:mode=exclusive_process" \
@@ -78,7 +81,8 @@ bsub -J "wandb_sweep_agent[1-${NUM_AGENTS}]" \
   source .venv/bin/activate; \
   # Prevent core dumps if the job is killed or crashes
   ulimit -c 0; \
-  echo Running agent for sweep: \"$SWEEP_ID\"; \
+  export PYTORCH_CUDA_ALLOC_CONF=${PYTORCH_CUDA_ALLOC_CONF}; \
+  echo Running agent for sweep: \"$SWEEP_ID\" \(mem=${SWEEP_MEM}, queue=${QUEUE}\); \
   python3 -m src.training.wandb_sweep_runner \"$ABS_SWEEP_YAML\" --agent-only --sweep-id \"$SWEEP_ID\" --trials-per-agent \"$TRIALS_PER_AGENT\"\""
 
 echo "Submitted array job. Monitor with bjobs and check hpc/output/sweep_${SWEEP_ID}/ for logs."

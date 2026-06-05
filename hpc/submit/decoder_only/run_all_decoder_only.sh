@@ -26,6 +26,11 @@ echo "------------------------"
 bsub < hpc/submit/decoder_only/run_decoder_only_reliability.sh
 
 echo ""
+echo "Reliability (labs 2+3+5 combined):"
+echo "-----------------------------------"
+bsub < hpc/submit/decoder_only/run_decoder_only_reliability_labs235.sh
+
+echo ""
 echo "Generalization Experiments:"
 echo "---------------------------"
 bash hpc/submit/decoder_only/run_decoder_only_generalization.sh

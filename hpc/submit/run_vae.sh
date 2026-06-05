@@ -1,7 +1,7 @@
 #!/bin/bash
 #BSUB -J vae                             
 #BSUB -q gpuv100            
-#BSUB -W 12:00  
+#BSUB -W 4:00  
 #BSUB -n 4
 #BSUB -R "span[hosts=1]"                      
 #BSUB -R "rusage[mem=4GB]"

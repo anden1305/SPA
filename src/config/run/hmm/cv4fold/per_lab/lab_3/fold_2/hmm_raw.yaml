@@ -1,0 +1,169 @@
+trainer:
+  epochs: 30000
+  learning_rate: 0.0003
+  optimizer: adam
+  grad_clip: null
+  validate_per_epoch: 10
+  early_stopping:
+    enabled: false
+    patience: 100
+    min_delta: 0.001
+  scheduler:
+    enabled: true
+    type: exponential
+    step_size: null
+    gamma: 0.99993
+validator:
+  nmi: true
+  accuracy: true
+  cross_nmi: true
+  learning_rate: true
+  state_distinctness: true
+  summary_statistics: true
+  log_likelihood: true
+visualizer:
+  losses: true
+  learning_rate: true
+  pca_tripanel: true
+  confusion_matrix: true
+  state_distinctness: true
+  summary_statistics: true
+  historic_values: true
+dataloader:
+  num_batches: 3200000
+  batch_size: 120
+  validation_batch_size: 4096
+  window_size: null
+  stride: null
+  sequence_length: 1
+  shuffle: true
+  normalize: true
+  use_legacy: true
+  transforms:
+  - type: percentile_clipping
+    channel: EEG
+    params:
+      percentile: 0.5
+  - type: percentile_clipping
+    channel: EMG
+    params:
+      percentile: 0.1
+model:
+  type: hmm
+  covariance_type: full
+  init_strategy: random_uniform
+  init_noisy: true
+  features: false
+  params: {}
+cvae:
+  normalize_global: false
+  pre_normalize: false
+  post_normalize: false
+  percentile_clip_channels: false
+  perform_hanning_window: false
+  band_pass_filter_fft: false
+  band_pass_filter_type: frequency_domain
+  training_pipeline: marhmm
+  model_checkpoint_path: null
+  reinit_marhmm: false
+verbose: true
+seed: 123
+runs: 1
+validate_data: true
+train_datasets:
+- type: mssv
+  id: sub-038
+  run: 1
+  remove_artifact: true
+  signals: &id001
+  - EEG1
+  - EEG2
+  - EMG
+- type: mssv
+  id: sub-038
+  run: 2
+  remove_artifact: true
+  signals: *id001
+- type: mssv
+  id: sub-039
+  run: 1
+  remove_artifact: true
+  signals: *id001
+- type: mssv
+  id: sub-039
+  run: 2
+  remove_artifact: true
+  signals: *id001
+- type: mssv
+  id: sub-039
+  run: 3
+  remove_artifact: true
+  signals: *id001
+- type: mssv
+  id: sub-043
+  run: 1
+  remove_artifact: true
+  signals: *id001
+- type: mssv
+  id: sub-054
+  run: 1
+  remove_artifact: true
+  signals: *id001
+- type: mssv
+  id: sub-054
+  run: 2
+  remove_artifact: true
+  signals: *id001
+- type: mssv
+  id: sub-056
+  run: 1
+  remove_artifact: true
+  signals: *id001
+- type: mssv
+  id: sub-059
+  run: 1
+  remove_artifact: true
+  signals: *id001
+- type: mssv
+  id: sub-060
+  run: 1
+  remove_artifact: true
+  signals: *id001
+val_datasets:
+- type: mssv
+  id: sub-041
+  run: 1
+  remove_artifact: true
+  signals: *id001
+- type: mssv
+  id: sub-041
+  run: 2
+  remove_artifact: true
+  signals: *id001
+- type: mssv
+  id: sub-041
+  run: 3
+  remove_artifact: true
+  signals: *id001
+- type: mssv
+  id: sub-048
+  run: 1
+  remove_artifact: true
+  signals: *id001
+- type: mssv
+  id: sub-048
+  run: 2
+  remove_artifact: true
+  signals: *id001
+- type: mssv
+  id: sub-048
+  run: 3
+  remove_artifact: true
+  signals: *id001
+- type: mssv
+  id: sub-069
+  run: 1
+  remove_artifact: true
+  signals: *id001
+run_name: cv4fold_hmm_raw_per_lab_lab_3_fold2
+results_dir: results/cv4fold/hmm_raw/per_lab/lab_3/fold_2

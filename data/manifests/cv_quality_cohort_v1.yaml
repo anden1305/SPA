@@ -1,0 +1,321 @@
+cohort:
+  lab_2:
+  - sub-071
+  - sub-072
+  - sub-076
+  - sub-077
+  - sub-080
+  - sub-081
+  lab_3:
+  - sub-038
+  - sub-039
+  - sub-041
+  - sub-043
+  - sub-048
+  - sub-054
+  - sub-056
+  - sub-059
+  - sub-060
+  - sub-069
+  lab_5:
+  - sub-087
+  - sub-088
+  - sub-089
+  - sub-092
+lab_signals:
+  lab_2: &id001
+  - EEG1
+  - EEG3
+  - EMG
+  lab_3: &id002
+  - EEG1
+  - EEG2
+  - EMG
+  lab_5: &id003
+  - EEG1
+  - EEG2
+  - EMG
+inventory:
+  sub-071:
+    lab: lab_2
+    runs:
+    - 1
+    - 2
+    hours: 12.0
+    epochs_4s: 10800
+    signals: *id001
+  sub-072:
+    lab: lab_2
+    runs:
+    - 1
+    - 2
+    hours: 12.0
+    epochs_4s: 10800
+    signals: *id001
+  sub-076:
+    lab: lab_2
+    runs:
+    - 1
+    - 2
+    hours: 12.0
+    epochs_4s: 10800
+    signals: *id001
+  sub-077:
+    lab: lab_2
+    runs:
+    - 1
+    - 2
+    hours: 13.0
+    epochs_4s: 11700
+    signals: *id001
+  sub-080:
+    lab: lab_2
+    runs:
+    - 1
+    - 2
+    hours: 12.0
+    epochs_4s: 10800
+    signals: *id001
+  sub-081:
+    lab: lab_2
+    runs:
+    - 1
+    - 2
+    hours: 12.0
+    epochs_4s: 10800
+    signals: *id001
+  sub-038:
+    lab: lab_3
+    runs:
+    - 1
+    - 2
+    hours: 48.0
+    epochs_4s: 43201
+    signals: *id002
+  sub-039:
+    lab: lab_3
+    runs:
+    - 1
+    - 2
+    - 3
+    hours: 12.04
+    epochs_4s: 10836
+    signals: *id002
+  sub-041:
+    lab: lab_3
+    runs:
+    - 1
+    - 2
+    - 3
+    hours: 12.0
+    epochs_4s: 10803
+    signals: *id002
+  sub-043:
+    lab: lab_3
+    runs:
+    - 1
+    hours: 24.0
+    epochs_4s: 21600
+    signals: *id002
+  sub-048:
+    lab: lab_3
+    runs:
+    - 1
+    - 2
+    - 3
+    hours: 12.0
+    epochs_4s: 10804
+    signals: *id002
+  sub-054:
+    lab: lab_3
+    runs:
+    - 1
+    - 2
+    hours: 47.99
+    epochs_4s: 43194
+    signals: *id002
+  sub-056:
+    lab: lab_3
+    runs:
+    - 1
+    hours: 23.55
+    epochs_4s: 21196
+    signals: *id002
+  sub-059:
+    lab: lab_3
+    runs:
+    - 1
+    hours: 24.0
+    epochs_4s: 21600
+    signals: *id002
+  sub-060:
+    lab: lab_3
+    runs:
+    - 1
+    hours: 8.01
+    epochs_4s: 7212
+    signals: *id002
+  sub-069:
+    lab: lab_3
+    runs:
+    - 1
+    hours: 24.0
+    epochs_4s: 21600
+    signals: *id002
+  sub-087:
+    lab: lab_5
+    runs:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    hours: 71.99
+    epochs_4s: 64788
+    signals: *id003
+  sub-088:
+    lab: lab_5
+    runs:
+    - 1
+    - 2
+    hours: 23.99
+    epochs_4s: 21595
+    signals: *id003
+  sub-089:
+    lab: lab_5
+    runs:
+    - 1
+    - 2
+    hours: 24.0
+    epochs_4s: 21596
+    signals: *id003
+  sub-092:
+    lab: lab_5
+    runs:
+    - 1
+    - 2
+    hours: 23.99
+    epochs_4s: 21595
+    signals: *id003
+cv_protocol: 4fold
+eval:
+  report_per_mouse: true
+runs_policy:
+  vae:
+    runs: 3
+    select: best_val_gmm_pred_nmi
+  hmm_raw:
+    runs: 1
+trainer:
+  vae_validate_per_epoch: 10
+  hmm_raw_validate_per_epoch: 10
+hyperparams:
+  learning_rate: 0.0003
+  epochs: 80
+# Bayesian tune winners (bayes50, in-sample all-mice). Source: docs/cv4fold/tune_sweep_bayes50_results.md
+tune_winners:
+  chmmgmvae:
+    trial_id: 5bkceef8
+    trainer:
+      learning_rate: 0.0014
+      epochs: 257
+      validate_per_epoch: 5
+    dataloader:
+      batch_size: 32
+      num_batches: 32
+    model:
+      conditioning_source: subject_lab
+      params:
+        latent_dim: 4
+        emb_dim: 8
+        ridge: 0.18
+        var_reg: 0.016
+        gmm_warmup_epochs: 18
+        hmm_warmup_epochs: 37
+        hmm_transition_ramp_epochs: 18
+        hmm_sticky_kappa: 0.86
+        min_beta: 0.016
+        beta_schedule: anneal
+  cgmvae:
+    trial_id: 8duimqhc
+    trainer:
+      learning_rate: 1.2e-5
+      epochs: 240
+      validate_per_epoch: 5
+    dataloader:
+      batch_size: 64
+      num_batches: 256
+    model:
+      conditioning_source: subject_lab
+      params:
+        latent_dim: 16
+        gmm_warmup_epochs: 0
+        beta_schedule: anneal
+subject_lab_tune_winners:
+  scope: joint
+  models:
+  - cgmvae
+  - chmmgmvae
+  folds:
+  - 1
+  - 2
+  - 3
+  - 4
+  results_root: results/cv4fold/subject_lab_tune_winners
+  note: >
+    4-fold joint CV with tune_winner hyperparams and subject_lab conditioning.
+    8 bsub jobs (4 folds x 2 models); runs_policy.vae.runs=3 per job.
+splits:
+  fold_1:
+    lab_2:
+    - sub-071
+    lab_3:
+    - sub-038
+    - sub-039
+    lab_5:
+    - sub-087
+  fold_2:
+    lab_2:
+    - sub-072
+    - sub-076
+    lab_3:
+    - sub-041
+    - sub-048
+    - sub-069
+    lab_5:
+    - sub-088
+  fold_3:
+    lab_2:
+    - sub-077
+    lab_3:
+    - sub-043
+    - sub-054
+    lab_5:
+    - sub-089
+  fold_4:
+    lab_2:
+    - sub-080
+    - sub-081
+    lab_3:
+    - sub-056
+    - sub-059
+    - sub-060
+    lab_5:
+    - sub-092
+preprocessing_audit:
+  completed: '2026-06-03'
+  results_dir: results/preprocessing_audit
+  worst_lab_by_silhouette: lab_5
+  smoke80_suggest: per_lab/lab_5
+  ablation_best_on_subset:
+    lab_2: no_post_normalize
+    lab_3: no_post_normalize
+    lab_5: +percentile_clip
+  note: >
+    Cross-lab audit (scripts/preprocessing_audit). Baseline cv4fold preprocessing
+    did not reach silhouette 0.15 in any lab. Review ablation winners before
+    changing cgmvae_base.yaml; prefer smoke80 on lab_5 then subject_lab conditioning.
+changelog:
+- 'lab_3 rebalance: sub-069 in fold_2 (not fold_4) to avoid 4-mice lab_3 holdout'
+- 'preprocessing_audit 2026-06-03: see preprocessing_audit block'

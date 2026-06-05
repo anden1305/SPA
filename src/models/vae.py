@@ -84,6 +84,8 @@ class ConditionalVAE(nn.Module):
         self.beta_warmup_epochs = params.get("beta_warmup_epochs", None)
         self.beta_slowdown_epochs = params.get("beta_slowdown_epochs", None)
         self.no_beta_epochs = params.get("no_beta_epochs", None)
+        self.beta_schedule = str(params.get("beta_schedule", "anneal"))
+        self.beta_cyclical_period_epochs = int(params.get("beta_cyclical_period_epochs") or 0)
         
         # Prior
         self.prior = params.get("prior", "warm_gmm")  # standard | gmm | warm_gmm | hmm_gmm | warm_hmm_gmm
@@ -496,6 +498,13 @@ class ConditionalVAE(nn.Module):
         kl_per_seq = log_q - log_p
         return self._kl_with_free_bits(kl_per_seq, T)
 
+    def _safe_hmm_gmm_prior(self, logvar: torch.Tensor, mu: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
+        """HMM-GMM KL; fall back to GMM-seq KL if numerics blow up (e.g. at HMM activation)."""
+        reg = self.hmm_gmm_prior(logvar, mu, z)
+        if torch.isfinite(reg):
+            return reg
+        return self.gmm_sequence_prior(logvar, mu, z)
+
     def warm_hmm_gmm_prior(
         self,
         logvar: torch.Tensor,
@@ -538,13 +547,13 @@ class ConditionalVAE(nn.Module):
             alpha = 1.0
 
         if alpha >= 1.0:
-            return self.hmm_gmm_prior(logvar, mu, z)
+            return self._safe_hmm_gmm_prior(logvar, mu, z)
         if alpha <= 0.0:
             return self.gmm_sequence_prior(logvar, mu, z)
 
-        return (1.0 - alpha) * self.gmm_sequence_prior(logvar, mu, z) + alpha * self.hmm_gmm_prior(
-            logvar, mu, z
-        )
+        hmm_reg = self._safe_hmm_gmm_prior(logvar, mu, z)
+        gmm_reg = self.gmm_sequence_prior(logvar, mu, z)
+        return (1.0 - alpha) * gmm_reg + alpha * hmm_reg
 
     @torch.no_grad()
     def __init_hmm_transitions(self, max_points: int = 200_000):
@@ -571,8 +580,16 @@ class ConditionalVAE(nn.Module):
             return
 
         log_pi_est, log_A_est = estimate_transition_logits_from_paths(assign, self.num_gmm_states)
+        log_A_sticky = init_sticky_transition_logits(
+            self.num_gmm_states, self.hmm_sticky_kappa, device=self.device
+        )
+        # Blend empirical transitions with sticky prior to avoid collapsed A at activation.
+        A_est = torch.exp(log_A_est)
+        A_sticky = torch.exp(log_A_sticky)
+        A_blend = 0.5 * A_est + 0.5 * A_sticky
+        A_blend = A_blend / A_blend.sum(dim=-1, keepdim=True).clamp_min(1e-12)
         self.prior_logits.copy_(log_pi_est)
-        self.prior_transition_logits.copy_(log_A_est)
+        self.prior_transition_logits.copy_(A_blend.clamp_min(1e-12).log())
         self.train(was_training)
     
     def __get_kmeans_centroids(self, max_points: int = 200_000):
@@ -701,21 +718,37 @@ class ConditionalVAE(nn.Module):
     def regularization_loss(self, reg_loss, epoch) -> torch.Tensor:
         if self.max_beta == 0.0:
             return torch.tensor(0.0, device=self.device)
-        elif self.no_beta_epochs and epoch <= self.no_beta_epochs:
+
+        total_epochs = int(getattr(self.global_config.trainer, "epochs", 0) or 0)
+        last_epoch = max(0, total_epochs - 1)
+        if total_epochs > 0 and epoch >= last_epoch:
+            self.beta = self.max_beta
+            return self.beta * reg_loss
+
+        if self.no_beta_epochs and epoch <= self.no_beta_epochs:
             return torch.tensor(0.0, device=self.device)
+
+        if self.beta_schedule == "cyclical" and self.beta_cyclical_period_epochs > 0:
+            period = max(1, self.beta_cyclical_period_epochs)
+            effective = max(0, epoch - (self.no_beta_epochs or 0))
+            pos = effective % period
+            progress = 0.5 * (1.0 - float(np.cos(np.pi * pos / period)))
+            self.beta = self.min_beta + (self.max_beta - self.min_beta) * progress
         elif self.beta_warmup_epochs and epoch <= self.beta_warmup_epochs:
-            # Ramp beta from min_beta -> max_beta AFTER the no-beta phase.
             warm_start = self.no_beta_epochs or 0
             warm_span = max(1, self.beta_warmup_epochs - warm_start)
             warm_progress = min(1.0, max(0.0, float(epoch - warm_start) / float(warm_span)))
             self.beta = self.min_beta + (self.max_beta - self.min_beta) * warm_progress
-        elif self.beta_slowdown_epochs and epoch > self.beta_warmup_epochs:
+        elif self.beta_slowdown_epochs and self.beta_warmup_epochs and epoch > self.beta_warmup_epochs:
             excess_epochs = epoch - self.beta_warmup_epochs
-            self.beta = max(self.min_beta, self.max_beta - (self.max_beta - self.min_beta) * excess_epochs / self.beta_slowdown_epochs)
+            self.beta = max(
+                self.min_beta,
+                self.max_beta - (self.max_beta - self.min_beta) * excess_epochs / self.beta_slowdown_epochs,
+            )
         else:
             self.beta = self.max_beta
-        reg = self.beta * reg_loss
-        return reg
+
+        return self.beta * reg_loss
     
     
     ## USE GMM TO PREDICT CLUSTERS

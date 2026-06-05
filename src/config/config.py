@@ -14,6 +14,22 @@ class SchedulerConfig(BaseModel):
     step_size: int | None = Field(..., description="Step size for 'step' scheduler.")
     gamma: float = Field(..., gt=0, lt=1, description="Decay factor for the scheduler.")
 
+class CheckpointScoreConfig(BaseModel):
+    """Thesis checkpoint score S(e) = beta * log_likelihood + (1-beta) * entropy_norm."""
+
+    enabled: bool = Field(
+        False,
+        description="Save/use cvae_best_checkpoint_score.pth when S improves (after warmup).",
+    )
+    beta: float = Field(0.9, ge=0.0, le=1.0, description="Weight on validation log-likelihood.")
+    warmup_frac: float = Field(
+        0.05,
+        ge=0.0,
+        lt=1.0,
+        description="Fraction of epochs excluded before maximizing S.",
+    )
+
+
 class EarlyStoppingConfig(BaseModel):
     enabled: bool = Field(True, description="Enable adaptive early stopping.")
     patience: int = Field(..., ge=1, le=1000, description="Epochs without relative improvement before action.")
@@ -32,6 +48,7 @@ class TrainerConfig(BaseModel):
     validate_per_epoch: int = Field(..., ge=0, le=10000, description="Frequency of validation during training in epochs. Set to 0 to disable per-epoch validation. Maximum value is 50.")
     early_stopping: EarlyStoppingConfig = Field(default_factory=EarlyStoppingConfig, description="Early stopping settings. Set enabled=False to disable.")
     scheduler: SchedulerConfig = Field(default_factory=SchedulerConfig)
+    checkpoint_score: CheckpointScoreConfig = Field(default_factory=CheckpointScoreConfig)
 
 class ValidatorConfig(BaseModel):
     nmi: bool = Field(..., description="Whether to compute NMI.")
@@ -41,7 +58,10 @@ class ValidatorConfig(BaseModel):
     state_distinctness: bool = Field(..., description="Whether to compute state distinctness.")
     summary_statistics: bool = Field(..., description="Whether to compute summary statistics.")
     log_likelihood: bool = Field(..., description="Whether to compute log-likelihood.")
-    # No hardcoded constants - all validation metrics are configurable toggles
+    validate_train: bool = Field(
+        default=True,
+        description="Whether to run train-set predict/NMI during per-epoch validation.",
+    )
 
 class VisualizerConfig(BaseModel):
     losses: bool = Field(..., description="Whether to visualize losses.")
@@ -51,6 +71,10 @@ class VisualizerConfig(BaseModel):
     state_distinctness: bool = Field(..., description="Whether to visualize state distinctness.")
     summary_statistics: bool = Field(..., description="Whether to visualize summary statistics.")
     historic_values: bool = Field(..., description="Whether to visualize historic model values (parameters & confusion matrices).")
+    save_results_npz: bool = Field(
+        default=True,
+        description="Write plots/results.npz (large on full-cohort runs). Disable for W&B tune sweeps.",
+    )
     # Hardcoded in src/visuals/visualizer.py (aesthetic constants)
 
 class TransformsConfig(BaseModel):
@@ -69,7 +93,11 @@ class DataLoaderConfig(BaseModel):
     shuffle: bool = Field(..., description="Whether to shuffle data each epoch.")
     normalize: bool = Field(..., description="Whether to normalize data using mean and std.")
     use_legacy: bool = Field(True, description="Whether to use legacy data loading behavior.")
-    # No hardcoded constants - all data loading behavior is configurable
+    max_batches_per_epoch: int | None = Field(
+        default=None,
+        ge=1,
+        description="Cap batch indices consumed each training epoch (smoke/debug). None = full dataset.",
+    )
 
 class DatasetConfig(BaseModel):
     type: str = Field(..., pattern="^(synthetic|mssv)$")
@@ -99,7 +127,18 @@ class CVAE(BaseModel):
     band_pass_freqs: list[list] | None = Field(default=None, description="List of [low, high] frequency pairs for band-pass filtering per channel.")
     band_pass_filter_type: str | None = Field(default=None, pattern="^(frequency_domain|time_domain)$", description="Type of band-pass filter to apply.")
     training_pipeline: str = Field(..., pattern="^(cvae|marhmm|cvae_then_marhmm)$", description="Training pipeline to use.")
-    model_checkpoint_path: str | None = Field(default=None, description="Path to a pre-trained CVAE model checkpoint.")
+    pretrained_checkpoint_path: str | None = Field(
+        default=None,
+        description="Read-only weights loaded at the start of each train_vae run (finetune seed).",
+    )
+    model_checkpoint_path: str | None = Field(
+        default=None,
+        description="Optional checkpoint for validate-only runs. Not written by train_vae unless save_pretrained_checkpoint is true.",
+    )
+    save_pretrained_checkpoint: bool = Field(
+        default=False,
+        description="If true, the last train_vae run also overwrites model_checkpoint_path / pretrained path.",
+    )
     reinit_marhmm: bool = Field(..., description="Whether to reinitialize MAR-HMM after CVAE training.")
     
 class ModelConfig(BaseModel):
@@ -165,6 +204,10 @@ class GlobalConfig(BaseModel):
     seed: int = Field(..., ge=0, description="Random seed for reproducibility.")
     results_dir: str = Field(default="results/training", description="Directory to save results.")
     run_name: str = Field(..., description="Name of the current run.")
+    append_run_timestamp: bool = Field(
+        default=True,
+        description="If true, append YYYYMMDD-HHMMSS to run_name (disable when re-validating an existing run folder).",
+    )
     runs: int = Field(..., ge=1, description="Number of runs to execute.")
     validate_data: bool = Field(..., description="Whether to perform data validation before training.")
     wandb: WandbConfig | None = Field(default_factory=WandbConfig, description="Weights & Biases settings.")

@@ -1,0 +1,90 @@
+# Bayesian tune for cv4fold chmmgmvae (joint, all mice, in-sample val). 50 trials, min 80 ep.
+sweep_mode: bayes
+method: bayes
+count: 50
+metric:
+  name: val/prior_pred_nmi
+  goal: maximize
+parameters:
+  trainer.learning_rate:
+    distribution: log_uniform_values
+    min: 1.0e-05
+    max: 0.002
+  trainer.epochs:
+    min: 80
+    max: 300
+  trainer.grad_clip:
+    distribution: uniform
+    min: 0.3
+    max: 1.0
+  trainer.validate_per_epoch:
+    values:
+    - 5
+    - 10
+  dataloader.num_batches:
+    values:
+    - 32
+    - 64
+    - 128
+  dataloader.batch_size:
+    values:
+    - 32
+    - 64
+    - 128
+  model.params.latent_dim:
+    values:
+    - 4
+    - 8
+  model.params.emb_dim:
+    values:
+    - 4
+    - 8
+  model.params.beta_schedule:
+    values:
+    - anneal
+    - cyclical
+  model.params.no_beta_epochs:
+    min: 0
+    max: 30
+  model.params.beta_warmup_epochs:
+    min: 0
+    max: 80
+  model.params.beta_slowdown_epochs:
+    values:
+    - 0
+    - 10
+    - 20
+    - 40
+  model.params.beta_cyclical_period_epochs:
+    min: 20
+    max: 80
+  model.params.min_beta:
+    distribution: log_uniform_values
+    min: 0.001
+    max: 0.05
+  model.params.ridge:
+    distribution: log_uniform_values
+    min: 0.01
+    max: 0.3
+  model.params.var_reg:
+    distribution: log_uniform_values
+    min: 0.01
+    max: 0.2
+  model.params.gmm_warmup_epochs:
+    min: 5
+    max: 25
+  model.params.hmm_warmup_epochs:
+    min: 25
+    max: 80
+  model.params.hmm_transition_ramp_epochs:
+    min: 8
+    max: 32
+  model.params.hmm_sticky_kappa:
+    distribution: uniform
+    min: 0.85
+    max: 0.98
+  model.params.sticky_coef:
+    distribution: uniform
+    min: 0.05
+    max: 0.2
+base_config: src/config/run/cvaeprior/cv4fold/tune/chmmgmvae_joint_all_mice_sweep_base.yaml

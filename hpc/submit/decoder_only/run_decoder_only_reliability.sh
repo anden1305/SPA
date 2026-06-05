@@ -10,15 +10,17 @@
 #BSUB -gpu "num=1:mode=exclusive_process"
 
 # Decoder-only reliability run (population)
-# Runs train_vae then validate_cvae_gmm for the reliability config.
+# train_vae: 10 seeds, per-run checkpoints under {run_name}/{1..10}/checkpoints/, GMM validate each run.
 
 set -euo pipefail
+
+SPA_ROOT="/work3/s204070/SPA"
+cd "$SPA_ROOT"
 
 module load cuda/12.8.1
 source .venv/bin/activate
 mkdir -p hpc/output/decoder_only/reliability
 
-CONFIG="src/config/run/cvaeprior/decoder_only/reliability/reliability_cgmvae_decoder_only_mssv_frequency.yaml"
+CONFIG="src/config/run/cvaeprior/decoder_only/reliability/reliability_cgmvae_decoder_only_subject_conditioning.yaml"
 
 python3 main.py --method train_vae --config_path ${CONFIG}
-python3 main.py --method validate_cvae_gmm --config_path ${CONFIG}

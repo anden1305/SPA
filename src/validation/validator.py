@@ -119,7 +119,7 @@ class Validator:
         self.validations[epoch]["nlpp"] = nlpp
         
         # Compute train NMI if train data loader is available
-        if self.config.nmi and self.train_data_loader is not None:
+        if self.config.validate_train and self.config.nmi and self.train_data_loader is not None:
             x_train, y_train, sub_ids = self.train_data_loader.get_all_data()
             with torch.no_grad():
                 if type(self.model) == CVAEMARHMM:
@@ -335,6 +335,9 @@ class Validator:
             x_np = x_latent.detach().cpu().numpy()
         except AttributeError:
             x_np = np.asarray(x_latent)
+        if not np.isfinite(x_np).all():
+            print("WARNING: NaN/Inf in CVAE latents; skipping KMeans NMI for this epoch.")
+            return 0.0
         kmeans = KMeans(n_clusters=n_clusters, n_init=10, random_state=42)
         cluster_labels = kmeans.fit_predict(x_np)
         # compute nmi

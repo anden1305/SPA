@@ -21,6 +21,7 @@ if __name__ == "__main__":
         "sweep",
         "validate_cvae_gmm",
         "validate_cvae_hmm",
+        "validate_cvae_all_runs",
         "plot_substages",
     ]:
         raise ValueError(f"Unknown method: {method}")
@@ -46,6 +47,9 @@ if __name__ == "__main__":
     elif method in ("validate_cvae_gmm", "validate_cvae_hmm"):
         orchestrator = Orchestrator(config_path, profile=args.profile)
         orchestrator.predict_cvae()
+    elif method == "validate_cvae_all_runs":
+        orchestrator = Orchestrator(config_path, profile=args.profile)
+        orchestrator.validate_all_cvae_runs()
     elif method == "plot_substages":
         from scripts.substage_analysis.run_substage_analysis import run_substage_analysis
         run_substage_analysis(config_path)

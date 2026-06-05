@@ -38,6 +38,7 @@ class DataLoaderCollection:
         self.pre_load_to_device = True
         self.x, self.y, self.sub_ids, self.x_non_norm_all = self.prepare_data()
         self.batches_per_next = self.config.num_batches
+        self.max_batches_per_epoch = self.config.max_batches_per_epoch
         
     def prepare_data(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, np.ndarray]:
         x = []
@@ -228,6 +229,8 @@ class DataLoaderCollection:
     def __iter__(self) -> "DataLoaderCollection":
         # Reset cursor and (optionally) shuffle order for a new pass
         self._num_batches = int(self.x.shape[0])
+        if self.max_batches_per_epoch is not None:
+            self._num_batches = min(self._num_batches, int(self.max_batches_per_epoch))
         self._cursor = 0
         # Track epochs to vary shuffle across iterations if desired
         if not hasattr(self, "_epoch"):

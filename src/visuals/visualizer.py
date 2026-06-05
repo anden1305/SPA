@@ -21,10 +21,13 @@ from src.config.config import GlobalConfig
 from src.data.data_loader import DataLoader
 from src.data.data_loader_collection import DataLoaderCollection
 from src.helpers.align_labels import align_labels_hungarian
+from src.helpers.model_display_name import model_display_name
 from src.orchestrator.train_details import TrainDetails
 from src.validation.validator import Validator
 from sklearn.metrics import confusion_matrix
 from itertools import combinations
+from src.visuals.pca_tripanel import save_pca_tripanel_arrays
+
 
 class Visualizer:
     def __init__(self,
@@ -42,6 +45,13 @@ class Visualizer:
         if ids.dim() >= 3 and ids.shape[-1] >= 2:
             ids = ids[..., 0]
         return ids.flatten().cpu().numpy()
+
+    def _plots_path(self, run_number: int | None = None) -> Path:
+        """Per-run plot directory when run_number is set (avoids overwriting multi-seed CVAE runs)."""
+        base = Path(self.global_config.results_dir) / self.global_config.run_name
+        path = base / str(run_number) / "plots" if run_number is not None else base / "plots"
+        path.mkdir(parents=True, exist_ok=True)
+        return path
     
     ####### GENERAL METHODS #######
     
@@ -91,9 +101,8 @@ class Visualizer:
         np.savez(path / "results.npz", y_hat=y_hat, y_true=y, x_latent=x, x=x_non_norm, sub_ids=subject_ids)
     
     
-    def visualize_cvae_gmm(self, y_hat, y_true, x_latent: torch.Tensor, x: torch.Tensor, nmi, likelihood, sub_ids):
-        path = Path(self.global_config.results_dir) / self.global_config.run_name / "plots"
-        path.mkdir(parents=True, exist_ok=True)
+    def visualize_cvae_gmm(self, y_hat, y_true, x_latent: torch.Tensor, x: torch.Tensor, nmi, likelihood, sub_ids, run_number: int | None = None):
+        path = self._plots_path(run_number)
         y_hat = y_hat.flatten().cpu().numpy()
         y_true = y_true.flatten().cpu().numpy()
         x_latent = x_latent.detach().cpu().numpy()
@@ -116,9 +125,9 @@ class Visualizer:
         log_pz,
         sub_ids,
         switch_rate: float,
+        run_number: int | None = None,
     ):
-        path = Path(self.global_config.results_dir) / self.global_config.run_name / "plots"
-        path.mkdir(parents=True, exist_ok=True)
+        path = self._plots_path(run_number)
         y_hat_np = y_hat.flatten().cpu().numpy()
         y_true_np = y_true.flatten().cpu().numpy()
         x_latent = mu.reshape(-1, mu.shape[-1]).detach().cpu().numpy()
@@ -158,9 +167,8 @@ class Visualizer:
         if validations.get("nmi"):
             self.__plot_reliability(nmis, cross_nmis, final_losses, path=path)
     
-    def visualize_cvae(self, model: CVAEMARHMM, train_details):
-        path = Path(self.global_config.results_dir) / self.global_config.run_name / "plots"
-        path.mkdir(parents=True, exist_ok=True)
+    def visualize_cvae(self, model: CVAEMARHMM, train_details, run_number: int | None = None):
+        path = self._plots_path(run_number)
         x, y, sub_ids = self.data_loader.get_all_data()
         y = y.flatten().cpu().numpy()
         model.prepare_for_inference()
@@ -1237,101 +1245,68 @@ class Visualizer:
             if loss_values:
                 print(f"Min Loss at epoch {min_loss_epoch}: {min_loss:.6g}")
 
+    def plot_pca_tripanel_arrays(
+        self,
+        x_latent: np.ndarray,
+        y_true: np.ndarray,
+        out_dir: Path | str,
+        *,
+        y_pred: np.ndarray | None = None,
+        y_init: np.ndarray | None = None,
+        y_trained: np.ndarray | None = None,
+        display_name: str | None = None,
+        state_names: list[str] | None = None,
+    ) -> list[Path]:
+        name = display_name or model_display_name(self.global_config)
+        if state_names is None and self.data_loader is not None:
+            try:
+                state_names = self.data_loader.get_state_names()
+            except Exception:
+                state_names = None
+        return save_pca_tripanel_arrays(
+            x_latent,
+            y_true,
+            out_dir=out_dir,
+            display_name=name,
+            y_pred=y_pred,
+            y_init=y_init,
+            y_trained=y_trained,
+            state_names=state_names,
+        )
+
     def __plot_pca_tripanel(self, train_details: TrainDetails, x: Tensor, y: Tensor, overwrite_path: str = None, pred_y: np.ndarray = None):
-        """Save tri-panel PCA plots comparing HMM-init, HMM-trained, and True labels."""
-        
+        """Save tri-panel PCA plots with model-specific panel titles."""
         if len(y.shape) == 3:
             y = y[:, :, 0]
-        
         if train_details is None and pred_y is None:
             return
-        
-        if pred_y is not None:
-            init_arr = pred_y
-            trained_arr = pred_y
-        else:
-            init_arr = train_details.get_initial_predictions()
-            trained_arr = train_details.get_trained_predictions()
-        
-        X = x.reshape(-1, x.shape[-1]) if x.ndim >= 2 else None
-        if X is None or X.ndim != 2:
-            raise ValueError(f"x must be (T,D) or (B,T,D); got {x.shape}")
-        
+
+        y_np = y.flatten().cpu().numpy() if hasattr(y, "cpu") else np.asarray(y).reshape(-1)
+        x_np = x.reshape(-1, x.shape[-1]).detach().cpu().numpy() if hasattr(x, "detach") else np.asarray(x).reshape(-1, x.shape[-1])
+
+        out_dir = Path(overwrite_path) if overwrite_path else train_details.get_path() / "plots"
+        state_names = None
         try:
-            init_arr = align_labels_hungarian(y, init_arr)
-            trained_arr = align_labels_hungarian(y, trained_arr)
-        except Exception as e:
-            print(f"Warning: Could not align labels for PCA tripanel due to: {e}")
-        
-        if not (len(y) == len(init_arr) == len(trained_arr) == X.shape[0]):
-            print(f"Lengths: y={len(y)}, init={len(init_arr)}, trained={len(trained_arr)}, X_rows={X.shape[0]}")
-            raise ValueError("Label lengths must match number of rows in x after flattening")
-        
-        ## sample 2500 points from each class
-        sampled_indices = []
-        for cls in np.unique(y):
-            cls_indices = np.where(y == cls)[0]
-            if len(cls_indices) > 2000:
-                sampled = np.random.choice(cls_indices, size=2000, replace=False)
-            else:
-                sampled = cls_indices
-            sampled_indices.extend(sampled)
-        sampled_indices = np.array(sampled_indices)
-        X = X[sampled_indices]
-        init_arr = init_arr[sampled_indices]
-        trained_arr = trained_arr[sampled_indices]
-        y = y[sampled_indices]
-        
-        # PCA via SVD (up to 4 comps)
-        K = min(4, max(2, X.shape[1]))
-        U, S, _ = np.linalg.svd(X - X.mean(0, keepdims=True), full_matrices=False)
-        proj = U[:, :K] * S[:K]
+            state_names = self.data_loader.get_state_names()
+        except Exception:
+            pass
 
-        # Colors and titles
-        palette = np.array(["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"])
-        def colors(a):
-            u = np.unique(a)
-            lut = {v: palette[i % len(palette)] for i, v in enumerate(u)}
-            return np.array([lut[v] for v in a])
+        if pred_y is not None:
+            return self.plot_pca_tripanel_arrays(
+                x_np, y_np, out_dir, y_pred=pred_y, state_names=state_names
+            )
 
-        cols = [colors(init_arr), colors(trained_arr), colors(y)]
-        titles = ["HMM init", "HMM trained", "True"]
-        arrays = [init_arr, trained_arr, y]
+        init_arr = train_details.get_initial_predictions()
+        trained_arr = train_details.get_trained_predictions()
+        return self.plot_pca_tripanel_arrays(
+            x_np,
+            y_np,
+            out_dir,
+            y_init=init_arr,
+            y_trained=trained_arr,
+            state_names=state_names,
+        )
 
-        # human-readable state names (if available)
-        state_names = self.data_loader.get_state_names()
-
-        saved: list[str] = []
-        for a, b in combinations(range(proj.shape[1]), 2):
-            fig, axes = plt.subplots(1, 3, figsize=(15, 4), sharex=True, sharey=True)
-            for ax, arr, c, t in zip(axes, arrays, cols, titles):
-                # Create scatter plot
-                scatter = ax.scatter(proj[:, a], proj[:, b], c=c, s=6, alpha=0.85, edgecolors="none")
-                ax.set_title(f"{t} (PC{a+1} vs PC{b+1})")
-                ax.set_xlabel(f"PC{a+1}")
-                
-                # Add legend with state/class names when possible
-                unique_labels = np.unique(arr)
-                # Build label text: prefer state_names if length matches, else fallback
-                if state_names is not None and len(state_names) >= unique_labels.size:
-                    label_texts = [state_names[int(label)] for label in unique_labels]
-                else:
-                    label_texts = [f"State {label}" for label in unique_labels]
-
-                legend_elements = [plt.Line2D([0], [0], marker='o', color='w',
-                                  markerfacecolor=palette[i % len(palette)],
-                                  label=label_texts[i], markersize=8)
-                                  for i, label in enumerate(unique_labels)]
-                ax.legend(handles=legend_elements, loc='best', title='States')
-                
-            axes[0].set_ylabel(f"PC{b+1}")
-            fig.tight_layout()
-            out_path = Path(overwrite_path) / f"hmm_tripanel_pc{a+1}_pc{b+1}.png" if overwrite_path else train_details.get_path() / "plots" / f"hmm_tripanel_pc{a+1}_pc{b+1}.png"
-            fig.savefig(out_path.as_posix(), dpi=160)
-            plt.close(fig)
-            saved.append(out_path.as_posix())   
-        return saved
-    
     def __plot_learning_rate(self, train_details: TrainDetails):
         """Visualize the learning rate over epochs."""
         vd = train_details.get_validations()

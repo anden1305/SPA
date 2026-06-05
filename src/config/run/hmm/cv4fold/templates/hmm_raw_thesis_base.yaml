@@ -1,0 +1,81 @@
+# Thesis HMM raw baseline (experiment_mssv_raw style)
+
+trainer:
+  epochs: 30000
+  learning_rate: 0.001
+  optimizer: adam
+  grad_clip: null
+  validate_per_epoch: 10
+  early_stopping:
+    enabled: false
+    patience: 100
+    min_delta: 0.001
+  scheduler:
+    enabled: true
+    type: exponential
+    step_size: Null
+    gamma: 0.99993
+
+validator:
+  nmi: True
+  accuracy: True
+  cross_nmi: True
+  learning_rate: True
+  state_distinctness: True
+  summary_statistics: True
+  log_likelihood: True
+
+visualizer:
+  losses: True
+  learning_rate: True
+  pca_tripanel: True
+  confusion_matrix: True
+  state_distinctness: True
+  summary_statistics: True
+  historic_values: True
+
+dataloader:
+  num_batches: 3200000
+  batch_size: 120
+  validation_batch_size: 4096
+  window_size: null
+  stride: null
+  sequence_length: 1
+  shuffle: True
+  normalize: True
+  use_legacy: true
+  transforms:
+    - type: percentile_clipping
+      channel: EEG
+      params:
+        percentile: 0.5
+    - type: percentile_clipping
+      channel: EMG
+      params:
+        percentile: 0.1
+
+model:
+  type: hmm
+  covariance_type: full
+  init_strategy: random_uniform
+  init_noisy: true
+  features: false
+  params: {}
+
+# Required by GlobalConfig even for pure HMM (method train); values unused.
+cvae:
+  normalize_global: false
+  pre_normalize: false
+  post_normalize: false
+  percentile_clip_channels: false
+  perform_hanning_window: false
+  band_pass_filter_fft: false
+  band_pass_filter_type: frequency_domain
+  training_pipeline: marhmm
+  model_checkpoint_path: null
+  reinit_marhmm: false
+
+verbose: true
+seed: 123
+runs: 1
+validate_data: True

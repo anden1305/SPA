@@ -37,52 +37,132 @@ def _build_sweep_config(base_cfg: GlobalConfig) -> Dict[str, Any]:
         "early_terminate": {"type": "hyperband", "min_iter": 3},
     }
 
-def _apply_wandb_config(base_cfg: GlobalConfig, wb_cfg: Dict[str, Any]) -> GlobalConfig:
-    """Deep-merge W&B sweep parameters into the base config without replacing entire submodels.
+# Grid sweeps: only apply keys in this map (original behaviour — unknown keys are ignored).
+_GRID_SWEEP_PARSERS: Dict[str, Any] = {
+    "trainer.learning_rate": float,
+    "trainer.optimizer": str,
+    "trainer.validate_per_epoch": int,
+    "trainer.scheduler.enabled": bool,
+    "trainer.scheduler.gamma": float,
+    "trainer.scheduler.type": str,
+    "trainer.scheduler.step_size": (lambda x: None if x is None else int(x)),
+    "model.init_strategy": str,
+    "model.init_noisy": bool,
+    "model.covariance_type": str,
+    "model.params.max_beta": float,
+    "dataloader.num_batches": int,
+}
 
-    We start from the full dict of base_cfg and directly set parsed leaf values along the dotted paths.
-    Then we re-validate into a GlobalConfig to ensure required fields remain intact.
-    """
-    parsers: Dict[str, Any] = {
-        "trainer.learning_rate": float,
-        "trainer.optimizer": str,
-        "trainer.validate_per_epoch": int,
-        "trainer.scheduler.enabled": bool,
-        "trainer.scheduler.gamma": float,
-        "trainer.scheduler.type": str,
-        "trainer.scheduler.step_size": (lambda x: None if x is None else int(x)),
-        "model.init_strategy": str,
-        "model.init_noisy": bool,
-        "model.covariance_type": str,
-        "model.params.max_beta": float,
-        "dataloader.num_batches": int,
-    }
 
-    # Work on a full dict snapshot to preserve all required fields
+def _set_nested(merged: Dict[str, Any], dotted_key: str, value: Any) -> None:
+    path = dotted_key.split(".")
+    node: Dict[str, Any] = merged
+    for part in path[:-1]:
+        nxt = node.get(part)
+        if not isinstance(nxt, dict):
+            nxt = {}
+            node[part] = nxt
+        node = nxt
+    node[path[-1]] = value
+
+
+def _resolve_sweep_mode(sweep_yaml: Dict[str, Any], sweep_spec: Dict[str, Any]) -> str:
+    """How to merge wandb.config into GlobalConfig: 'grid' (whitelist) or 'bayes' (dotted paths)."""
+    explicit = sweep_yaml.get("sweep_mode")
+    if explicit in ("grid", "bayes"):
+        return explicit
+    method = str(sweep_spec.get("method", "grid")).lower()
+    if method in ("bayes", "bayesian"):
+        return "bayes"
+    return "grid"
+
+
+def _apply_wandb_config_grid(base_cfg: GlobalConfig, wb_cfg: Dict[str, Any]) -> GlobalConfig:
+    """Grid sweeps: merge only whitelisted keys (legacy behaviour)."""
     merged: Dict[str, Any] = base_cfg.model_dump()
-
     for key, value in wb_cfg.items():
-        parser = parsers.get(key)
+        parser = _GRID_SWEEP_PARSERS.get(key)
         if parser is None:
             continue
         try:
             parsed_value = parser(value)
         except Exception:
-            # If parsing fails, skip this key rather than breaking the sweep
             continue
-        # Descend into nested dicts according to dotted path
-        path = key.split(".")
-        node: Dict[str, Any] = merged
-        for p in path[:-1]:
-            nxt = node.get(p)
-            if not isinstance(nxt, dict):
-                nxt = {}
-                node[p] = nxt
-            node = nxt  # type: ignore[assignment]
-        node[path[-1]] = parsed_value
-
-    # Reconstruct a validated config
+        _set_nested(merged, key, parsed_value)
     return GlobalConfig.model_validate(merged)
+
+
+def _parse_bayes_sweep_value(key: str, value: Any) -> Any:
+    if value is None:
+        return None
+    if key in (
+        "trainer.grad_clip",
+        "model.params.min_beta",
+        "model.params.ridge",
+        "model.params.var_reg",
+        "model.params.sticky_coef",
+        "model.params.hmm_sticky_kappa",
+    ):
+        return float(value)
+    if key == "model.params.beta_schedule":
+        return str(value)
+    if key.endswith(".enabled") or key.endswith(".init_noisy"):
+        return bool(value)
+    if (
+        key.endswith(".epochs")
+        or key.endswith("_epochs")
+        or key.endswith("_dim")
+        or key in (
+            "dataloader.num_batches",
+            "dataloader.batch_size",
+            "trainer.validate_per_epoch",
+            "trainer.epochs",
+            "model.params.beta_cyclical_period_epochs",
+            "model.params.no_beta_epochs",
+            "model.params.beta_warmup_epochs",
+            "model.params.beta_slowdown_epochs",
+            "model.params.gmm_warmup_epochs",
+            "model.params.hmm_warmup_epochs",
+            "model.params.hmm_transition_ramp_epochs",
+            "model.params.latent_dim",
+            "model.params.emb_dim",
+        )
+    ):
+        parsed = int(value)
+        if key == "trainer.epochs":
+            parsed = max(80, parsed)
+        return parsed
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int) and not isinstance(value, bool):
+        return int(value)
+    if isinstance(value, float):
+        return float(value)
+    if isinstance(value, str):
+        return value
+    return value
+
+
+def _apply_wandb_config_bayes(base_cfg: GlobalConfig, wb_cfg: Dict[str, Any]) -> GlobalConfig:
+    """Bayesian sweeps: merge any dotted key from wandb.config."""
+    merged: Dict[str, Any] = base_cfg.model_dump()
+    for key, value in wb_cfg.items():
+        if not isinstance(key, str) or "." not in key:
+            continue
+        try:
+            parsed = _parse_bayes_sweep_value(key, value)
+        except (TypeError, ValueError):
+            continue
+        _set_nested(merged, key, parsed)
+    return GlobalConfig.model_validate(merged)
+
+
+def _apply_wandb_config(
+    base_cfg: GlobalConfig, wb_cfg: Dict[str, Any], sweep_mode: str = "grid"
+) -> GlobalConfig:
+    if sweep_mode == "bayes":
+        return _apply_wandb_config_bayes(base_cfg, wb_cfg)
+    return _apply_wandb_config_grid(base_cfg, wb_cfg)
 
 
 def _unique_sweep_results_dir(cfg: GlobalConfig, run_id: str) -> GlobalConfig:
@@ -153,6 +233,7 @@ def run_sweep(sweep_yaml_path: str) -> None:
     sweep_spec = {k: v for k, v in sweep_yaml.items() if k in {"method", "metric", "parameters", "early_terminate"}}
     if not sweep_spec:
         sweep_spec = _build_sweep_config(base_cfg)
+    sweep_mode = _resolve_sweep_mode(sweep_yaml, sweep_spec)
 
     # Determine metric to optimize for summary aggregation
     metric_spec = sweep_spec.get("metric") or {}
@@ -172,20 +253,33 @@ def run_sweep(sweep_yaml_path: str) -> None:
         # Import after backend is set so Visualizer uses Agg
         from src.orchestrator.orchestrator import Orchestrator
         wandb.init(project=project, entity=entity, group=group, tags=tags)
-        cfg = _apply_wandb_config(base_cfg, dict(wandb.config))
+        cfg = _apply_wandb_config(base_cfg, dict(wandb.config), sweep_mode)
         cfg = _unique_sweep_results_dir(cfg, wandb.run.id)
         tmp_yaml = _write_temp_yaml(cfg)
         orch = Orchestrator(str(tmp_yaml))
-        _run_orchestrator(orch)
+        crashed = False
+        crash_reason: str | None = None
+        try:
+            _run_orchestrator(orch)
+        except Exception as e:
+            crashed = True
+            crash_reason = repr(e)
+            print(f"Sweep trial failed: {crash_reason}")
         best_val, best_run_number = _aggregate_sweep_metric(
             orch, metric_name=metric_name, metric_goal=metric_goal
         )
+        if best_val is None and crashed:
+            best_val = 0.0 if metric_goal == "maximize" else float("inf")
 
         # Log the aggregated result as the sweep metric
         if best_val is not None:
             wandb.summary[metric_name] = float(best_val)
             wandb.summary["aggregate/best_run_number"] = best_run_number
             wandb.summary["aggregate/runs"] = int(getattr(cfg, "runs", 1))
+        if crashed:
+            wandb.summary["run/failed"] = True
+            if crash_reason:
+                wandb.summary["run/error"] = crash_reason[:500]
         wandb.finish()
 
     # If environment variable WAND_B_AGENT_ONLY is set, act as an agent for this sweep
@@ -237,6 +331,7 @@ def run_agent_only(sweep_yaml_path: str, sweep_id: str | None = None, trials_per
     sweep_spec = {k: v for k, v in sweep_yaml.items() if k in {"method", "metric", "parameters", "early_terminate"}}
     if not sweep_spec:
         sweep_spec = _build_sweep_config(base_cfg)
+    sweep_mode = _resolve_sweep_mode(sweep_yaml, sweep_spec)
     import os
     project = os.getenv("WANDB_PROJECT", "SPA")
     entity = os.getenv("WANDB_ENTITY", "dtu_projects")
@@ -254,23 +349,36 @@ def run_agent_only(sweep_yaml_path: str, sweep_id: str | None = None, trials_per
         group = getattr(wb_settings, "group", None) if wb_settings is not None else None
         tags = getattr(wb_settings, "tags", None) if wb_settings is not None else None
         wandb.init(project=project, entity=entity, group=group, tags=tags)
-        cfg = _apply_wandb_config(base_cfg, dict(wandb.config))
+        cfg = _apply_wandb_config(base_cfg, dict(wandb.config), sweep_mode)
         cfg = _unique_sweep_results_dir(cfg, wandb.run.id)
         tmp_yaml = _write_temp_yaml(cfg)
         orch = Orchestrator(str(tmp_yaml))
-        _run_orchestrator(orch)
         metric_spec = sweep_spec.get("metric") or {}
         metric_name = metric_spec.get("name") or (
             "val/nmi" if getattr(base_cfg.validator, "nmi", False) else "train/total_loss"
         )
         metric_goal = metric_spec.get("goal", "maximize")
+        crashed = False
+        crash_reason: str | None = None
+        try:
+            _run_orchestrator(orch)
+        except Exception as e:
+            crashed = True
+            crash_reason = repr(e)
+            print(f"Sweep trial failed: {crash_reason}")
         best_val, best_run_number = _aggregate_sweep_metric(
             orch, metric_name=metric_name, metric_goal=metric_goal
         )
+        if best_val is None and crashed:
+            best_val = 0.0 if metric_goal == "maximize" else float("inf")
         if best_val is not None:
             wandb.summary[metric_name] = float(best_val)
             wandb.summary["aggregate/best_run_number"] = best_run_number
             wandb.summary["aggregate/runs"] = int(getattr(cfg, "runs", 1))
+        if crashed:
+            wandb.summary["run/failed"] = True
+            if crash_reason:
+                wandb.summary["run/error"] = crash_reason[:500]
         wandb.finish()
 
     wandb.agent(sweep_id, function=_train, entity=entity, project=project, count=int(trials_per_agent))

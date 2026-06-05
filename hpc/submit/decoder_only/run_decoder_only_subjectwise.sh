@@ -6,6 +6,7 @@
 
 set -euo pipefail
 
+SPA_ROOT="/work3/s204070/SPA"
 SUBJECTS=("sub038" "sub039" "sub041" "sub043" "sub048" "sub054" "sub056" "sub059" "sub060" "sub069")
 QUEUE="gpuv100"
 WALLTIME="8:00"
@@ -15,7 +16,7 @@ CPUS="4"
 echo "Submitting decoder-only subjectwise jobs for ${#SUBJECTS[@]} subjects..."
 
 for subject in "${SUBJECTS[@]}"; do
-  CONFIG="src/config/run/cvaeprior/decoder_only/subjectwise/${subject}_cgmvae_decoder_only_mssv_frequency.yaml"
+  CONFIG="src/config/run/cvaeprior/decoder_only/subjectwise/${subject}_cgmvae_decoder_only.yaml"
   OUTPUT_DIR="hpc/output/decoder_only/subjectwise/${subject}"
 
   mkdir -p "$OUTPUT_DIR"
@@ -33,6 +34,7 @@ for subject in "${SUBJECTS[@]}"; do
 #BSUB -gpu "num=1:mode=exclusive_process"
 
 module load cuda/12.8.1
+cd ${SPA_ROOT}
 source .venv/bin/activate
 
 python3 main.py --method train_vae --config_path ${CONFIG}
