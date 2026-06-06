@@ -67,8 +67,8 @@ class CVAEMARHMM(BaseModel):
         out = self.marhmm.predict(mu)
         return out
     
-    def predict_gmm(self, x: torch.Tensor, subject_ids: torch.Tensor) -> torch.Tensor:
-        y, likelihood, mu = self.cvae.predict_gmm_labels(x, subject_ids)
+    def predict_gmm(self, x: torch.Tensor, subject_ids: torch.Tensor, *, initialize_if_needed: bool = False) -> torch.Tensor:
+        y, likelihood, mu = self.cvae.predict_gmm_labels(x, subject_ids, initialize_if_needed=initialize_if_needed)
         return mu, y, likelihood
     
     def reinitialize_marhmm(self):

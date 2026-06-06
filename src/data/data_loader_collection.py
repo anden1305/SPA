@@ -9,6 +9,10 @@ from src.data.data_loader import DataLoader
 from src.preprocessing.helpers.base_transform import BaseTransform
 from concurrent.futures import ThreadPoolExecutor
 
+# Legacy MSSV subject indexing: participant sub-NNN maps to embedding row N (0..91).
+LEGACY_SUBJECT_EMB_NUM_ROWS = 92
+
+
 class DataLoaderCollection:
     """
     A collection of DataLoader instances for training and validation datasets.
@@ -132,10 +136,10 @@ class DataLoaderCollection:
         return self.data_loaders[0].has_features_enabled()
     
     def get_num_subjects(self) -> int:
-        return 92
-    
-    def get_subject_map(self) -> list[int]:
-        # Returns list mapping subject ID to index
+        return LEGACY_SUBJECT_EMB_NUM_ROWS
+
+    def get_subject_map(self) -> dict[str, int]:
+        # Maps dataset id (e.g. sub-041) → legacy embedding index (41).
         subject_ids = set([ds.get_id() for ds in self.datasets])
         subject_to_id = {subject_id: int(re.search(r'\d+', subject_id).group()) for subject_id in subject_ids}
         return subject_to_id

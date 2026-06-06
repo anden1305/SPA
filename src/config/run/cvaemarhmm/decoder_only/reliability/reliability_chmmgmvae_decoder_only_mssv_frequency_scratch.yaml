@@ -30,7 +30,7 @@ visualizer:
   summary_statistics: True
   historic_values: True
 dataloader:
-  num_batches: 64
+  num_batches: 64 # EXPERIMENTAL
   batch_size: 128
   validation_batch_size: 128
   window_size: 512
@@ -192,7 +192,7 @@ val_datasets:
 model:
   type: cvae_marhmm
   covariance_type: full
-  init_strategy: random_uniform
+  init_strategy: random_uniform # EXPERIMENTAL
   init_noisy: true
   features: false
   params:
@@ -206,23 +206,28 @@ model:
     
     # CVAE parameters
     # weights
-    latent_dim: 8
-    enc_hidden_dims: [256, 128]
-    dec_hidden_dims: [128, 256]
-    conv_channels: [32, 64, 128, 128]
-    kernel_sizes:  [7, 5, 5, 3]
-    strides:       [2, 2, 2, 2]
-    paddings:      [3, 2, 2, 1]
-    emb_dim: 4
-    decoder_only_conditioning: true
-    use_rms: False
-    # prior
-    prior: gmm
+    latent_dim: 8 # FIXED
+    enc_hidden_dims: [256, 128] # FIXED
+    dec_hidden_dims: [128, 256] # FIXED
+    conv_channels: [32, 64, 128, 128] # FIXED
+    kernel_sizes:  [7, 5, 5, 3] # FIXED
+    strides:       [2, 2, 2, 2] # FIXED
+    paddings:      [3, 2, 2, 1] # FIXED
+    emb_dim: 4 # FIXED
+    decoder_only_conditioning: true # FIXED
+    use_rms: False # FIXED
+    # prior (warm HMM-GMM; emissions init via KMeans at gmm_warmup_epochs)
+    prior: warm_hmm_gmm
+    num_gmm_states: 3
+    gmm_warmup_epochs: 18
+    hmm_warmup_epochs: 37
+    hmm_transition_ramp_epochs: 18
+    hmm_sticky_kappa: 0.86
+    hmm_estimate_transitions: true
     min_beta: 0.01
     max_beta: 1.0
     beta_warmup_epochs: 0
     beta_slowdown_epochs: 0
-    gmm_warmup_epochs: 0
     free_nats_per_dim: 0.00
     no_beta_epochs: 10
 
@@ -237,12 +242,11 @@ cvae:
   band_pass_filter_type: frequency_domain # FIXED
   traning_pipeline: cvae
   model_checkpoint_path: null
-  save_pretrained_checkpoint: false
   reinit_marhmm: false
 
 verbose: True
 seed: 123
-results_dir: results/decoder_only
-run_name: cvae_final_decoder_only
-runs: 3
+results_dir: results/decoder_only/reliability/chmmgmvae_decoder_only_scratch
+run_name: reliability_chmmgmvae_decoder_only_mssv_frequency_scratch
+runs: 10
 validate_data: True

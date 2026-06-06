@@ -1,7 +1,7 @@
 from src.models.cvae_mar_hmm import CVAEMARHMM
 from src.data.data_loader_collection import DataLoaderCollection
 from src.models.base_model import BaseModel
-from src.validation.validator import Validator
+from src.validation.validator import PRIOR_PRED_NMI_KEY, Validator
 from src.config.config import GlobalConfig
 from src.training.early_stopping import create_early_stopper
 from src.training.experiment_logger import create_logger
@@ -27,6 +27,21 @@ class Trainer:
         self.current_epoch = 0
         self.validator = validator
         self.early_stopping = create_early_stopper(self.config, self.global_config.verbose)
+        self._best_prior_nmi = -1.0
+        self._best_prior_epoch: int | None = None
+        self._best_checkpoint_score = float("-inf")
+        self._best_checkpoint_score_epoch: int | None = None
+        self._experiment_logger = None
+        self.results_run_subdir: str | None = None
+
+    def _checkpoint_dir(self) -> Path:
+        base = Path(self.global_config.results_dir) / self.global_config.run_name
+        if self.results_run_subdir is not None:
+            out = base / self.results_run_subdir / "checkpoints"
+        else:
+            out = base
+        out.mkdir(parents=True, exist_ok=True)
+        return out
     
     def __init_optimizer(self):
         if self.config.optimizer == "adam":
@@ -65,11 +80,16 @@ class Trainer:
         if self.global_config.verbose:
             self.__print_training_start()
         logger = create_logger(self.global_config)
+        self._experiment_logger = logger
         logger.start(
             run_name=self.global_config.run_name,
             config=self.global_config.model_dump(),
         )
         self.__init_training()
+        self._best_prior_nmi = -1.0
+        self._best_prior_epoch = None
+        self._best_checkpoint_score = float("-inf")
+        self._best_checkpoint_score_epoch = None
         for epoch in range(self.config.epochs):
             self.current_epoch = epoch
             for x, _, sub_ids in self.data_loader:
@@ -93,6 +113,8 @@ class Trainer:
             if self.config.validate_per_epoch > 0 and (epoch + 1) % self.config.validate_per_epoch == 0:
                 if isinstance(self.model, CVAEMARHMM) and self.model.training_pipeline == 'cvae':
                     self.validator.validate_cvae_epoch(epoch)
+                    self._maybe_save_best_prior_checkpoint(epoch)
+                    self._maybe_save_best_checkpoint_score(epoch)
                 else:
                     self.validator.validate_epoch(epoch, self.optimizer)
             lr = self.optimizer.param_groups[0].get('lr')
@@ -112,7 +134,13 @@ class Trainer:
             self.epoch_regularization_losses.clear()
             if self.global_config.verbose:
                 self.__print_epoch()
-        logger.finish()
+        self._log_wandb_training_summary()
+        defer_finish = (
+            isinstance(self.model, CVAEMARHMM)
+            and self.model.training_pipeline == "cvae"
+        )
+        if not defer_finish:
+            self.finalize_wandb()
     
     def train_profiled(self, out_dir: str | Path, *, basename: str = "train", sort: str = "cumulative") -> None:
         prof = cProfile.Profile()
@@ -127,8 +155,82 @@ class Trainer:
         assert self.losses, "Training has not been run yet."
         return self.losses
     
+    def _maybe_save_best_prior_checkpoint(self, epoch: int) -> None:
+        """Save when prior-prediction NMI improves (GMM marginal or HMM Viterbi)."""
+        metrics = self.validator.validations.get(epoch, {})
+        nmi = metrics.get(PRIOR_PRED_NMI_KEY)
+        if nmi is None or nmi <= self._best_prior_nmi:
+            return
+        self._best_prior_nmi = float(nmi)
+        self._best_prior_epoch = epoch
+        path = self._checkpoint_dir() / "cvae_best_prior_pred_nmi.pth"
+        torch.save(self.model.state_dict(), path)
+        if self.global_config.verbose:
+            print(
+                f"Saved best prior-pred NMI checkpoint (NMI={nmi:.4f}, epoch={epoch + 1}) to {path}",
+                flush=True,
+            )
+
+    def get_best_prior_checkpoint_path(self) -> Path | None:
+        path = self._checkpoint_dir() / "cvae_best_prior_pred_nmi.pth"
+        return path if path.exists() else None
+
+    def _checkpoint_score_warmup_epoch(self) -> int:
+        frac = self.config.checkpoint_score.warmup_frac
+        return int(frac * self.config.epochs)
+
+    def _maybe_save_best_checkpoint_score(self, epoch: int) -> None:
+        if not self.config.checkpoint_score.enabled:
+            return
+        if epoch < self._checkpoint_score_warmup_epoch():
+            return
+        metrics = self.validator.validations.get(epoch, {})
+        score = metrics.get("checkpoint_score")
+        if score is None or score <= self._best_checkpoint_score:
+            return
+        self._best_checkpoint_score = float(score)
+        self._best_checkpoint_score_epoch = epoch
+        path = self._checkpoint_dir() / "cvae_best_checkpoint_score.pth"
+        torch.save(self.model.state_dict(), path)
+        if self.global_config.verbose:
+            print(
+                f"Saved best checkpoint-score S={score:.4f} (epoch={epoch + 1}) to {path}",
+                flush=True,
+            )
+
+    def get_best_checkpoint_score_path(self) -> Path | None:
+        path = self._checkpoint_dir() / "cvae_best_checkpoint_score.pth"
+        return path if path.exists() else None
+
+    def _log_wandb_training_summary(self) -> None:
+        logger = self._experiment_logger
+        if logger is None:
+            return
+        summary: dict[str, float | int] = {}
+        if self._best_prior_epoch is not None:
+            summary["val/best_prior_pred_nmi"] = self._best_prior_nmi
+            summary["val/best_prior_pred_nmi_epoch"] = self._best_prior_epoch + 1
+        if self._best_checkpoint_score_epoch is not None:
+            summary["val/best_checkpoint_score"] = self._best_checkpoint_score
+            summary["val/best_checkpoint_score_epoch"] = self._best_checkpoint_score_epoch + 1
+        if summary:
+            logger.update_summary(summary)
+
+    def finalize_wandb(self, extra_summary: dict[str, float | int] | None = None) -> None:
+        logger = self._experiment_logger
+        if logger is None:
+            return
+        if extra_summary:
+            logger.update_summary(extra_summary)
+        logger.finish()
+        self._experiment_logger = None
+
     def reset(self):
         self.current_epoch = 0
+        self._best_prior_nmi = -1.0
+        self._best_prior_epoch = None
+        self._best_checkpoint_score = float("-inf")
+        self._best_checkpoint_score_epoch = None
         if self.config.early_stopping:
             self.early_stopping = create_early_stopper(self.config, self.global_config.verbose)
         else:

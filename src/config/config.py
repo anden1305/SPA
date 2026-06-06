@@ -14,6 +14,22 @@ class SchedulerConfig(BaseModel):
     step_size: int | None = Field(..., description="Step size for 'step' scheduler.")
     gamma: float = Field(..., gt=0, lt=1, description="Decay factor for the scheduler.")
 
+class CheckpointScoreConfig(BaseModel):
+    """Checkpoint score S(e) = beta * log_likelihood + (1 - beta) * entropy_norm."""
+
+    enabled: bool = Field(
+        False,
+        description="Save cvae_best_checkpoint_score.pth when S improves (after warmup).",
+    )
+    beta: float = Field(0.9, ge=0.0, le=1.0, description="Weight on validation log-likelihood.")
+    warmup_frac: float = Field(
+        0.05,
+        ge=0.0,
+        lt=1.0,
+        description="Fraction of epochs excluded before maximizing S.",
+    )
+
+
 class EarlyStoppingConfig(BaseModel):
     enabled: bool = Field(True, description="Enable adaptive early stopping.")
     patience: int = Field(..., ge=1, le=1000, description="Epochs without relative improvement before action.")
@@ -32,6 +48,7 @@ class TrainerConfig(BaseModel):
     validate_per_epoch: int = Field(..., ge=0, le=10000, description="Frequency of validation during training in epochs. Set to 0 to disable per-epoch validation. Maximum value is 50.")
     early_stopping: EarlyStoppingConfig = Field(default_factory=EarlyStoppingConfig, description="Early stopping settings. Set enabled=False to disable.")
     scheduler: SchedulerConfig = Field(default_factory=SchedulerConfig)
+    checkpoint_score: CheckpointScoreConfig = Field(default_factory=CheckpointScoreConfig)
 
 class ValidatorConfig(BaseModel):
     nmi: bool = Field(..., description="Whether to compute NMI.")
@@ -89,6 +106,10 @@ class CVAE(BaseModel):
     band_pass_filter_type: str | None = Field(default=None, pattern="^(frequency_domain|time_domain)$", description="Type of band-pass filter to apply.")
     traning_pipeline: str = Field(..., pattern="^(cvae|marhmm|cvae_then_marhmm)$", description="Training pipeline to use.")
     model_checkpoint_path: str | None = Field(default=None, description="Path to a pre-trained CVAE model checkpoint.")
+    save_pretrained_checkpoint: bool = Field(
+        default=True,
+        description="If true, the last train_vae internal run overwrites model_checkpoint_path when set.",
+    )
     reinit_marhmm: bool = Field(..., description="Whether to reinitialize MAR-HMM after CVAE training.")
     
 class ModelConfig(BaseModel):

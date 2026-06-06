@@ -1,0 +1,58 @@
+[
+  {
+    "id": "ref",
+    "config": "src/config/run/cvaemarhmm/decoder_only/sweep/generated/baseline_sweep_ref.yaml"
+  },
+  {
+    "id": "lr2e4",
+    "config": "src/config/run/cvaemarhmm/decoder_only/sweep/generated/baseline_sweep_lr2e4.yaml"
+  },
+  {
+    "id": "lr25e4",
+    "config": "src/config/run/cvaemarhmm/decoder_only/sweep/generated/baseline_sweep_lr25e4.yaml"
+  },
+  {
+    "id": "lr35e4",
+    "config": "src/config/run/cvaemarhmm/decoder_only/sweep/generated/baseline_sweep_lr35e4.yaml"
+  },
+  {
+    "id": "lr4e4",
+    "config": "src/config/run/cvaemarhmm/decoder_only/sweep/generated/baseline_sweep_lr4e4.yaml"
+  },
+  {
+    "id": "bw10",
+    "config": "src/config/run/cvaemarhmm/decoder_only/sweep/generated/baseline_sweep_bw10.yaml"
+  },
+  {
+    "id": "bw20_nb5",
+    "config": "src/config/run/cvaemarhmm/decoder_only/sweep/generated/baseline_sweep_bw20_nb5.yaml"
+  },
+  {
+    "id": "fn01",
+    "config": "src/config/run/cvaemarhmm/decoder_only/sweep/generated/baseline_sweep_fn01.yaml"
+  },
+  {
+    "id": "fn02",
+    "config": "src/config/run/cvaemarhmm/decoder_only/sweep/generated/baseline_sweep_fn02.yaml"
+  },
+  {
+    "id": "nb5",
+    "config": "src/config/run/cvaemarhmm/decoder_only/sweep/generated/baseline_sweep_nb5.yaml"
+  },
+  {
+    "id": "mb005",
+    "config": "src/config/run/cvaemarhmm/decoder_only/sweep/generated/baseline_sweep_mb005.yaml"
+  },
+  {
+    "id": "comb_a",
+    "config": "src/config/run/cvaemarhmm/decoder_only/sweep/generated/baseline_sweep_comb_a.yaml"
+  },
+  {
+    "id": "comb_b",
+    "config": "src/config/run/cvaemarhmm/decoder_only/sweep/generated/baseline_sweep_comb_b.yaml"
+  },
+  {
+    "id": "ep100",
+    "config": "src/config/run/cvaemarhmm/decoder_only/sweep/generated/baseline_sweep_ep100.yaml"
+  }
+]

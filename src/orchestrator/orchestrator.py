@@ -22,6 +22,7 @@ from src.orchestrator.train_details import TrainDetails
 from src.training.trainer import Trainer
 from src.validation.validator import Validator
 from src.helpers.profiling import write_cprofile_outputs
+from src.helpers.cvae_checkpoint import expected_subject_emb_shape, incompatible_subject_emb_message, is_legacy_subject_emb_checkpoint, subject_emb_shape_from_cvae_state
 from src.visuals.visualizer import Visualizer
 import matplotlib.pyplot as plt
 import numpy as np
@@ -42,25 +43,75 @@ class Orchestrator:
     
     ### public methods ###
 
-    def _load_cvae_checkpoint_if_available(self) -> bool:
-        """Load configured CVAE checkpoint if present. Returns True when loaded."""
-        checkpoint_path = self.global_config.cvae.model_checkpoint_path
-        if checkpoint_path is None:
-            return False
-
+    def _load_cvae_checkpoint_from(self, checkpoint_path: Path | str) -> bool:
         checkpoint = Path(checkpoint_path)
         if not checkpoint.exists():
-            print(f"CVAE checkpoint not found at {checkpoint_path}; continuing without loading.")
+            print(f"CVAE checkpoint not found at {checkpoint}; continuing without loading.")
             return False
 
-        print(f"Loading CVAE model from checkpoint: {checkpoint_path}")
         state = torch.load(checkpoint, map_location="cpu")
         cvae_state = {k[len("cvae."):]: v for k, v in state.items() if k.startswith("cvae.")}
+        if not cvae_state:
+            print(f"No cvae.* keys in checkpoint {checkpoint}; skipping load.")
+            return False
+
+        emb_dim = int(getattr(self.model.cvae, "emb_dim", 0) or 0)
+        if emb_dim > 0 and not is_legacy_subject_emb_checkpoint(cvae_state, emb_dim):
+            ckpt_shape = subject_emb_shape_from_cvae_state(cvae_state)
+            print(
+                "Skipping CVAE checkpoint load — incompatible subject embedding. "
+                f"{incompatible_subject_emb_message(ckpt_shape, emb_dim)}. "
+                f"Expected {list(expected_subject_emb_shape(emb_dim))}. "
+                "Training from scratch; a compatible checkpoint will be saved at run end."
+            )
+            return False
+
+        print(f"Loading CVAE model from checkpoint: {checkpoint}")
         self.model.cvae.load_state_dict(cvae_state, strict=False)
+        prior = getattr(self.model.cvae, "prior", None)
+        if prior in ("warm_gmm", "warm_hmm_gmm", "gmm", "hmm_gmm") and "prior_means" in cvae_state:
+            self.model.cvae.gmm_warmup_initialized = True
+        if prior in ("warm_hmm_gmm", "hmm_gmm") and "prior_transition_logits" in cvae_state:
+            self.model.cvae.hmm_transitions_initialized = True
+            self.model.cvae.hmm_transitions_initialized_at_hmm = True
         return True
 
+    @staticmethod
+    def _resolve_run_validation_checkpoint(ckpt_dir: Path) -> Path | None:
+        manifest = ckpt_dir / "validation_checkpoint.txt"
+        if manifest.exists():
+            path = Path(manifest.read_text().strip())
+            return path if path.exists() else None
+        score = ckpt_dir / "cvae_best_checkpoint_score.pth"
+        if score.exists():
+            return score
+        best = ckpt_dir / "cvae_best_prior_pred_nmi.pth"
+        if best.exists():
+            return best
+        final = ckpt_dir / "cvae_final_model.pth"
+        return final if final.exists() else None
+
+    def _load_cvae_checkpoint_if_available(self) -> bool:
+        """Load configured CVAE checkpoint, else per-run best/final under checkpoints/."""
+        if self.global_config.cvae.model_checkpoint_path:
+            return self._load_cvae_checkpoint_from(self.global_config.cvae.model_checkpoint_path)
+
+        if self.run_number is not None:
+            ckpt_dir = (
+                Path(self.global_config.results_dir)
+                / self.global_config.run_name
+                / str(self.run_number)
+                / "checkpoints"
+            )
+            run_ckpt = self._resolve_run_validation_checkpoint(ckpt_dir)
+            if run_ckpt is not None:
+                return self._load_cvae_checkpoint_from(run_ckpt)
+        return False
+
     def _save_cvae_checkpoint_to_config_path(self):
-        """Save the full model state to configured CVAE checkpoint path for later reuse."""
+        """Optionally mirror the latest finetuned weights to model_checkpoint_path."""
+        if not self.global_config.cvae.save_pretrained_checkpoint:
+            return
         checkpoint_path = self.global_config.cvae.model_checkpoint_path
         if checkpoint_path is None:
             return
@@ -251,13 +302,16 @@ class Orchestrator:
             self.global_config.seed += 1
             self.model.reset()
             self.trainer.reset()
-            # self.validator.validate(epoch=0)  
+            self.validator.reset()
             run_dir = Path(self.global_config.results_dir) / self.global_config.run_name / str(self.run_number)
-        
-            # CVAE training
-            self._load_cvae_checkpoint_if_available()
-            
-            
+            run_dir.mkdir(parents=True, exist_ok=True)
+            ckpt_dir = run_dir / "checkpoints"
+            ckpt_dir.mkdir(parents=True, exist_ok=True)
+            self.trainer.results_run_subdir = str(self.run_number)
+
+            if self.global_config.cvae.model_checkpoint_path:
+                self._load_cvae_checkpoint_from(self.global_config.cvae.model_checkpoint_path)
+
             if self.global_config.cvae.traning_pipeline in ['cvae_then_marhmm', 'cvae']:
                 self.model.training_pipeline = 'cvae'
                 self.trainer.train()
@@ -267,12 +321,55 @@ class Orchestrator:
                 except Exception as e:
                     print(f"Error collecting training details: {e}")
                     train_details = None
+                if train_details is not None:
+                    self.__save_info(train_details=train_details)
                 self.visualizer.visualize_cvae(model=self.model, train_details=train_details)
-                # Save one checkpoint per run to avoid overwriting when runs > 1.
-                run_ckpt_path = Path(self.global_config.results_dir) / self.global_config.run_name / f"cvae_final_model_run{self.run_number}.pth"
+
+                run_ckpt_path = ckpt_dir / "cvae_final_model.pth"
                 torch.save(self.model.state_dict(), run_ckpt_path)
-                # Also save to configured checkpoint path so follow-up validation can load it.
+                legacy_ckpt = (
+                    Path(self.global_config.results_dir)
+                    / self.global_config.run_name
+                    / f"cvae_final_model_run{self.run_number}.pth"
+                )
+                torch.save(self.model.state_dict(), legacy_ckpt)
                 self._save_cvae_checkpoint_to_config_path()
+
+                prior_nmi: float | None = None
+                try:
+                    cs_enabled = self.global_config.trainer.checkpoint_score.enabled
+                    score_ckpt = self.trainer.get_best_checkpoint_score_path()
+                    prior_ckpt = self.trainer.get_best_prior_checkpoint_path()
+                    if cs_enabled and score_ckpt is not None:
+                        validation_ckpt = score_ckpt
+                        best_ep = self.trainer._best_checkpoint_score_epoch
+                        print(
+                            f"Validating with best checkpoint-score: {validation_ckpt} "
+                            f"(epoch {(best_ep + 1) if best_ep is not None else '?'})"
+                        )
+                    elif prior_ckpt is not None:
+                        validation_ckpt = prior_ckpt
+                        best_ep = self.trainer._best_prior_epoch
+                        print(
+                            f"Validating with best prior-pred NMI checkpoint: {validation_ckpt} "
+                            f"(epoch {(best_ep + 1) if best_ep is not None else '?'})"
+                        )
+                    else:
+                        validation_ckpt = run_ckpt_path
+                        print(f"Validating with final run checkpoint: {validation_ckpt}")
+                    (ckpt_dir / "validation_checkpoint.txt").write_text(str(validation_ckpt))
+                    self._load_cvae_checkpoint_from(validation_ckpt)
+                    prior_nmi = self._validate_trained_cvae_prior(run_dir)
+                except Exception as e:
+                    print(f"Warning: post-train prior validation failed: {e}")
+                finally:
+                    from src.validation.validator import PRIOR_PRED_NMI_KEY
+
+                    extra: dict[str, float | int] = {}
+                    if prior_nmi is not None:
+                        extra["val/prior_pred_nmi"] = prior_nmi
+                        extra[PRIOR_PRED_NMI_KEY] = prior_nmi
+                    self.trainer.finalize_wandb(extra)
             
             if self.global_config.cvae.traning_pipeline in ['marhmm', 'cvae_then_marhmm']:
                 self.model.training_pipeline = 'marhmm'
@@ -289,8 +386,27 @@ class Orchestrator:
                 torch.save(self.model.state_dict(), f"{self.global_config.results_dir}/{self.global_config.run_name}/cvaehmm_final_model.pth")
     
     
+    def _validate_trained_cvae_prior(self, run_dir: Path) -> float:
+        """Run prior-based validation on in-memory weights (best or final checkpoint)."""
+        plots_dir = run_dir / "plots"
+        plots_dir.mkdir(parents=True, exist_ok=True)
+        prior = getattr(self.model.cvae, "prior", "gmm")
+        if prior in ("hmm_gmm", "warm_hmm_gmm"):
+            nmi, log_pz, y_hat, y, mu, x, sub_ids, switch_rate, gmm_switch = self.validator.validate_cvae_hmm()
+            self.visualizer.visualize_cvae_hmm(y_hat, y, mu, x, nmi, log_pz, sub_ids, switch_rate, output_subdir=str(run_dir.name))
+            self._write_validation_info(nmi=nmi, likelihood=float(log_pz), output_subdir=str(run_dir.name))
+            print(f"HMM-GMM NMI: {nmi}, log p(z_1:T): {log_pz}, HMM switch (per 100): {switch_rate}, GMM marginal switch (per 100): {gmm_switch}")
+        else:
+            nmi, likelihood, y_hat, y, x_latent, x, sub_ids = self.validator.validate_cvae_gmm()
+            self.visualizer.visualize_cvae_gmm(
+                y_hat, y, x_latent, x, nmi, likelihood, sub_ids, output_subdir=str(run_dir.name)
+            )
+            self._write_validation_info(nmi=nmi, likelihood=likelihood, output_subdir=str(run_dir.name))
+            print(f"GMM NMI: {nmi}, Likelihood: {likelihood}")
+        return float(nmi)
+
     def predict_cvae(self):
-        
+
         # CVAE training
         loaded = self._load_cvae_checkpoint_if_available()
         if not loaded:
@@ -298,23 +414,17 @@ class Orchestrator:
                 "No CVAE checkpoint available for validation. "
                 "Run train_vae first or set cvae.model_checkpoint_path to an existing file."
             )
-        nmi, likelihood, y_hat, y, x_latent, x, sub_ids = self.validator.validate_cvae_gmm()
-        self.visualizer.visualize_cvae_gmm(
-            y_hat,
-            y,
-            x_latent,
-            x,
-            nmi,
-            likelihood,
-            sub_ids,
-            output_subdir=self.validation_tag,
-        )
-        self._write_validation_info(
-            nmi=nmi,
-            likelihood=likelihood,
-            output_subdir=self.validation_tag,
-        )
-        print(f"GMM NMI: {nmi}, Likelihood: {likelihood}")
+        prior = getattr(self.model.cvae, "prior", "gmm")
+        if prior in ("hmm_gmm", "warm_hmm_gmm"):
+            nmi, log_pz, y_hat, y, mu, x, sub_ids, switch_rate, gmm_switch = self.validator.validate_cvae_hmm()
+            self.visualizer.visualize_cvae_hmm(y_hat, y, mu, x, nmi, log_pz, sub_ids, switch_rate, output_subdir=self.validation_tag)
+            self._write_validation_info(nmi=nmi, likelihood=float(log_pz), output_subdir=self.validation_tag)
+            print(f"HMM-GMM NMI: {nmi}, log p(z_1:T): {log_pz}, HMM switch (per 100): {switch_rate}, GMM marginal switch (per 100): {gmm_switch}")
+        else:
+            nmi, likelihood, y_hat, y, x_latent, x, sub_ids = self.validator.validate_cvae_gmm()
+            self.visualizer.visualize_cvae_gmm(y_hat, y, x_latent, x, nmi, likelihood, sub_ids, output_subdir=self.validation_tag)
+            self._write_validation_info(nmi=nmi, likelihood=likelihood, output_subdir=self.validation_tag)
+            print(f"GMM NMI: {nmi}, Likelihood: {likelihood}")
         
     
     ### private methods ###

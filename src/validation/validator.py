@@ -14,6 +14,9 @@ from src.models.base_model import BaseModel
 from src.models.cvae_mar_hmm import CVAEMARHMM
 from src.orchestrator.train_details import TrainDetails
 from src.helpers.state_distinctness import compute_state_distinctness
+from src.validation.hmmgmm_metrics import checkpoint_score, entropy_norm, state_switch_rate
+
+PRIOR_PRED_NMI_KEY = "prior_pred_nmi"
 
 
 class Validator:
@@ -242,13 +245,69 @@ class Validator:
         x, y, sub_ids = self.data_loader.get_all_data()
         self.model.prepare_for_inference()
         with torch.no_grad():
-            x_latent = self.model.get_latent_representation(x, sub_ids)
-            x_latent = x_latent.reshape(-1, x_latent.shape[-1])
+            x_latent_seq = self.model.get_latent_representation(x, sub_ids)
+            x_latent = x_latent_seq.reshape(-1, x_latent_seq.shape[-1])
         n_clusters = len(torch.unique(y))
         nmi = self.__calculate_kmeans_nmi(x_latent, y, n_clusters)
         self.validations[epoch]['cvae_latent_kmeans_nmi'] = nmi
         print(f"CVAE Latent KMeans NMI: {nmi:.4f}")
+        self._validate_cvae_prior_metrics(epoch, x, y, sub_ids)
         self.model.prepare_for_training()
+
+    def _validate_cvae_prior_metrics(
+        self,
+        epoch: int,
+        x: torch.Tensor,
+        y: torch.Tensor,
+        sub_ids: torch.Tensor,
+    ) -> None:
+        """Prior predictions, collapse metrics, and checkpoint score S(e)."""
+        k_pred = self.data_loader.get_num_states()
+        prior_name = getattr(self.model.cvae, "prior", None)
+        cs_cfg = self.global_config.trainer.checkpoint_score
+        beta = cs_cfg.beta
+
+        with torch.no_grad():
+            val_nll, _ = self.model.forward(x, sub_ids, epoch)
+        log_likelihood = float(-val_nll.item())
+        self.validations[epoch]["log_likelihood"] = log_likelihood
+
+        try:
+            with torch.no_grad():
+                if prior_name in ("hmm_gmm", "warm_hmm_gmm"):
+                    y_hat, _, _ = self.model.cvae.predict_hmm_labels(x, sub_ids)
+                else:
+                    _, y_hat, _ = self.model.predict_gmm(
+                        x, sub_ids, initialize_if_needed=True
+                    )
+        except Exception as e:
+            print(f"Skipping CVAE prior metrics at epoch {epoch + 1}: {e}")
+            return
+
+        y_np = y.detach().cpu().numpy().flatten()
+        preds_np = y_hat.detach().cpu().numpy().flatten()
+        prior_nmi = float(calculate_nmi(preds_np, y_np))
+        ent_norm = entropy_norm(preds_np, k_pred)
+        score = checkpoint_score(log_likelihood, ent_norm, beta=beta)
+
+        self.validations[epoch][PRIOR_PRED_NMI_KEY] = prior_nmi
+        self.validations[epoch]["entropy_norm"] = ent_norm
+        self.validations[epoch]["checkpoint_score"] = score
+        self.validations[epoch]["n_unique_pred_states"] = int(len(np.unique(preds_np)))
+
+        if y_hat.dim() == 2 and y_hat.shape[1] > 1:
+            switch = state_switch_rate(y_hat)
+            self.validations[epoch]["prior_switch_rate_per100"] = switch
+        else:
+            self.validations[epoch]["prior_switch_rate_per100"] = 0.0
+
+        if self.global_config.verbose:
+            sw = self.validations[epoch]["prior_switch_rate_per100"]
+            print(
+                f"Prior val — NMI: {prior_nmi:.4f}, log-lik: {log_likelihood:.4f}, "
+                f"H_norm: {ent_norm:.4f}, S: {score:.4f}, n_states: "
+                f"{self.validations[epoch]['n_unique_pred_states']}, switch/100: {sw:.4f}"
+            )
     
     def validate_cvae_gmm(self):
         assert type(self.model) == CVAEMARHMM, "Model must be of type CVAEMARHMM to validate CVAE latent representations."
@@ -256,9 +315,27 @@ class Validator:
         x_non_norm = self.data_loader.get_non_normalized_data()
         self.model.prepare_for_inference()
         with torch.no_grad():
-            x_latent, y_hat, likelihood = self.model.predict_gmm(x, sub_ids)
+            x_latent, y_hat, likelihood = self.model.predict_gmm(x, sub_ids, initialize_if_needed=True)
         nmi = calculate_nmi(y_hat.detach().cpu().numpy().flatten(), y.detach().cpu().numpy().flatten())
         return nmi, likelihood, y_hat, y, x_latent, x_non_norm, sub_ids
+
+    def validate_cvae_hmm(self):
+        assert type(self.model) == CVAEMARHMM, "Model must be of type CVAEMARHMM."
+        x, y, sub_ids = self.data_loader.get_all_data()
+        x_non_norm = self.data_loader.get_non_normalized_data()
+        self.model.prepare_for_inference()
+        with torch.no_grad():
+            y_hat, log_pz, mu = self.model.cvae.predict_hmm_labels(x, sub_ids)
+            gmm_switch = 0.0
+            try:
+                _, y_gmm, _ = self.model.predict_gmm(x, sub_ids, initialize_if_needed=True)
+                gmm_switch = state_switch_rate(y_gmm)
+            except Exception as e:
+                print(f"Skipping GMM marginal comparison: {e}")
+        nmi = calculate_nmi(y_hat.detach().cpu().numpy().flatten(), y.detach().cpu().numpy().flatten())
+        switch_rate = state_switch_rate(y_hat)
+        print(f"HMM switch rate (per 100): {switch_rate:.4f}; GMM marginal (per 100): {gmm_switch:.4f}")
+        return nmi, log_pz, y_hat, y, mu, x_non_norm, sub_ids, switch_rate, gmm_switch
     
     ####### HELPER METHODS #######
     

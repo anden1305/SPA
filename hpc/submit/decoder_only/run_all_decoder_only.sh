@@ -23,7 +23,7 @@ bash hpc/submit/decoder_only/run_decoder_only_generalization_subject.sh
 echo ""
 echo "Reliability Experiments:"
 echo "------------------------"
-bsub < hpc/submit/decoder_only/run_decoder_only_reliability.sh
+bsub < hpc/submit/decoder_only/reliability/run_cgmvae.sh
 
 echo ""
 echo "Generalization Experiments:"

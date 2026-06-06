@@ -8,6 +8,7 @@ from sklearn.cluster import KMeans
 
 from src.config.config import GlobalConfig
 from src.data.data_loader_collection import DataLoaderCollection
+from src.models.hmm_gmm_prior import estimate_transition_logits_from_paths, forward_log_marginal, gaussian_log_prob_diag, init_sticky_transition_logits, viterbi_decode
 
 class ConditionalVAE(nn.Module):
     def __init__(
@@ -58,11 +59,18 @@ class ConditionalVAE(nn.Module):
         self.no_beta_epochs = params.get("no_beta_epochs", None)
         
         # Prior
-        self.prior = params.get("prior", "warm_gmm") # "standard", "gmm" or "warm_gmm"
-        self.gmm_warmup_epochs = params.get("gmm_warmup_epochs", 50) # only for "warm_gmm"
+        self.prior = params.get("prior", "warm_gmm")  # standard | gmm | warm_gmm | hmm_gmm | warm_hmm_gmm
+        self.gmm_warmup_epochs = params.get("gmm_warmup_epochs", 50)  # warm_gmm / warm_hmm_gmm
         self.gmm_warmup_initialized = False
         self.free_nats_per_dim = params.get("free_nats_per_dim", 0.02)
         self.num_gmm_states = params.get("num_gmm_states", self.num_states)
+
+        self.hmm_warmup_epochs = params.get("hmm_warmup_epochs", self.gmm_warmup_epochs)
+        self.hmm_transition_ramp_epochs = int(params.get("hmm_transition_ramp_epochs", 0))
+        self.hmm_sticky_kappa = float(params.get("hmm_sticky_kappa", 0.9))
+        self.hmm_estimate_transitions = bool(params.get("hmm_estimate_transitions", True))
+        self.hmm_transitions_initialized = False
+        self.hmm_transitions_initialized_at_hmm = False
         
         # Set torch random seed for reproducibility
         seed = self.global_config.seed
@@ -150,11 +158,13 @@ class ConditionalVAE(nn.Module):
         self.decoder_cnn = nn.Sequential(*dec_layers)
         
         
-        # GMM prior parameters (unchanged)
-        if self.prior in ("gmm","warm_gmm"):
+        # GMM / HMM-GMM emission parameters
+        if self.prior in ("gmm", "warm_gmm", "hmm_gmm", "warm_hmm_gmm"):
             self.prior_logits = nn.Parameter(torch.zeros(self.num_gmm_states, device=self.device))
             self.prior_means = nn.Parameter(torch.randn(self.num_gmm_states, self.latent_dim))
             self.prior_logvars = nn.Parameter(torch.zeros(self.num_gmm_states, self.latent_dim, device=self.device))
+        if self.prior in ("hmm_gmm", "warm_hmm_gmm"):
+            self.prior_transition_logits = nn.Parameter(init_sticky_transition_logits(self.num_gmm_states, self.hmm_sticky_kappa, device=self.device))
 
         self.to(self.device)
 
@@ -287,6 +297,12 @@ class ConditionalVAE(nn.Module):
             reg_loss = self.standard_prior(logvar, mu)
         elif self.prior == "warm_gmm":
             reg_loss = self.warm_gmm_prior(logvar, mu, z, epoch)
+        elif self.prior == "hmm_gmm":
+            reg_loss = self.hmm_gmm_prior(logvar, mu, z)
+        elif self.prior == "warm_hmm_gmm":
+            reg_loss = self.warm_hmm_gmm_prior(logvar, mu, z, epoch)
+        else:
+            raise ValueError(f"Unknown prior '{self.prior}'.")
         reg_loss = self.regularization_loss(reg_loss, epoch)
         return recon_loss, reg_loss
     
@@ -301,7 +317,101 @@ class ConditionalVAE(nn.Module):
                 self.prior_logits.copy_(logits)
             self.gmm_warmup_initialized = True
         return self.gmm_prior(logvar, mu, z)
-    
+
+    def _log_q_per_step(self, mu: torch.Tensor, logvar: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
+        return -0.5 * (
+            math.log(2 * math.pi) + logvar + (z - mu).pow(2) / logvar.exp()
+        ).sum(dim=-1)
+
+    def _gmm_log_p_per_step(self, z: torch.Tensor) -> torch.Tensor:
+        log_emit = gaussian_log_prob_diag(z, self.prior_means, self.prior_logvars)
+        log_mix = F.log_softmax(self.prior_logits, dim=0).view(1, 1, -1)
+        return torch.logsumexp(log_emit + log_mix, dim=-1)
+
+    def _kl_with_free_bits(self, kl_per_seq: torch.Tensor, T: int) -> torch.Tensor:
+        kl_mean = kl_per_seq / float(T)
+        free_nats_total = float(self.free_nats_per_dim) * self.latent_dim
+        return torch.clamp(kl_mean, min=free_nats_total).mean()
+
+    def hmm_gmm_prior(self, logvar: torch.Tensor, mu: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
+        if z.dim() != 3:
+            raise ValueError(f"hmm_gmm_prior expects z of shape (B,T,L); got {tuple(z.shape)}")
+        B, T, _ = z.shape
+        log_q = self._log_q_per_step(mu, logvar, z).sum(dim=-1)
+        log_emit = gaussian_log_prob_diag(z, self.prior_means, self.prior_logvars)
+        log_pi = F.log_softmax(self.prior_logits, dim=0)
+        log_A = F.log_softmax(self.prior_transition_logits, dim=-1)
+        log_p_seq = forward_log_marginal(log_emit, log_pi, log_A)
+        return self._kl_with_free_bits(log_q - log_p_seq, T)
+
+    def gmm_sequence_prior(self, logvar: torch.Tensor, mu: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
+        if z.dim() != 3:
+            raise ValueError(f"gmm_sequence_prior expects z of shape (B,T,L); got {tuple(z.shape)}")
+        B, T, _ = z.shape
+        log_q = self._log_q_per_step(mu, logvar, z).sum(dim=-1)
+        log_p = self._gmm_log_p_per_step(z).sum(dim=-1)
+        return self._kl_with_free_bits(log_q - log_p, T)
+
+    def _safe_hmm_gmm_prior(self, logvar: torch.Tensor, mu: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
+        reg = self.hmm_gmm_prior(logvar, mu, z)
+        if torch.isfinite(reg):
+            return reg
+        return self.gmm_sequence_prior(logvar, mu, z)
+
+    def warm_hmm_gmm_prior(self, logvar: torch.Tensor, mu: torch.Tensor, z: torch.Tensor, epoch: int) -> torch.Tensor:
+        if epoch < self.gmm_warmup_epochs:
+            return self.standard_prior(logvar, mu)
+        if not self.gmm_warmup_initialized:
+            means, logvars, logits = self.__get_kmeans_centroids()
+            with torch.no_grad():
+                self.prior_means.copy_(means)
+                self.prior_logvars.copy_(logvars)
+                self.prior_logits.copy_(logits)
+            self.gmm_warmup_initialized = True
+        if epoch < self.hmm_warmup_epochs:
+            return self.gmm_sequence_prior(logvar, mu, z)
+        if self.hmm_estimate_transitions and not self.hmm_transitions_initialized_at_hmm:
+            self.__init_hmm_transitions()
+            self.hmm_transitions_initialized_at_hmm = True
+            self.hmm_transitions_initialized = True
+        if self.hmm_transition_ramp_epochs > 0:
+            ramp_progress = (epoch - self.hmm_warmup_epochs) / float(self.hmm_transition_ramp_epochs)
+            alpha = max(0.0, min(1.0, ramp_progress))
+        else:
+            alpha = 1.0
+        if alpha >= 1.0:
+            return self._safe_hmm_gmm_prior(logvar, mu, z)
+        if alpha <= 0.0:
+            return self.gmm_sequence_prior(logvar, mu, z)
+        hmm_reg = self._safe_hmm_gmm_prior(logvar, mu, z)
+        gmm_reg = self.gmm_sequence_prior(logvar, mu, z)
+        return (1.0 - alpha) * gmm_reg + alpha * hmm_reg
+
+    @torch.no_grad()
+    def __init_hmm_transitions(self, max_points: int = 200_000):
+        was_training = self.training
+        self.eval()
+        x, _, subject_ids = self.data_loader.get_all_data()
+        x = x.to(self.device)
+        mu, _ = self.encode(x, subject_ids=subject_ids)
+        log_emit = gaussian_log_prob_diag(mu, self.prior_means, self.prior_logvars)
+        log_mix = F.log_softmax(self.prior_logits, dim=0).view(1, 1, -1)
+        assign = (log_emit + log_mix).argmax(dim=-1)
+        if assign.shape[1] < 2:
+            log_A = init_sticky_transition_logits(self.num_gmm_states, self.hmm_sticky_kappa, device=self.device)
+            self.prior_transition_logits.copy_(log_A)
+            self.train(was_training)
+            return
+        log_pi_est, log_A_est = estimate_transition_logits_from_paths(assign, self.num_gmm_states)
+        log_A_sticky = init_sticky_transition_logits(self.num_gmm_states, self.hmm_sticky_kappa, device=self.device)
+        A_est = torch.exp(log_A_est)
+        A_sticky = torch.exp(log_A_sticky)
+        A_blend = 0.5 * A_est + 0.5 * A_sticky
+        A_blend = A_blend / A_blend.sum(dim=-1, keepdim=True).clamp_min(1e-12)
+        self.prior_logits.copy_(log_pi_est)
+        self.prior_transition_logits.copy_(A_blend.clamp_min(1e-12).log())
+        self.train(was_training)
+
     def __get_kmeans_centroids(self, max_points: int = 200_000):
         """
         Fits KMeans on encoder means (mu) and returns:
@@ -472,16 +582,13 @@ class ConditionalVAE(nn.Module):
             y: (B, S) LongTensor of predicted component indices
             likelihood: (B, S) Tensor of chosen likelihood quantity (see likelihood_type)
         """
-        if self.prior not in ("gmm", "warm_gmm"):
-            raise ValueError(f"predict_gmm_labels requires a GMM prior, got prior='{self.prior}'.")
+        if self.prior not in ("gmm", "warm_gmm", "hmm_gmm", "warm_hmm_gmm"):
+            raise ValueError(f"predict_gmm_labels requires a GMM or HMM-GMM emission prior, got prior='{self.prior}'.")
 
         # If warm_gmm and not initialized, optionally initialize from current encoder means.
-        if self.prior == "warm_gmm" and (not getattr(self, "gmm_warmup_initialized", False)):
+        if self.prior in ("warm_gmm", "warm_hmm_gmm") and (not getattr(self, "gmm_warmup_initialized", False)):
             if not initialize_if_needed:
-                raise RuntimeError(
-                    "GMM prior not initialized (warm_gmm). "
-                    "Run training past gmm_warmup_epochs or call with initialize_if_needed=True."
-                )
+                raise RuntimeError("GMM prior not initialized (warm_gmm). Run training past gmm_warmup_epochs or call with initialize_if_needed=True.")
             means, logvars, logits = self.__get_kmeans_centroids(max_points=max_points)
             self.prior_means.copy_(means)
             self.prior_logvars.copy_(logvars)
@@ -554,4 +661,19 @@ class ConditionalVAE(nn.Module):
         log_pz = log_pz_flat.view(B, S)
         log_pz = log_pz.mean()
 
+        return y, log_pz, mu
+
+    @torch.no_grad()
+    def predict_hmm_labels(self, x: torch.Tensor, subject_ids: torch.Tensor, *, use_mu: bool = True):
+        if self.prior not in ("hmm_gmm", "warm_hmm_gmm"):
+            raise ValueError(f"predict_hmm_labels requires an HMM-GMM prior, got prior='{self.prior}'.")
+        self.eval()
+        x = x.to(self.device)
+        mu, logvar = self.encode(x, subject_ids=subject_ids)
+        z = mu if use_mu else self.reparameterize(mu, logvar)
+        log_emit = gaussian_log_prob_diag(z, self.prior_means, self.prior_logvars)
+        log_pi = F.log_softmax(self.prior_logits, dim=0)
+        log_A = F.log_softmax(self.prior_transition_logits, dim=-1)
+        y = viterbi_decode(log_emit, log_pi, log_A)
+        log_pz = forward_log_marginal(log_emit, log_pi, log_A).mean()
         return y, log_pz, mu

@@ -8,6 +8,6 @@ echo "Submitting baseline ablation job"
 bsub < hpc/submit/run_vae.sh
 
 echo "Submitting decoder-only ablation job"
-bsub < hpc/submit/run_vae_decoder_only.sh
+bsub < hpc/submit/decoder_only/baseline/run_decoder_only.sh
 
 echo "Done submitting ablation jobs."

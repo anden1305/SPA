@@ -1,0 +1,70 @@
+---
+description: HPC bsub — keep user informed; never block on long queues
+alwaysApply: true
+---
+
+# HPC job communication (bsub / batch)
+
+When submitting or monitoring batch jobs, **the user stays in control**. Do not leave them in limbo.
+
+## Before submitting — **wait for confirmation**
+
+**Never run `bsub` (or `bmod`/`bkill` on the user's jobs) until the user explicitly confirms** after seeing the full plan — e.g. "yes submit", "go ahead", "submit them". Discussing experiments, fixing scripts, or saying "you need to run X" is **not** permission to submit.
+
+**Default:** Give the exact copy-paste commands only; user runs them. Agent submits only when clearly asked.
+
+**Pre-submit checklist** (all items, in the message — user must see this before any submit):
+
+| Field | Example |
+|-------|---------|
+| Submit script | `hpc/submit/decoder_only/reliability/run_cgmvae.sh` |
+| YAML config | `src/config/run/.../reliability_cgmvae_decoder_only_mssv_frequency.yaml` |
+| `runs` / seeds | `10` |
+| Queue / walltime | `gpuv100`, `6:00` |
+| Job name (`#BSUB -J`) | `do_rel_cgmvae` |
+| Dependencies | `done(<JOBID>)` or none |
+| Checkpoint load | `cvae.model_checkpoint_path` value or `null` (scratch) |
+| LSF logs | `hpc/output/decoder_only/reliability/cgmvae_%J.out` |
+| Results | `results_dir` + `run_name` from YAML |
+
+If multiple jobs: numbered list with the same fields per job and dependency order.
+
+End with: **"Confirm if you want me to submit (or run the commands above yourself)."**
+
+## After submitting
+
+- Report each **JOBID** and **job name** (`bjobs` / script stdout).
+- Give **copy-paste monitor commands** (do not run long polls yourself):
+
+```bash
+bjobs -u $USER                    # queue status
+bjobs -J <job_name>               # one job family
+tail -f hpc/output/.../<JOBID>.out
+```
+
+- State that **PEND can last hours** on busy queues; the agent does not wait for completion unless the user asks to check status once.
+
+## While jobs run
+
+- **Do not** loop `sleep` / `Await` for minutes waiting for batch jobs to finish.
+- **Do not** background a long poll and disappear without telling the user what to run and where logs live.
+- If checking status: one quick `bjobs` or `tail` snapshot, then report findings and hand control back.
+
+## When jobs finish (user or one-off check)
+
+- Point to **LSF log** (`*.out` / `*.err`) for errors.
+- Point to **result directory** (e.g. `results/cv4fold/.../<run_name>_<timestamp>/`) and any postprocess artifacts (`per_mouse/`, `val_nmi_by_lab.csv`, `summary.csv`).
+- If postprocess is manual, list the exact commands once.
+
+## Project conventions (SPA)
+
+| Job type | LSF stdout/stderr | Training results |
+|----------|-------------------|------------------|
+| cv4fold VAE | `hpc/output/cv4fold/vae/%J.out` | `results/cv4fold/<experiment>/<model>/joint/fold_k/<run_name>_*` |
+| cv4fold HMM raw | `hpc/output/cv4fold/hmm_raw/%J.out` | same pattern under `results/cv4fold/` |
+| decoder-only baseline | `hpc/output/decoder_only/baseline/*_%J.out` | `results/decoder_only/<run_name>_*` |
+| decoder-only reliability | `hpc/output/decoder_only/reliability/*_%J.out` | `results/decoder_only/reliability/<model>/` |
+| preprocessing audit | `preprocessing_audit_%J.out` (repo root or script dir) | `results/preprocessing_audit/` |
+| pytest | `hpc/output/tests/pytest_%J.out` | n/a |
+
+Walltime and queue are set per submit script; mention them when submitting.

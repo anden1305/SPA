@@ -86,6 +86,17 @@ class ExperimentLogger:
         # Don't pass step to avoid non-monotonic warnings across internal runs
         self._wb.log(payload)
 
+    def update_summary(self, summary: Dict[str, float | int]) -> None:
+        if not self.enabled or self._wb is None or getattr(self._wb, "run", None) is None:
+            return
+        for key, value in summary.items():
+            if value is None:
+                continue
+            try:
+                self._wb.summary[key] = float(value) if isinstance(value, (int, float)) else value
+            except Exception:
+                pass
+
     def finish(self):
         if not self.enabled or self._wb is None:
             return

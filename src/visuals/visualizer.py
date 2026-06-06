@@ -102,7 +102,25 @@ class Visualizer:
             f.write(f"Likelihood: {likelihood}\n")
         # write y_hat, y_true, x_latent to npz
         np.savez(path / "results.npz", y_hat=y_hat, y_true=y_true, x_latent=x_latent, x=x, sub_ids=sub_ids)
-        
+
+    def visualize_cvae_hmm(self, y_hat, y_true, mu: torch.Tensor, x: torch.Tensor, nmi, log_pz, sub_ids, switch_rate: float, output_subdir: str | None = None):
+        path = Path(self.global_config.results_dir) / self.global_config.run_name / "plots"
+        if output_subdir:
+            path = path / output_subdir
+        path.mkdir(parents=True, exist_ok=True)
+        y_hat_np = y_hat.flatten().cpu().numpy()
+        y_true_np = y_true.flatten().cpu().numpy()
+        x_latent = mu.reshape(-1, mu.shape[-1]).detach().cpu().numpy()
+        sub_ids_np = sub_ids.flatten().cpu().numpy()
+        self.__plot_pca_tripanel(None, x=x_latent, y=y_true_np, overwrite_path=path, pred_y=y_hat_np)
+        # write a txt file with nmi and log p(z)
+        with open(path / "metrics.txt", "w") as f:
+            f.write(f"NMI: {nmi}\n")
+            f.write(f"log p(z_1:T): {log_pz}\n")
+            f.write(f"HMM switch rate (per 100): {switch_rate}\n")
+            f.write(f"Predicted unique states: {len(np.unique(y_hat_np))}\n")
+        # write y_hat, y_true, x_latent to npz
+        np.savez(path / "results.npz", y_hat=y_hat_np, y_true=y_true_np, x_latent=x_latent, x=x, sub_ids=sub_ids_np)
     
     def visualize_runs(self, train_details: list[TrainDetails], validations: dict[str, Any]):
         path = Path(self.global_config.results_dir) / self.global_config.run_name / "plots"
