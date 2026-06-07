@@ -220,7 +220,7 @@ class Orchestrator:
             self.validator.validate(epoch=0)  
             run_dir = Path(self.global_config.results_dir) / self.global_config.run_name / str(self.run_number)
             if self.profile:
-                self.trainer.train_profiled(run_dir, basename="train", sort="cumulative")
+                self.trainer.train_profiled(run_dir, basename="train")
             else:
                 self.trainer.train()
             self.validator.validate(epoch=self.trainer.current_epoch)
@@ -321,7 +321,10 @@ class Orchestrator:
 
             if self.global_config.cvae.traning_pipeline in ['cvae_then_marhmm', 'cvae']:
                 self.model.training_pipeline = 'cvae'
-                self.trainer.train()
+                if self.profile:
+                    self.trainer.train_profiled(run_dir, basename="train")
+                else:
+                    self.trainer.train()
                 self.validator.validate_cvae()
                 try:
                     train_details = self.__collect_training_details()

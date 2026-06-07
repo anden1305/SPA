@@ -34,15 +34,18 @@ class CVAEMARHMM(BaseModel):
         self.to(self.device)
     
     def forward(self, x: torch.Tensor, subject_ids: torch.Tensor, epoch: int) -> torch.Tensor:
+        if self.training_pipeline == 'marhmm':
+            mu = self.cvae.encode_to_latent(x, subject_ids)
+            marhmm_loss = self.marhmm(mu)
+            marhmm_reg_loss = self.marhmm.regularization_loss()
+            return marhmm_loss, marhmm_reg_loss
         x_recon, mu, logvar, z = self.cvae.forward(x, subject_ids)
         cvae_loss, cvae_reg_loss = self.cvae.calculate_loss(x, x_recon, mu, logvar, z, epoch)
         if self.training_pipeline == 'cvae':
             return cvae_loss, cvae_reg_loss
-        marhmm_loss = self.marhmm(mu)
-        marhmm_reg_loss = self.marhmm.regularization_loss()
-        if self.training_pipeline == 'marhmm':
-            return marhmm_loss, marhmm_reg_loss
         if self.training_pipeline == 'end_to_end':
+            marhmm_loss = self.marhmm(mu)
+            marhmm_reg_loss = self.marhmm.regularization_loss()
             return marhmm_loss + cvae_loss, marhmm_reg_loss + cvae_reg_loss
         raise ValueError(f"Unsupported training mode: {self.training_pipeline}")
     
@@ -67,8 +70,17 @@ class CVAEMARHMM(BaseModel):
         out = self.marhmm.predict(mu)
         return out
     
-    def predict_gmm(self, x: torch.Tensor, subject_ids: torch.Tensor, *, initialize_if_needed: bool = False) -> torch.Tensor:
-        y, likelihood, mu = self.cvae.predict_gmm_labels(x, subject_ids, initialize_if_needed=initialize_if_needed)
+    def predict_gmm(
+        self,
+        x: torch.Tensor,
+        subject_ids: torch.Tensor,
+        *,
+        initialize_if_needed: bool = False,
+        mu: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        y, likelihood, mu = self.cvae.predict_gmm_labels(
+            x, subject_ids, initialize_if_needed=initialize_if_needed, mu=mu
+        )
         return mu, y, likelihood
     
     def reinitialize_marhmm(self):

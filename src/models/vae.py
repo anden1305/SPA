@@ -10,6 +10,9 @@ from src.config.config import GlobalConfig
 from src.data.data_loader_collection import DataLoaderCollection
 from src.models.hmm_gmm_prior import estimate_transition_logits_from_paths, forward_log_marginal, gaussian_log_prob_diag, init_sticky_transition_logits, viterbi_decode
 
+_LOG_2PI = math.log(2 * math.pi)
+
+
 class ConditionalVAE(nn.Module):
     def __init__(
         self,
@@ -320,7 +323,7 @@ class ConditionalVAE(nn.Module):
 
     def _log_q_per_step(self, mu: torch.Tensor, logvar: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
         return -0.5 * (
-            math.log(2 * math.pi) + logvar + (z - mu).pow(2) / logvar.exp()
+            _LOG_2PI + logvar + (z - mu).pow(2) / logvar.exp()
         ).sum(dim=-1)
 
     def _gmm_log_p_per_step(self, z: torch.Tensor) -> torch.Tensor:
@@ -482,7 +485,7 @@ class ConditionalVAE(nn.Module):
         # 1. log q(z|x) ~ log N(z | mu, exp(logvar))
         # Constant term -0.5*L*log(2pi) cancels out in KL, but keeping for completeness
         # Sum over latent dimension L
-        log_q_z_x = -0.5 * (math.log(2 * math.pi) + logvar + (z - mu).pow(2) / logvar.exp()).sum(dim=1)
+        log_q_z_x = -0.5 * (_LOG_2PI + logvar + (z - mu).pow(2) / logvar.exp()).sum(dim=1)
         
         # 2. log p(z) ~ log sum_k pi_k N(z | mu_k, exp(logvar_k))
         # Prior parameters
@@ -497,8 +500,8 @@ class ConditionalVAE(nn.Module):
         
         # Calculate log component probabilities: (N, K)
         log_prob_components = -0.5 * (
-            math.log(2 * math.pi) + 
-            logvars_ex + 
+            _LOG_2PI +
+            logvars_ex +
             (z_ex - means_ex).pow(2) / logvars_ex.exp()
         ).sum(dim=2)
         
@@ -561,6 +564,8 @@ class ConditionalVAE(nn.Module):
         likelihood_type: str = "posterior",  # "posterior" | "log_posterior" | "joint" | "log_joint"
         initialize_if_needed: bool = False,
         max_points: int = 200_000,
+        mu: torch.Tensor | None = None,
+        logvar: torch.Tensor | None = None,
     ):
         """
         Predict labels (GMM component indices) from the learned GMM prior via maximum likelihood.
@@ -600,8 +605,10 @@ class ConditionalVAE(nn.Module):
         B, S, _, _ = x.shape
         x = x.to(self.device)
 
-        # Encode to latent
-        mu, logvar = self.encode(x, subject_ids=subject_ids)
+        if mu is None:
+            mu, logvar = self.encode(x, subject_ids=subject_ids)
+        elif logvar is None and not use_mu:
+            _, logvar = self.encode(x, subject_ids=subject_ids)
         z = mu if use_mu else self.reparameterize(mu, logvar)  # (B, S, L)
 
         # Flatten to (N, L) where N = B*S
@@ -617,7 +624,7 @@ class ConditionalVAE(nn.Module):
         logvars_ex = self.prior_logvars.unsqueeze(0)
 
         log_prob_components = -0.5 * (
-            math.log(2 * math.pi) +
+            _LOG_2PI +
             logvars_ex +
             (z_ex - means_ex).pow(2) / logvars_ex.exp()
         ).sum(dim=2)  # (N, K)
@@ -664,12 +671,23 @@ class ConditionalVAE(nn.Module):
         return y, log_pz, mu
 
     @torch.no_grad()
-    def predict_hmm_labels(self, x: torch.Tensor, subject_ids: torch.Tensor, *, use_mu: bool = True):
+    def predict_hmm_labels(
+        self,
+        x: torch.Tensor,
+        subject_ids: torch.Tensor,
+        *,
+        use_mu: bool = True,
+        mu: torch.Tensor | None = None,
+        logvar: torch.Tensor | None = None,
+    ):
         if self.prior not in ("hmm_gmm", "warm_hmm_gmm"):
             raise ValueError(f"predict_hmm_labels requires an HMM-GMM prior, got prior='{self.prior}'.")
         self.eval()
         x = x.to(self.device)
-        mu, logvar = self.encode(x, subject_ids=subject_ids)
+        if mu is None:
+            mu, logvar = self.encode(x, subject_ids=subject_ids)
+        elif logvar is None and not use_mu:
+            _, logvar = self.encode(x, subject_ids=subject_ids)
         z = mu if use_mu else self.reparameterize(mu, logvar)
         log_emit = gaussian_log_prob_diag(z, self.prior_means, self.prior_logvars)
         log_pi = F.log_softmax(self.prior_logits, dim=0)

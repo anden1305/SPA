@@ -80,20 +80,28 @@ class Validator:
         self.validations[epoch] = {}
         self.model.prepare_for_inference()
         xt, yt, sub_ids = self.data_loader.get_all_data()
-        with torch.no_grad():
-            if self.config.log_likelihood:
-                if type(self.model) == CVAEMARHMM:
-                    val_nll, _ = self.model.forward(xt, sub_ids, epoch)
-                else:
-                    val_nll = self.model.forward(xt)
-                
-                self.validations[epoch]['log_likelihood'] = -val_nll.item()
-                self.validations[epoch]['likelihood'] = np.exp(-val_nll.item())
-                self.validations[epoch]['nll'] = val_nll.item()
-            if type(self.model) == CVAEMARHMM:
-                predst = self.model.predict(xt, sub_ids)
+        with torch.inference_mode():
+            if type(self.model) == CVAEMARHMM and self.model.training_pipeline == 'marhmm':
+                mu = self.model.cvae.encode_to_latent(xt, sub_ids)
+                if self.config.log_likelihood:
+                    val_nll = self.model.marhmm(mu)
+                    self.validations[epoch]['log_likelihood'] = -val_nll.item()
+                    self.validations[epoch]['likelihood'] = np.exp(-val_nll.item())
+                    self.validations[epoch]['nll'] = val_nll.item()
+                predst = self.model.marhmm.predict(mu)
             else:
-                predst = self.model.predict(xt)
+                if self.config.log_likelihood:
+                    if type(self.model) == CVAEMARHMM:
+                        val_nll, _ = self.model.forward(xt, sub_ids, epoch)
+                    else:
+                        val_nll = self.model.forward(xt)
+                    self.validations[epoch]['log_likelihood'] = -val_nll.item()
+                    self.validations[epoch]['likelihood'] = np.exp(-val_nll.item())
+                    self.validations[epoch]['nll'] = val_nll.item()
+                if type(self.model) == CVAEMARHMM:
+                    predst = self.model.predict(xt, sub_ids)
+                else:
+                    predst = self.model.predict(xt)
             
             # Handle MARHMM burn-in
             if hasattr(self.model, 'max_lag') and self.model.max_lag > 0:
@@ -121,8 +129,12 @@ class Validator:
         # Compute train NMI if train data loader is available
         if self.config.nmi and self.train_data_loader is not None:
             x_train, y_train, sub_ids = self.train_data_loader.get_all_data()
-            with torch.no_grad():
-                if type(self.model) == CVAEMARHMM:
+            with torch.inference_mode():
+                if type(self.model) == CVAEMARHMM and self.model.training_pipeline == 'marhmm':
+                    mu_train = self.model.cvae.encode_to_latent(x_train, sub_ids)
+                    preds_train = self.model.marhmm.predict(mu_train)
+                    nll = self.model.marhmm(mu_train)
+                elif type(self.model) == CVAEMARHMM:
                     preds_train = self.model.predict(x_train, sub_ids)
                     nll, _ = self.model.forward(x_train, sub_ids, epoch)
                 else:
@@ -281,14 +293,15 @@ class Validator:
         assert type(self.model) == CVAEMARHMM, "Model must be of type CVAEMARHMM to validate CVAE latent representations."
         x, y, sub_ids = self.data_loader.get_all_data()
         self.model.prepare_for_inference()
-        with torch.no_grad():
-            x_latent_seq = self.model.get_latent_representation(x, sub_ids)
-            x_latent = x_latent_seq.reshape(-1, x_latent_seq.shape[-1])
-        n_clusters = len(torch.unique(y))
-        nmi = self.__calculate_kmeans_nmi(x_latent, y, n_clusters)
-        self.validations[epoch]['cvae_latent_kmeans_nmi'] = nmi
-        print(f"CVAE Latent KMeans NMI: {nmi:.4f}")
-        self._validate_cvae_prior_metrics(epoch, x, y, sub_ids)
+        with torch.inference_mode():
+            x_recon, mu, logvar, z = self.model.cvae.forward(x, sub_ids)
+            val_nll, _ = self.model.cvae.calculate_loss(x, x_recon, mu, logvar, z, epoch)
+            x_latent = mu.reshape(-1, mu.shape[-1])
+            n_clusters = len(torch.unique(y))
+            nmi = self.__calculate_kmeans_nmi(x_latent, y, n_clusters)
+            self.validations[epoch]['cvae_latent_kmeans_nmi'] = nmi
+            print(f"CVAE Latent KMeans NMI: {nmi:.4f}")
+            self._validate_cvae_prior_metrics(epoch, x, y, sub_ids, val_nll=val_nll, mu=mu)
         self.model.prepare_for_training()
 
     def _validate_cvae_prior_metrics(
@@ -297,6 +310,9 @@ class Validator:
         x: torch.Tensor,
         y: torch.Tensor,
         sub_ids: torch.Tensor,
+        *,
+        val_nll: torch.Tensor | None = None,
+        mu: torch.Tensor | None = None,
     ) -> None:
         """Prior predictions, collapse metrics, and checkpoint score S(e)."""
         k_pred = self.data_loader.get_num_states()
@@ -304,26 +320,28 @@ class Validator:
         cs_cfg = self.global_config.trainer.checkpoint_score
         beta = cs_cfg.beta
 
-        with torch.no_grad():
-            val_nll, _ = self.model.forward(x, sub_ids, epoch)
+        if val_nll is None:
+            with torch.inference_mode():
+                val_nll, _ = self.model.forward(x, sub_ids, epoch)
         log_likelihood = float(-val_nll.item())
         self.validations[epoch]["log_likelihood"] = log_likelihood
 
         try:
-            with torch.no_grad():
+            with torch.inference_mode():
                 if prior_name in ("hmm_gmm", "warm_hmm_gmm"):
-                    y_hat, _, _ = self.model.cvae.predict_hmm_labels(x, sub_ids)
+                    y_hat, _, _ = self.model.cvae.predict_hmm_labels(x, sub_ids, mu=mu)
                 else:
                     _, y_hat, _ = self.model.predict_gmm(
-                        x, sub_ids, initialize_if_needed=True
+                        x, sub_ids, initialize_if_needed=True, mu=mu
                     )
         except Exception as e:
             print(f"Skipping CVAE prior metrics at epoch {epoch + 1}: {e}")
             return
 
-        y_np = y.detach().cpu().numpy().flatten()
-        preds_np = y_hat.detach().cpu().numpy().flatten()
-        prior_nmi = float(calculate_nmi(preds_np, y_np))
+        y_flat = y.view(-1)
+        preds_flat = y_hat.view(-1) if y_hat.dim() == 1 else y_hat.reshape(-1)
+        prior_nmi = float(calculate_nmi(preds_flat, y_flat))
+        preds_np = preds_flat.detach().cpu().numpy()
         ent_norm = entropy_norm(preds_np, k_pred)
         score = checkpoint_score(log_likelihood, ent_norm, beta=beta)
 
@@ -361,11 +379,11 @@ class Validator:
         x, y, sub_ids = self.data_loader.get_all_data()
         x_non_norm = self.data_loader.get_non_normalized_data()
         self.model.prepare_for_inference()
-        with torch.no_grad():
+        with torch.inference_mode():
             y_hat, log_pz, mu = self.model.cvae.predict_hmm_labels(x, sub_ids)
             gmm_switch = 0.0
             try:
-                _, y_gmm, _ = self.model.predict_gmm(x, sub_ids, initialize_if_needed=True)
+                _, y_gmm, _ = self.model.predict_gmm(x, sub_ids, initialize_if_needed=True, mu=mu)
                 gmm_switch = state_switch_rate(y_gmm)
             except Exception as e:
                 print(f"Skipping GMM marginal comparison: {e}")

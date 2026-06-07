@@ -74,6 +74,7 @@ class Trainer:
         self.losses: dict[int, float] = {}
         self.regularization_losses: dict[int, float] = {}
         self.model.prepare_for_training()
+        self._grad_params = [p for p in self.model.parameters() if p.requires_grad]
         self.current_epoch = 0
     
     def train(self):
@@ -92,8 +93,11 @@ class Trainer:
         self._best_checkpoint_score_epoch = None
         for epoch in range(self.config.epochs):
             self.current_epoch = epoch
+            epoch_total_sum = torch.zeros((), device=self.model.device)
+            epoch_reg_sum = torch.zeros((), device=self.model.device)
+            n_batches = 0
             for x, _, sub_ids in self.data_loader:
-                self.optimizer.zero_grad()
+                self.optimizer.zero_grad(set_to_none=True)
                 if isinstance(self.model, CVAEMARHMM):
                     loss, reg_loss = self.model.forward(x, sub_ids, epoch)
                 else:
@@ -102,14 +106,15 @@ class Trainer:
                 loss = loss + reg_loss
                 loss.backward()
                 if self.config.grad_clip is not None:
-                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.config.grad_clip)
+                    torch.nn.utils.clip_grad_norm_(self._grad_params, self.config.grad_clip)
                 self.optimizer.step()
-                self.epoch_losses.append(loss.item())
-                self.epoch_regularization_losses.append(reg_loss.item())
+                epoch_total_sum = epoch_total_sum + loss.detach()
+                epoch_reg_sum = epoch_reg_sum + reg_loss.detach()
+                n_batches += 1
             if self.scheduler:
                     self.scheduler.step()
-            self.losses[epoch] = sum(self.epoch_losses) / len(self.epoch_losses)
-            self.regularization_losses[epoch] = sum(self.epoch_regularization_losses) / len(self.epoch_regularization_losses)
+            self.losses[epoch] = (epoch_total_sum / n_batches).item()
+            self.regularization_losses[epoch] = (epoch_reg_sum / n_batches).item()
             if self.config.validate_per_epoch > 0 and (epoch + 1) % self.config.validate_per_epoch == 0:
                 if isinstance(self.model, CVAEMARHMM) and self.model.training_pipeline == 'cvae':
                     self.validator.validate_cvae_epoch(epoch)
@@ -130,8 +135,6 @@ class Trainer:
             )
             if self.early_stopping is not None and self.early_stopping.step(self.losses[epoch], self.model, epoch, optimizer=self.optimizer):
                 break
-            self.epoch_losses.clear()
-            self.epoch_regularization_losses.clear()
             if self.global_config.verbose:
                 self.__print_epoch()
         self._log_wandb_training_summary()
@@ -142,14 +145,16 @@ class Trainer:
         if not defer_finish:
             self.finalize_wandb()
     
-    def train_profiled(self, out_dir: str | Path, *, basename: str = "train", sort: str = "cumulative") -> None:
+    def train_profiled(self, out_dir: str | Path, *, basename: str = "train") -> None:
+        """Profile ``train()`` and write .prof plus cumulative and tottime text reports."""
         prof = cProfile.Profile()
         prof.enable()
         try:
             self.train()
         finally:
             prof.disable()
-            write_cprofile_outputs(prof, out_dir, basename=basename, sort=sort)
+            for sort in ("cumulative", "tottime"):
+                write_cprofile_outputs(prof, out_dir, basename=basename, sort=sort)
     
     def get_losses(self) -> dict[int, float]:
         assert self.losses, "Training has not been run yet."

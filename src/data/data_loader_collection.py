@@ -162,9 +162,14 @@ class DataLoaderCollection:
                 rng = np.random.default_rng(int(self.random_seed) + int(self._epoch))
             else:
                 rng = np.random.default_rng()
-            self._order = rng.permutation(self._num_batches)
+            order = rng.permutation(self._num_batches)
         else:
-            self._order = np.arange(self._num_batches)
+            order = np.arange(self._num_batches)
+        self._order = order
+        if self.device.type == "cuda" and self.pre_load_to_device:
+            self._order_idx = torch.from_numpy(order).to(device=self.x.device, dtype=torch.long)
+        else:
+            self._order_idx = None
         self._epoch += 1
         return self
     
@@ -178,8 +183,11 @@ class DataLoaderCollection:
         # Compute slice of indices for this step
         start = self._cursor
         end = min(start + int(self.batches_per_next), self._num_batches)
-        idx = self._order[start:end]
         self._cursor = end
+        if self._order_idx is not None:
+            idx = self._order_idx[start:end]
+            return self.x[idx], self.y[idx], self.sub_ids[idx]
+        idx = self._order[start:end]
         if self.device.type == "cuda" and not self.pre_load_to_device:
             return (self.x[idx].to(self.device, non_blocking=True),
                     self.y[idx].to(self.device, non_blocking=True),

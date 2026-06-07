@@ -8,7 +8,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run SPA Orchestrator with a given config file")
     parser.add_argument("--method", "-m", default="train", help="Method to run (train | train_vae | generate | explore_synthetic | sweep)")
     parser.add_argument("--config_path", "-c", required=True, help="Path to the configuration file")
-    parser.add_argument("--profile", "-p", action="store_true", help="Enable cProfile profiling for the run (train only)")
+    parser.add_argument("--profile", "-p", action="store_true", help="Enable cProfile profiling (train or train_vae)")
     parser.add_argument(
         "--validation_tag",
         default=None,
@@ -21,9 +21,8 @@ if __name__ == "__main__":
     if method not in ["train", "train_vae", "generate", "explore_synthetic", "sweep", "validate_cvae_gmm", "plot_substages"]:
         raise ValueError(f"Unknown method: {method}")
     
-    # Enforce that profiling is only valid for training runs
     if args.profile:
-        assert method == "train", "--profile is only supported with --method train"
+        assert method in ("train", "train_vae"), "--profile is only supported with --method train or train_vae"
 
     if method == "train":
         orchestrator = Orchestrator(config_path, profile=args.profile)

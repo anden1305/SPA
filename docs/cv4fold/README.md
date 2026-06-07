@@ -12,6 +12,7 @@ Cross-lab validation for cGMVAE / cHMM-GMVAE (Phase 2 of the [decoder conditioni
 | [ablation_lab2_signals.md](ablation_lab2_signals.md) | lab_2 EEG1+EEG4 vs EEG1+EEG3 montage (winner prepro) |
 | [latent_separability_guide.md](latent_separability_guide.md) | Which plots/metrics matter; input vs latent; what to skip |
 | [overnight_experiments_20260606.md](overnight_experiments_20260606.md) | **Overnight plan:** arch sweep + job tracker |
+| [local_profiling.md](../local_profiling.md) | Laptop GPU profiling (`--profile` + smoke configs) |
 | Phase 1 (lab_3) | [decoder_only_lab3_chmm_experiments.md](../decoder_only_lab3_chmm_experiments.md) |
 
 ## Per-lab in-cohort (baby step)
