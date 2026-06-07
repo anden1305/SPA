@@ -21,6 +21,11 @@ PLOT_NAMES = (
     "input_channel_total_power_per_state.png",
     "input_emg_band_power_per_state.png",
     "input_eeg_band_power_per_state.png",
+    "input_separation_gaps_bar.png",
+    "input_pairwise_energy_bars.png",
+    "latent_pairwise_energy_bars.png",
+    "separability_input_vs_latent.png",
+    "latent_dim_separability_ranking.png",
 )
 
 

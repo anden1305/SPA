@@ -13,6 +13,7 @@ import numpy as np
 import torch
 
 from src.data.data_loader_collection import DataLoaderCollection
+from src.helpers.state_distinctness import compute_state_distinctness
 
 # Hz bands for staging diagnostics (mouse EEG @ 128 Hz, 512-sample windows).
 EEG_BANDS: dict[str, tuple[float, float]] = {
@@ -150,3 +151,24 @@ def compute_input_channel_statistics(
             "separation_gaps": separation,
         }
     }
+
+
+def compute_input_compact_distinctness(
+    x: torch.Tensor | np.ndarray,
+    y: torch.Tensor | np.ndarray,
+    data_loader: DataLoaderCollection,
+) -> dict[str, Any]:
+    """Energy distance on per-sample mean log-power per channel (pre-VAE)."""
+    x_np = _to_numpy(x)
+    y_np = _to_numpy(y)
+    if x_np.ndim != 4:
+        return {}
+
+    y_flat = y_np.reshape(-1).astype(int)
+    x_flat = x_np.reshape(-1, x_np.shape[2], x_np.shape[3])
+    if y_flat.shape[0] != x_flat.shape[0]:
+        return {}
+
+    # One feature per channel: mean log-power across frequency bins.
+    feats = x_flat.mean(axis=-1)
+    return compute_state_distinctness(feats, y_flat)

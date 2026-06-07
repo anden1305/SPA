@@ -489,7 +489,10 @@ class Orchestrator:
             self.global_config.run_name = f"{self.global_config.run_name}_{time_str}"
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.train_details: list[TrainDetails] = []
-        self.run_number: int = 1
+        if self.validation_tag and str(self.validation_tag).isdigit():
+            self.run_number = int(self.validation_tag)
+        else:
+            self.run_number = 1
         self.__prepare_run()
 
     def __make_output_dir(self):

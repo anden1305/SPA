@@ -12,7 +12,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--validation_tag",
         default=None,
-        help="Optional subfolder name under plots for validate_cvae_gmm outputs.",
+        help="Optional subfolder under plots/; if a seed index (1, 2, 3), also loads that run's checkpoint.",
     )
     args = parser.parse_args()
     method = args.method

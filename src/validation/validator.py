@@ -7,7 +7,10 @@ from src.data.data_loader_collection import DataLoaderCollection
 from src.helpers.accuracy import accuracy
 from src.helpers.align_labels import align_labels_hungarian
 from src.helpers.frequency_statistics import compute_feature_statistics
-from src.helpers.input_channel_statistics import compute_input_channel_statistics
+from src.helpers.input_channel_statistics import (
+    compute_input_channel_statistics,
+    compute_input_compact_distinctness,
+)
 from src.helpers.metrics_aggregation import summarize_metrics
 from src.helpers.nmi import calculate_nmi
 from src.helpers.summary_statistics import compute_summary_statistics
@@ -207,14 +210,32 @@ class Validator:
             json.dump(validations, f)
         return validations
 
+    def _store_space_distinctness(self, space: str, distinctness: dict[str, Any]) -> None:
+        for key, value in distinctness.items():
+            self.data_validations[f"{space}_{key}"] = value
+        if space == "latent":
+            self.data_validations.update(distinctness)
+
+    def _data_validations_path(self) -> str:
+        return f"{self.global_config.results_dir}/{self.global_config.run_name}/data_validations.json"
+
+    def _save_data_validations(self) -> None:
+        with open(self._data_validations_path(), "w") as f:
+            json.dump(self.data_validations, f, indent=2)
+
     def validate_data(self):
         x, y, _ = self.data_loader.get_all_data()
         has_features = self.data_loader.has_features_enabled()
         self.data_validations = {}
-        out_path = f"{self.global_config.results_dir}/{self.global_config.run_name}/data_validations.json"
-        if self.config.state_distinctness and has_features:
-            distinctness = compute_state_distinctness(x, y)
-            self.data_validations.update(distinctness)
+        out_path = self._data_validations_path()
+        if self.config.state_distinctness:
+            if x.ndim == 4:
+                distinctness = compute_input_compact_distinctness(x, y, self.data_loader)
+                if distinctness:
+                    self._store_space_distinctness("input", distinctness)
+            elif has_features:
+                distinctness = compute_state_distinctness(x, y)
+                self._store_space_distinctness("input", distinctness)
         if self.config.summary_statistics:
             self.data_validations.update(compute_summary_statistics(x, y, self.data_loader))
             if x.ndim == 4:
@@ -230,7 +251,14 @@ class Validator:
         if has_features:
             separability = self.__calculate_feature_separability(x, y)
             if separability:
+                self.data_validations["input_feature_separability"] = separability
                 self.data_validations["feature_separability"] = separability
+        elif self.config.state_distinctness and x.ndim == 4:
+            y_flat = y.reshape(-1)
+            x_flat = x.reshape(-1, x.shape[2], x.shape[3]).mean(dim=-1)
+            separability = self.__calculate_feature_separability(x_flat, y_flat)
+            if separability:
+                self.data_validations["input_feature_separability"] = separability
         with open(out_path, "w") as f:
             json.dump(self.data_validations, f, indent=2)
     
@@ -242,7 +270,11 @@ class Validator:
             x_latent = self.model.get_latent_representation(x, sub_ids)
         self.data_validations.update(compute_feature_statistics(x_latent, y, self.data_loader, True))
         distinctness = compute_state_distinctness(x_latent, y)
-        self.data_validations.update(distinctness)
+        self._store_space_distinctness("latent", distinctness)
+        separability = self.__calculate_feature_separability(x_latent, y)
+        if separability:
+            self.data_validations["latent_feature_separability"] = separability
+        self._save_data_validations()
     
     def validate_cvae_epoch(self, epoch: int):
         self.validations[epoch] = {}

@@ -49,13 +49,15 @@ class Visualizer:
             print('There was no data validations to visualize.')
             return
         if self.global_config.visualizer.state_distinctness and self.global_config.validator.state_distinctness:
-            self.__plot_state_distinctness(path=path)
+            self.__plot_state_distinctness(path=path, space="input")
+            self.__plot_pairwise_energy_bars(path=path, space="input")
         if self.global_config.visualizer.summary_statistics and self.global_config.validator.summary_statistics:
             self.__plot_summary_statistics(path=path)
             self.__plot_input_channel_statistics(path=path)
             self.__plot_feature_statistics(path=path)
             self.__plot_feature_correlations(path=path)
-        self.__plot_feature_separability(path=path)
+        self.__plot_feature_separability(path=path, separability_key="input_feature_separability",
+                                          filename="input_feature_separability_ranking.png")
     
     
     def visualize(self, train_details: TrainDetails):
@@ -146,7 +148,11 @@ class Visualizer:
         with torch.no_grad():
             x_latent = model.get_latent_representation(x, sub_ids).cpu().numpy()
         self.__plot_feature_statistics(path=path)
-        self.__plot_state_distinctness(path=path)
+        self.__plot_state_distinctness(path=path, space="latent")
+        self.__plot_pairwise_energy_bars(path=path, space="latent")
+        self.__plot_separability_input_vs_latent(path=path)
+        self.__plot_feature_separability(path=path, separability_key="latent_feature_separability",
+                                          filename="latent_dim_separability_ranking.png")
         self.__plot_pca_tripanel(train_details, x=x_latent, y=y, overwrite_path=path)
     
     ####### HELPER METHODS #######
@@ -447,9 +453,16 @@ class Visualizer:
                 fig.savefig(path / f'feature_correlation_state_{safe_label}.png', dpi=230)
                 plt.close(fig)
 
-    def __plot_feature_separability(self, path: Path) -> None:
+    def __plot_feature_separability(
+        self,
+        path: Path,
+        separability_key: str = "feature_separability",
+        filename: str = "feature_separability_ranking.png",
+    ) -> None:
         dv = self.validator.get_data_validations()
-        separability = dv.get("feature_separability", {})
+        separability = dv.get(separability_key, {})
+        if not separability:
+            separability = dv.get("feature_separability", {})
         if not separability:
             return
 
@@ -482,7 +495,8 @@ class Visualizer:
         ax.set_yticks(y_pos)
         ax.set_yticklabels(sorted_names)
         ax.set_xlabel('Fisher score (higher is better)')
-        ax.set_title('Feature separability ranking')
+        title = 'Latent dimension separability ranking' if 'latent' in separability_key else 'Feature separability ranking'
+        ax.set_title(title)
 
         max_score = float(np.nanmax(sorted_scores)) if np.isfinite(sorted_scores).any() else 0.0
         offset = max(max_score * 0.015, 0.01)
@@ -493,7 +507,7 @@ class Visualizer:
                     f"{sorted_scores[idx]:.3f}", va='center', ha='left', fontsize=8, color='#333333')
 
         fig.tight_layout()
-        fig.savefig(path / 'feature_separability_ranking.png', dpi=220, bbox_inches='tight')
+        fig.savefig(path / filename, dpi=220, bbox_inches='tight')
         plt.close(fig)
 
     def __plot_input_channel_statistics(self, path: Path) -> None:
@@ -599,17 +613,140 @@ class Visualizer:
             fig3.savefig(path / "input_emg_band_power_per_state.png", dpi=220, bbox_inches="tight")
             plt.close(fig3)
 
-        # 4) Separation gaps text summary.
+        # 4) Separation gaps bar chart (REM troubleshooting).
         gaps = stats.get("separation_gaps", {})
         if gaps:
-            lines = [f"{k}: {v:.4f}" for k, v in sorted(gaps.items())]
-            fig4, ax4 = plt.subplots(figsize=(10, max(2, 0.35 * len(lines))))
-            ax4.axis("off")
-            ax4.text(0.01, 0.99, "Input-space separation gaps (REM troubleshooting)\n" + "\n".join(lines),
-                     va="top", ha="left", fontsize=9, family="monospace")
-            fig4.tight_layout()
-            fig4.savefig(path / "input_separation_gaps.png", dpi=150, bbox_inches="tight")
-            plt.close(fig4)
+            self.__plot_separation_gaps_bar(path, gaps)
+    
+    def __plot_separation_gaps_bar(self, path: Path, gaps: dict[str, float]) -> None:
+        """Bar chart of input-space REM/atonia separation gaps."""
+        items = sorted(gaps.items(), key=lambda kv: abs(kv[1]), reverse=True)
+        labels = [k for k, _ in items]
+        values = [v for _, v in items]
+        colors = []
+        for label in labels:
+            if "rem_minus_nrem" in label or "awake_minus_rem" in label:
+                colors.append("#c44e52")
+            else:
+                colors.append("#4c72b0")
+
+        fig, ax = plt.subplots(figsize=(10, max(3.5, 0.45 * len(labels))))
+        y_pos = np.arange(len(labels))
+        ax.barh(y_pos, values, color=colors, alpha=0.85)
+        ax.axvline(0.0, color="#333333", linewidth=0.8, linestyle="--")
+        ax.set_yticks(y_pos)
+        ax.set_yticklabels(labels, fontsize=8)
+        ax.invert_yaxis()
+        ax.set_xlabel("Mean log-power gap (REM troubleshooting)")
+        ax.set_title("Input-space separation gaps\n(red = REM-related pairs)")
+        fig.tight_layout()
+        fig.savefig(path / "input_separation_gaps_bar.png", dpi=220, bbox_inches="tight")
+        plt.close(fig)
+
+        # Compact text summary for quick grep in logs.
+        lines = [f"{k}: {v:.4f}" for k, v in sorted(gaps.items())]
+        fig2, ax2 = plt.subplots(figsize=(10, max(2, 0.35 * len(lines))))
+        ax2.axis("off")
+        ax2.text(
+            0.01, 0.99,
+            "Input-space separation gaps (REM troubleshooting)\n" + "\n".join(lines),
+            va="top", ha="left", fontsize=9, family="monospace",
+        )
+        fig2.tight_layout()
+        fig2.savefig(path / "input_separation_gaps.png", dpi=150, bbox_inches="tight")
+        plt.close(fig2)
+
+    def __distinctness_keys(self, space: str) -> tuple[str, str]:
+        if space == "latent":
+            return "latent_pairwise_energy", "pairwise_energy"
+        return f"{space}_pairwise_energy", f"{space}_pairwise_energy"
+
+    def __get_pairwise_energy_matrix(self, dv: dict[str, Any], space: str) -> np.ndarray:
+        primary, fallback = self.__distinctness_keys(space)
+        ed_mat = np.asarray(dv.get(primary, dv.get(fallback, [])), dtype=float)
+        return ed_mat
+
+    def __state_labels_for_distinctness(self, n_states: int) -> list[str]:
+        state_names = self.data_loader.get_state_names()
+        if state_names and len(state_names) == n_states:
+            return [str(name) for name in state_names]
+        return [str(i) for i in range(n_states)]
+
+    def __pairwise_energy_pairs(self, ed_mat: np.ndarray, state_labels: list[str]) -> tuple[list[str], list[float]]:
+        n_states = ed_mat.shape[0]
+        labels: list[str] = []
+        values: list[float] = []
+        for i in range(n_states):
+            for j in range(i + 1, n_states):
+                labels.append(f"{state_labels[i]}–{state_labels[j]}")
+                values.append(float(ed_mat[i, j]))
+        return labels, values
+
+    def __plot_pairwise_energy_bars(self, path: Path, space: str) -> None:
+        dv = self.validator.get_data_validations()
+        ed_mat = self.__get_pairwise_energy_matrix(dv, space)
+        if ed_mat.size == 0 or ed_mat.shape[0] < 2:
+            return
+
+        state_labels = self.__state_labels_for_distinctness(ed_mat.shape[0])
+        pair_labels, pair_values = self.__pairwise_energy_pairs(ed_mat, state_labels)
+        fisher_key = f"{space}_fisher_trace" if space != "latent" else "fisher_trace"
+        fisher_val = dv.get(fisher_key, dv.get(f"{space}_fisher_trace"))
+        weighted_key = f"{space}_weighted_mean_pairwise_energy"
+        if space == "latent":
+            weighted_val = dv.get(weighted_key, dv.get("weighted_mean_pairwise_energy"))
+        else:
+            weighted_val = dv.get(weighted_key)
+
+        space_title = "Input (pre-VAE channel power)" if space == "input" else "Latent (encoder μ)"
+        colors = ["#8172b3" if "REM" in lbl else "#55a868" for lbl in pair_labels]
+
+        fig, ax = plt.subplots(figsize=(8, 4.5))
+        x_pos = np.arange(len(pair_labels))
+        ax.bar(x_pos, pair_values, color=colors, alpha=0.9)
+        ax.set_xticks(x_pos)
+        ax.set_xticklabels(pair_labels, rotation=20, ha="right")
+        ax.set_ylabel("Energy distance")
+        subtitle = space_title
+        if weighted_val is not None:
+            subtitle += f"  |  weighted mean ED: {float(weighted_val):.3f}"
+        if fisher_val is not None:
+            subtitle += f"  |  Fisher trace: {float(fisher_val):.3f}"
+        ax.set_title(f"Pairwise state separation — {subtitle}")
+        for idx, val in enumerate(pair_values):
+            ax.text(idx, val, f"{val:.2f}", ha="center", va="bottom", fontsize=8)
+        fig.tight_layout()
+        outfile = "input_pairwise_energy_bars.png" if space == "input" else "latent_pairwise_energy_bars.png"
+        fig.savefig(path / outfile, dpi=220, bbox_inches="tight")
+        plt.close(fig)
+
+    def __plot_separability_input_vs_latent(self, path: Path) -> None:
+        """Side-by-side pairwise energy for input vs latent (same state pairs)."""
+        dv = self.validator.get_data_validations()
+        ed_input = self.__get_pairwise_energy_matrix(dv, "input")
+        ed_latent = self.__get_pairwise_energy_matrix(dv, "latent")
+        if ed_input.size == 0 or ed_latent.size == 0:
+            return
+        if ed_input.shape != ed_latent.shape:
+            return
+
+        state_labels = self.__state_labels_for_distinctness(ed_input.shape[0])
+        pair_labels, input_vals = self.__pairwise_energy_pairs(ed_input, state_labels)
+        _, latent_vals = self.__pairwise_energy_pairs(ed_latent, state_labels)
+
+        x_pos = np.arange(len(pair_labels))
+        width = 0.38
+        fig, ax = plt.subplots(figsize=(9, 5))
+        ax.bar(x_pos - width / 2, input_vals, width, label="Input (pre-VAE)", color="#4c72b0", alpha=0.9)
+        ax.bar(x_pos + width / 2, latent_vals, width, label="Latent (encoder μ)", color="#dd8452", alpha=0.9)
+        ax.set_xticks(x_pos)
+        ax.set_xticklabels(pair_labels, rotation=15, ha="right")
+        ax.set_ylabel("Pairwise energy distance")
+        ax.set_title("Input vs latent separation\n(gap shrinking on NREM–REM → encoder bottleneck)")
+        ax.legend(frameon=False)
+        fig.tight_layout()
+        fig.savefig(path / "separability_input_vs_latent.png", dpi=220, bbox_inches="tight")
+        plt.close(fig)
     
     def __plot_summary_statistics(self, path: Path):
         # load from validator
@@ -726,7 +863,7 @@ class Visualizer:
         plt.close(fig3)
 
 
-    def __plot_state_distinctness(self, path: Path):
+    def __plot_state_distinctness(self, path: Path, space: str = "latent"):
         """Create a circular network visualization for pairwise Energy Distance between states.
         Annotates each state node with its mean pairwise ED to other states and displays Fisher trace.
         """
@@ -736,16 +873,15 @@ class Visualizer:
         # human-readable state names (may be None)
         state_names = self.data_loader.get_state_names()
 
-        ed_mat = np.asarray(dv.get("pairwise_energy", []), dtype=float)
+        ed_mat = self.__get_pairwise_energy_matrix(dv, space)
         if ed_mat.size == 0:
             return
-        states = list(dv.get("states", range(ed_mat.shape[0])))
+        states = list(range(ed_mat.shape[0]))
         # If state_names provided and matches number of states, use them; otherwise fallback to integer labels
         if state_names and len(state_names) == len(states):
             state_labels = list(state_names)
         else:
             state_labels = [str(s) for s in states]
-        counts = dv.get("counts", {})
         # Per-state mean pairwise ED (exclude diagonal)
         n_states = len(states)
         if n_states < 2:
@@ -753,7 +889,8 @@ class Visualizer:
         mask = ~np.eye(n_states, dtype=bool)
         per_state_mean = (ed_mat * mask).sum(axis=1) / mask.sum(axis=1)
         # Fisher trace, if available
-        fisher_val = dv.get("fisher_trace", None)
+        fisher_key = f"{space}_fisher_trace" if space != "latent" else "fisher_trace"
+        fisher_val = dv.get(fisher_key, dv.get(f"{space}_fisher_trace"))
         # Network in circular layout
         if n_states >= 3:  # Only create this plot if we have at least 3 states
             fig, ax = plt.subplots(figsize=(10, 9))
@@ -822,9 +959,13 @@ class Visualizer:
             title = "Pairwise Energy Distance Network\n(Line color intensity shows separation strength)"
             if fisher_val is not None:
                 title += f"\nFisher trace: {float(fisher_val):.3f}"
-            plt.title(title)
+            space_note = "Input (pre-VAE)" if space == "input" else "Latent (encoder μ)"
+            plt.title(f"{space_note}\n{title}")
             plt.tight_layout()
-            plt.savefig(path / "pairwise_ed_network.png", dpi=200)
+            outfile = "input_pairwise_ed_network.png" if space == "input" else "latent_pairwise_ed_network.png"
+            fig.savefig(path / outfile, dpi=200)
+            if space == "latent":
+                fig.savefig(path / "pairwise_ed_network.png", dpi=200)
             plt.close(fig)
 
     def __plot_confusion_matrix(self, train_details: TrainDetails, y: Tensor):

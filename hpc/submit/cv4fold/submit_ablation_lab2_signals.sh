@@ -12,7 +12,7 @@ cd "${SPA_ROOT}"
 
 declare -A JOB_QUEUES=(
   ["lab_2_baseline_eeg1_eeg3"]="gpuv100"
-  ["lab_2_eeg1_eeg4"]="gpua10"
+  ["lab_2_eeg1_eeg4"]="gpua100"
 )
 
 JOBS=(
