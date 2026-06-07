@@ -81,31 +81,25 @@ tail -f hpc/output/cv4fold/ablation_arch/lab_2_wide_lat16_*.out
 
 _Update this table as jobs finish (`scrape_experiment_results.py`)._
 
-### Round 4 architecture (GMM NMI, best / mean) — updated 2026-06-07
+### Round 4 architecture (GMM NMI, **best-of-3**) — complete 2026-06-07
 
 | Lab | lat4 | lat16 | wide_mlp | wide_lat16 | **Winner** |
 |-----|------|-------|----------|------------|------------|
-| lab_2 | 0.541 | 0.486† | 0.530 | 0.564 | **prepro 0.568** (arch ≈ tie) |
-| lab_3 | 0.680 | 0.662 | **0.737** | 0.736 | **wide_mlp 0.737** |
-| lab_5 | 0.524* | PEND | PEND | PEND | prepro **long 0.508** |
+| lab_2 | 0.541 | 0.486† | 0.530 | 0.564 | **prepro 0.568** |
+| lab_3 | 0.680 | 0.662 | **0.737** | 0.736 | **`wide_mlp` 0.737** |
+| lab_5 | 0.524 | 0.477 | **0.534** | 0.476 | **`wide_mlp` 0.534** (vs prepro long 0.508) |
 
-†lab_2 lat16 seeds 2–3 failed (~0.0 NMI) — unstable.  
-\*lab_5 lat4 still running (2/3 seeds).
+†lab_2 lat16 seeds 2–3 ~0.0 — unstable; would fail **≥2/3 healthy** rule despite best 0.486.
 
-### Round 2 / 3 — DONE
+### Round 2 / 3 / 4 prepro — complete (bp25 partial)
 
-| Variant | Best | Mean | Winner? |
-|---------|------|------|---------|
-| lab_2 no_postnorm_widebp | 0.568 | 0.559 | **lab_2 prepro** |
-| lab_2 paper_robust | 0.514 | 0.377 | no |
-| lab_3 baseline_long | **0.713** | 0.649 | **lab_3 prepro** |
-| lab_3 no_postnorm | 0.628 | 0.563 | no |
-| lab_3 paper_robust | 0.616 | 0.604 | no |
-| lab_5 long | **0.508** | 0.454 | **lab_5 prepro** |
-| lab_5 no_postnorm / widebp | 0.471 | ~0.39 | no |
-| lab_5 paper_robust | 0.365 | 0.284 | no |
+See [ablation_prepro_lab2_lab5.md](ablation_prepro_lab2_lab5.md) for full tables.
 
-**Locked winners (from-scratch HQ incohort):** lab_2 `no_postnorm_widebp`; lab_3 `baseline_long` + **`wide_mlp` arch** → **0.737** (meets ~0.72 target without hotstart); lab_5 `long` + postnorm.
+**Locked (best-of-3):** lab_2 `no_postnorm_widebp` **0.568**; lab_3 `baseline_long` + **`wide_mlp` → 0.737**; lab_5 `long` + **`wide_mlp` → 0.534**.
+
+### lab_2 REM + montage (2026-06-07)
+
+See [ablation_lab2_findings_20260607.md](ablation_lab2_findings_20260607.md). Leading candidate: **`rem_emg_wide_eeg4` best 0.593** (1/3 seeds at scrape).
 
 ---
 
@@ -143,14 +137,14 @@ results/cv4fold/<experiment>/<lab>/<run_name>/plots/
 
 ## Next steps after overnight (for thesis path)
 
-1. Lock per-lab template in `generate_configs.py` (prepro + best arch from R4).
-2. Re-run per-lab in-cohort gate (>0.45) with winners — publish per-lab checkpoints.
-3. Per-lab holdout folds (`seq64`) once all three labs pass in-cohort.
-4. If `paper_robust` beats per-lab tuning on any lab → adopt as shared front-end.
+1. Lock per-lab template in `generate_configs.py` (prepro + best arch from R4; lab_2 montage/EMG when `rem_emg_wide_eeg4` confirms).
+2. **Per-lab holdout folds** — best-of-3 on held-out mice ([cross_lab_cv4fold.md](cross_lab_cv4fold.md)).
+3. Joint cross-lab cv4fold with locked templates — **best-of-3 per YAML per fold** for thesis tables.
 
 ---
 
 ## Changelog
 
 - **2026-06-06 23:15** — Submitted R4 arch sweep (28606509–28606520). R2 running, R3 PEND.
-- **2026-06-07 ~11:00** — R1–R3 + lab_2/lab_3 arch DONE. lab_3 **wide_mlp 0.737**. lab_5 arch 28606517–20 still queued/running.
+- **2026-06-07 ~11:00** — R1–R3 + lab_2/lab_3 arch DONE. lab_3 **wide_mlp 0.737**.
+- **2026-06-07 (pm)** — R4 all labs DONE; prepro/bp25/RAM/montage results; **best-of-3** selection metric documented in [README.md](README.md).

@@ -9,6 +9,7 @@ Round 1 (done): lab_2 {baseline_long, no_postnorm, widebp, no_postnorm_widebp},
                 lab_5 {long}.
 Round 2: lab_5 {no_postnorm, no_postnorm_widebp},
          lab_3 {baseline_long, no_postnorm, no_postnorm_widebp}.
+Round 4: lab_3/5 {bp25, no_postnorm_bp25} — EEG 0.3-25 Hz (vs locked 0-20).
 """
 
 from __future__ import annotations
@@ -29,6 +30,9 @@ WIDE_BP = [[None, 30.0], [None, 30.0], [5.0, 60.0]]
 # Paper (Rose et al. 2025) EEG band 0.3-35 Hz; EMG kept at 5-60 Hz for our
 # spectral model (paper's single 0.3-35 band would drop EMG high-freq tone).
 PAPER_BP = [[0.3, 35.0], [0.3, 35.0], [5.0, 60.0]]
+# Mid band between locked 0-20 Hz (lab_3/5) and lab_2 winner 0-30 Hz; EEG high-pass
+# at 0.3 Hz (paper-style) instead of null lowpass-only.
+BP25 = [[0.3, 25.0], [0.3, 25.0], [5.0, 60.0]]
 
 # variant -> cvae knob overrides (epochs=LONG_EPOCHS applied to all).
 VARIANTS = {
@@ -45,13 +49,29 @@ VARIANTS = {
         "pre_normalize": False,
         "band_pass_freqs": PAPER_BP,
     },
+    "bp25": {"band_pass_freqs": BP25},
+    "no_postnorm_bp25": {"post_normalize": False, "band_pass_freqs": BP25},
 }
 
 # Per-lab variant sets (covers round 1 + round 2 + round 3; regeneration is idempotent).
 LAB_VARIANTS = {
     "lab_2": ["baseline_long", "no_postnorm", "widebp", "no_postnorm_widebp", "paper_robust"],
-    "lab_3": ["baseline_long", "no_postnorm", "no_postnorm_widebp", "paper_robust"],
-    "lab_5": ["long", "no_postnorm", "no_postnorm_widebp", "paper_robust"],
+    "lab_3": [
+        "baseline_long",
+        "no_postnorm",
+        "no_postnorm_widebp",
+        "paper_robust",
+        "bp25",
+        "no_postnorm_bp25",
+    ],
+    "lab_5": [
+        "long",
+        "no_postnorm",
+        "no_postnorm_widebp",
+        "paper_robust",
+        "bp25",
+        "no_postnorm_bp25",
+    ],
 }
 
 

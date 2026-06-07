@@ -10,16 +10,19 @@ Related: [decoder_conditioning_roadmap.md](../decoder_conditioning_roadmap.md), 
 
 **Ship decisions on GMM prior NMI** (`plots/<seed>/metrics.txt`). Separability plots explain *why* NMI is high or low; they do not replace NMI.
 
+**Final cv4fold selection:** each YAML runs **3 seeds**; take the **best** prior NMI among seeds (not the mean). When comparing ablations, also check that **≥2 of 3 seeds** are healthy — one lucky seed is not enough if the other two collapse. See [README.md](README.md#selection-metric-final-cv4fold).
+
 ---
 
 ## Two spaces — do not mix them
 
-| Plot / metric | Space | When to use |
-|---------------|-------|-------------|
-| `input_*_per_state.png`, `input_channel_statistics` in `data_validations.json` | **Pre-VAE** log-power spectra | “Is REM/atonia visible **before** the encoder?” (lab_2 REM work) |
-| `feature_amplitude_per_state.png` | **Post-VAE** encoder μ, per latent dim | “Which latent axes encode which stage?” |
-| `state_distinctness.png`, `weighted_mean_pairwise_energy`, `fisher_trace` | **Full latent** (all dims jointly) | Better than reading one amplitude line at a time |
-| `hmm_tripanel_pc1_pc2.png` | Latent PCA | Quick 3-way geometry; True vs Pred panels |
+| Plot / metric | Space | Level | When to use |
+|---------------|-------|-------|-------------|
+| `input_*_per_state.png`, `input_channel_statistics` in `data_validations.json` | **Pre-VAE** | **`plots/` once** | REM/atonia before encoder (lab_2) |
+| `input_pairwise_ed_network.png`, `input_feature_separability_ranking.png` | **Pre-VAE** | **`plots/` once** | Input separability summary |
+| `latent_pairwise_ed_network.png`, `latent_dim_separability_ranking.png`, `separability_input_vs_latent.png` | **Post-VAE** | **`plots/` once** (seed 1 encoder) | Latent geometry vs input |
+| `plots/<seed>/tripanel_pc1_pc2.png` | Latent PCA | **per seed** | Prior pred vs True |
+| `plots/<seed>/feature_amplitude_per_state.png` | Post-VAE μ | **per seed** | Which latent dims encode stages |
 
 If **input** EMG/EEG bands do not separate REM from NREM, fixing **arch or prior alone** rarely helps (lab_2 lesson). If **input** separates but **latent** does not, look at capacity / training / collapse.
 
@@ -134,22 +137,22 @@ validate_data: true
 After a run:
 
 ```
-results/cv4fold/<experiment>/lab_2/<run>/plots/
-  input_emg_band_power_per_state.png    # pre-VAE
-  input_eeg_band_power_per_state.png
-  input_separation_gaps_bar.png         # REM/atonia gaps (bar chart)
-  input_pairwise_energy_bars.png        # pre-VAE Awake/NREM/REM ED
-  feature_amplitude_per_state.png       # latent μ
-  latent_pairwise_energy_bars.png       # latent Awake/NREM/REM ED
-  separability_input_vs_latent.png      # side-by-side input vs latent ED
-  latent_dim_separability_ranking.png   # Fisher score per latent dim
-  latent_pairwise_ed_network.png        # (alias: pairwise_ed_network.png)
-  <seed>/hmm_tripanel_pc1_pc2.png
-  <seed>/metrics.txt                    # ← decision metric
-  data_validations.json                 # energy / fisher (+ input_* / latent_*)
+results/cv4fold/<experiment>/lab_2/<run>/
+  data_validations.json                 # input_* + latent_* (input kept across seeds)
+  plots/                                # experiment-level (once)
+    input_emg_band_power_per_state.png
+    input_separation_gaps_bar.png
+    input_pairwise_ed_network.png
+    latent_pairwise_ed_network.png
+    separability_input_vs_latent.png
+    latent_dim_separability_ranking.png
+  plots/<seed>/                         # per seed
+    tripanel_pc1_pc2.png
+    feature_amplitude_per_state.png
+    metrics.txt                         # ← decision metric
 ```
 
-Compare ablations with the same seed count (3) and epochs (200 for lab_2 sweeps).
+Compare ablations with the same seed count (3) and epochs (200 for lab_2 sweeps). **Lock recipes on best-of-3 NMI**; use mean or all-seed lists only as a stability sanity check.
 
 ---
 
@@ -165,4 +168,5 @@ Do not interpret joint pooled NMI or a single amplitude plot across labs until h
 
 ## Changelog
 
+- **2026-06-07 (pm)** — Document **best-of-3** selection metric for final cv4fold; stability check on collapsed seeds.
 - **2026-06-07** — Initial doc; trimmed from chmmgmm_fold draft; aligned with lab_2 REM + input diagnostics work.

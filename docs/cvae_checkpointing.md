@@ -30,6 +30,27 @@ You do **not** always train from scratch. For reliability you almost always want
 
 **Rule of thumb:** `null` = scratch. Path to an existing baseline `.pth` = finetune (hotstart).
 
+### Reliability SEM (multi-seed runs)
+
+For **`runs > 1`** where you report **mean ± SEM** (reliability, ablations):
+
+| Setup | What SEM measures | Use when |
+|-------|-------------------|----------|
+| **`model_checkpoint_path: null`** (scratch) | Full run-to-run variability (init + training) | **Default for future reliability and cv4fold** |
+| Hotstart from shared `.pth` | Finetune / optimizer noise only — **SEM is artificially tight** | Phase 1 lab_3 model comparison only (A vs B same checkpoint) |
+
+Example (decoder-only lab_3, 10 seeds): hotstart cHMM **0.650 ± 0.0004** vs scratch **0.612 ± 0.019** — hotstart SEM is not comparable to scratch or ablation SEM.
+
+**Required for scratch reliability / ablations:**
+
+```yaml
+cvae:
+  model_checkpoint_path: null
+  save_pretrained_checkpoint: false   # never overwrite a shared baseline across seeds
+```
+
+`train_cvae` prints a **WARNING** if `model_checkpoint_path` is set with `runs > 1`.
+
 **Hotstart vs scratch:**
 
 | Question | Config | Checkpoint |
@@ -66,6 +87,8 @@ trainer:
 ```
 
 When enabled, post-train validation prefers `cvae_best_checkpoint_score.pth` over prior-pred-best.
+
+Per-epoch W&B keys and \(S(\varepsilon)\) details: [cvae_wandb_checkpoint_metrics.md](cvae_wandb_checkpoint_metrics.md).
 
 HMM-GMM prior parameters are **not** loaded from an old checkpoint in a special way; they warm up during training (KMeans → transitions).
 

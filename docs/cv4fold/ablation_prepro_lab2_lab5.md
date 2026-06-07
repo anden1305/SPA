@@ -1,55 +1,79 @@
 # Preprocessing & epochs ablations (labs 2, 3, 5)
 
-**Added 2026-06-06.** Canonical log for preprocessing rounds 1–3. Architecture sweep:
-[`overnight_experiments_20260606.md`](overnight_experiments_20260606.md).
+**Added 2026-06-06.** Updated **2026-06-07** with R2–R4 results and **best-of-3** locked winners.
+
+**Selection metric:** for each YAML, **`runs: 3`** → report **best** GMM prior NMI across seeds (`scrape_experiment_results.py`). Mean shown for stability only. See [README.md](README.md#selection-metric-final-cv4fold).
+
+Architecture sweep: [`overnight_experiments_20260606.md`](overnight_experiments_20260606.md).
 
 ## Baselines (80 ep, per-lab in-cohort, from scratch)
 
-| Lab | Best GMM NMI | Job |
-|-----|-------------|-----|
+| Lab | Best-of-3 NMI | Job |
+|-----|---------------|-----|
 | lab_5 | 0.474 (s2) | 28605498 |
 | lab_2 | 0.334 (s3) | 28605499 |
 
-## Round 1 — DONE (~18:10–20:40)
+## Round 1 — DONE
 
 Generator: `scripts/cv4fold/generate_ablation_prepro.py`  
 Submit: `bash hpc/submit/cv4fold/submit_ablation_prepro.sh`
 
-| Variant | JOBID | seed1 | seed2 | seed3 | Best | Mean |
-|---------|-------|-------|-------|-------|------|------|
-| lab_5_long | 28605764 | 0.417 | 0.508 | 0.436 | **0.508** | 0.454 |
-| lab_2_baseline_long | 28605765 | 0.336 | 0.309 | 0.385 | 0.385 | 0.343 |
-| lab_2_widebp | 28605767 | 0.321 | 0.323 | 0.337 | 0.337 | 0.327 |
-| lab_2_no_postnorm | 28605766 | 0.521 | 0.527 | 0.520 | **0.527** | **0.523** |
-| lab_2_no_postnorm_widebp | 28605768 | 0.567 | 0.541 | 0.568 | **0.568** | **0.559** |
+| Variant | Best | Mean | seeds | Winner? |
+|---------|------|------|-------|---------|
+| lab_5_long | **0.508** | 0.454 | [0.417, 0.508, 0.436] | **lab_5 prepro** |
+| lab_2_baseline_long | 0.385 | 0.343 | [0.336, 0.309, 0.385] | no |
+| lab_2_widebp | 0.337 | 0.327 | [0.321, 0.323, 0.337] | no |
+| lab_2_no_postnorm | 0.527 | 0.523 | [0.521, 0.527, 0.520] | partial |
+| lab_2_no_postnorm_widebp | **0.568** | 0.559 | [0.567, 0.541, 0.568] | **lab_2 prepro** |
 
-**Findings:** lab_2 gain is **`post_normalize: false`** (+0.19 mean); wide EEG band helps only combined with no postnorm. lab_5 modest gain from 200 epochs.
+**Finding:** lab_2 gain is **`post_normalize: false`** (+0.19 mean vs baseline); wide EEG band (0–30 Hz) helps only with no postnorm.
 
-## Round 2 — running / partial (~23:12+)
+## Round 2 — DONE
 
 Submit: `bash hpc/submit/cv4fold/submit_ablation_prepro_round2.sh`
 
-| Variant | JOBID | Status | Best (partial) |
-|---------|-------|--------|----------------|
-| lab_3_baseline_long | 28606252 | running | 0.595 (s1) |
-| lab_3_no_postnorm | 28606253 | running | 0.517 (s1) |
-| lab_3_no_postnorm_widebp | 28606254 | running | 0.570 (s1) |
-| lab_5_no_postnorm | 28606255 | running | 0.470 (s1–2) |
-| lab_5_no_postnorm_widebp | 28606256 | PEND | — |
+| Variant | Best | Mean | seeds | Winner? |
+|---------|------|------|-------|---------|
+| lab_3_baseline_long | **0.713** | 0.649 | [0.595, 0.639, 0.713] | **lab_3 prepro** |
+| lab_3_no_postnorm | 0.628 | 0.563 | [0.517, 0.628, 0.543] | no |
+| lab_3_no_postnorm_widebp | 0.616 | 0.540 | [0.570, 0.616, 0.433] | no |
+| lab_5_no_postnorm | 0.471 | 0.386 | [0.470, 0.318, 0.471] | no |
+| lab_5_no_postnorm_widebp | 0.471 | 0.402 | [0.382, 0.354, 0.471] | no |
 
-**Interim:** `post_normalize` **helps lab_3**, **hurts lab_2** → per-lab preprocessing required.
+**Finding:** `post_normalize` **helps lab_3**, **hurts lab_2** → per-lab preprocessing required.
 
-## Round 3 — paper front-end (PEND/RUN)
+## Round 3 — paper front-end — DONE
 
-`robust_normalize: true`, `post/pre_normalize: false`, EEG 0.3–35 Hz (see [`lab_measurement_preprocessing_2_3_5.md`](../lab_measurement_preprocessing_2_3_5.md)).
+`robust_normalize: true`, `post/pre_normalize: false`, EEG 0.3–35 Hz.
 
-Submit: `bash hpc/submit/cv4fold/submit_ablation_paper_robust.sh`
+| Lab | Best | Mean | seeds | Winner? |
+|-----|------|------|-------|---------|
+| lab_2 | 0.514 | 0.377 | [0.234, 0.514, 0.382] | no |
+| lab_3 | 0.616 | 0.604 | [0.616, 0.600, 0.595] | no |
+| lab_5 | 0.365 | 0.284 | [0.365, 0.284, 0.202] | no |
 
-| Lab | JOBID |
-|-----|-------|
-| lab_2 | 28606501 |
-| lab_3 | 28606502 |
-| lab_5 | 28606503 |
+**Finding:** shared paper front-end does **not** beat per-lab tuned prepro on any lab.
+
+## Round 4 — EEG 0.3–25 Hz (lab_3, lab_5) — partial
+
+Mid band + paper-style high-pass 0.3 Hz. Compare to locked winners above.
+
+| Variant | Status | Best | seeds | vs winner |
+|---------|--------|------|-------|-----------|
+| lab_3 `no_postnorm_bp25` | RUN | 0.551 | [0.551] (1/3) | below lab_3 baseline_long **0.713** |
+| lab_5 `no_postnorm_bp25` | RUN | 0.357 | [0.333, 0.357] (2/3) | below lab_5 long **0.508** |
+
+**Interim:** bp25 unlikely to replace locked recipes; let jobs finish then archive.
+
+## Locked per-lab preprocessing (best-of-3, from-scratch HQ incohort)
+
+| Lab | Recipe | Best NMI | Arch add-on (R4) | Combined best |
+|-----|--------|----------|------------------|---------------|
+| **lab_2** | `post_normalize: false`, EEG **0–30 Hz** | **0.568** (`no_postnorm_widebp`) | none beats prepro (`wide_lat16` 0.564) | **0.568** |
+| **lab_3** | `post_normalize: true`, EEG **0–20 Hz**, 200 ep | **0.713** (`baseline_long`) | **`wide_mlp` 0.737** | **0.737** |
+| **lab_5** | `post_normalize: true`, EEG **0–20 Hz**, 200 ep | **0.508** (`long`) | `wide_mlp` 0.534 | **0.534** (arch) |
+
+lab_5 remains the **weakest lab** (best ~0.53 with arch); gate >0.45 passed but no ~0.72-class ceiling yet.
 
 ## Latent separability & diagnostic plots
 
@@ -57,27 +81,17 @@ After each run, inspect under `results/cv4fold/ablation_prepro/<lab>/<run_name>/
 
 | Plot | What to look for |
 |------|------------------|
-| `hmm_tripanel_pc*_pc*.png` | **True** panel: overlapping classes → poor ceiling; **HMM** panel: sharp but wrong boundaries → preprocessing/arch issue not prior |
-| `feature_amplitude_per_state.png` | State-wise EEG/EMG amplitude; Awake vs REM EMG separation |
-| `feature_variance_per_state.png` | Spectral variance by state |
-| `plots/<seed>/results.npz` | `x_latent`, `y_true`, `y_hat` for silhouette / confusion |
+| `hmm_tripanel_pc*_pc*.png` | True panel smearing → prepro issue |
+| `input_emg_band_power_per_state.png` | REM atonia before encoder (lab_2) |
+| `plots/<seed>/metrics.txt` | **Best-of-3 prior NMI** |
 
-**Documented patterns (baseline 80 ep):**
-
-- **lab_2 baseline** (`per_lab_incohort/.../162334/plots/`): True labels smeared in PC1–PC2; Awake↔REM confusion; silhouette ~0.22.
-- **lab_5 baseline** (`.../161924/plots/`): True labels more clustered; silhouette ~0.31; NMI still climbing at ep80.
-- **lab_2 no_postnorm_widebp** (`ablation_prepro/lab_2/abl_lab_2_no_postnorm_widebp_*/plots/`): tripanels show cleaner True-class structure vs baseline_long.
-
-Scrape NMI + plot paths:
+Scrape:
 
 ```bash
-source .venv/bin/activate && python3 scripts/cv4fold/scrape_experiment_results.py
+source .venv/bin/activate && PYTHONPATH=. python3 scripts/cv4fold/scrape_experiment_results.py
 ```
 
-## Per-lab preprocessing winners (locked for arch sweep)
+## Changelog
 
-| Lab | `post_normalize` | EEG bandpass |
-|-----|------------------|--------------|
-| lab_2 | **false** | 0–30 Hz |
-| lab_3 | **true** | 0–20 Hz |
-| lab_5 | **true** | 0–20 Hz (+ 200 ep) |
+- **2026-06-07** — R2–R3 complete; R4 bp25 partial; locked winners table (best-of-3); paper_robust rejected.
+- **2026-06-06** — Initial R1 log.

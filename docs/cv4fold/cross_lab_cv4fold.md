@@ -80,6 +80,8 @@ Low cv4fold NMI does **not** overturn Phase 1 — it shows **generalization** is
 
 ## Reading results
 
+**Selection metric (final cv4fold):** each YAML runs **`runs: 3`**; thesis tables use **best GMM prior NMI** among seeds, not mean. See [README.md](README.md#selection-metric-final-cv4fold). Require **≥2/3 healthy seeds** when locking a recipe (avoid single lucky init).
+
 Per run directory:
 
 ```
@@ -95,24 +97,22 @@ Batch analysis example: `results/cv4fold/subject_lab_tune_winners/analysis_repor
 
 ---
 
-## Per-lab in-cohort (Step 2 — in progress)
+## Per-lab in-cohort (Step 2 — largely done)
 
 Train+val on **all HQ mice within one lab** before holdout (see [README.md](README.md)):
 
 - Manifest: `data/manifests/cv_quality_cohort_v1.yaml` (20 mice only)
-- Generator: `scripts/cv4fold/generate_configs.py --phase per_lab_incohort`
-- Submit: `hpc/submit/cv4fold/submit_per_lab_incohort.sh` (lab_5, lab_2 first)
-- **Per-lab in-cohort:** `model_checkpoint_path: null` — train from scratch per lab (no lab_3 hotstart).
-- Generated dataset entries include manifest **`signals`** (lab_2: EEG1+EEG3+EMG; lab_3/5: EEG1+EEG2+EMG → 3 channels each).
-- Lab_3 baseline hotstart (`cvae_decoder_only_model.pth`, `[93,4]`) remains for lab_3-only / decoder-only experiments only.
+- **Locked winners (best-of-3 scratch):** lab_2 prepro **0.568** (+ EEG4 REM candidate **0.593** pending); lab_3 **`wide_mlp` 0.737**; lab_5 **`wide_mlp` 0.534**
+- Details: [ablation_prepro_lab2_lab5.md](ablation_prepro_lab2_lab5.md), [ablation_lab2_findings_20260607.md](ablation_lab2_findings_20260607.md)
 
 ## Next steps
 
-1. **Lock recipe:** seq64 + `subject` (not subject_lab).
-2. **Run remaining folds** (1–3) with that recipe for cGMVAE and cHMM.
-3. **Stabilize seeds** — investigate runs 2–3 collapse (GMM init, checkpoint score, more seeds).
-4. **Optional:** fold-4 hotstart from lab_3 baseline — does in-lab checkpoint help holdout?
-5. **Re-tune subject_lab** on fold 4 only before any full subject_lab sweep.
+1. **Finish lab_2 lock** — `rem_emg_wide_eeg4` 3 seeds; update manifest signals if confirmed.
+2. **Per-lab holdout folds** (seq64, scratch, **best-of-3**) — gate before joint cv4fold.
+3. **Lock recipe for joint line:** seq64 + `subject` (not subject_lab).
+4. **Run remaining joint folds** (1–3) with locked per-lab templates embedded in generated YAMLs.
+5. **Stabilize seeds** — fold-4 pilot had runs 2–3 at ~0; re-check with new prepro before trusting best-of-3 alone.
+6. Pause **subject_lab** until fold-4 re-tune with locked prepro.
 
 ---
 

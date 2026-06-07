@@ -92,6 +92,7 @@ class Trainer:
         self._best_checkpoint_score_epoch = None
         for epoch in range(self.config.epochs):
             self.current_epoch = epoch
+            skipped_batches = 0
             for x, _, sub_ids in self.data_loader:
                 self.optimizer.zero_grad()
                 if isinstance(self.model, CVAEMARHMM):
@@ -99,17 +100,51 @@ class Trainer:
                 else:
                     loss = self.model.forward(x)
                     reg_loss = self.model.regularization_loss()
-                loss = loss + reg_loss
-                loss.backward()
+                total_loss = loss + reg_loss
+                if total_loss.dim() != 0 or loss.dim() != 0 or reg_loss.dim() != 0:
+                    raise RuntimeError(
+                        f"Expected scalar losses at epoch={epoch}; "
+                        f"got loss.shape={tuple(loss.shape)}, reg_loss.shape={tuple(reg_loss.shape)}"
+                    )
+                if not torch.isfinite(total_loss):
+                    skipped_batches += 1
+                    if self.global_config.verbose and skipped_batches <= 3:
+                        recon_val = float(loss.detach().cpu()) if torch.isfinite(loss) else float("nan")
+                        reg_val = float(reg_loss.detach().cpu()) if torch.isfinite(reg_loss) else float("nan")
+                        print(
+                            f"WARNING: non-finite loss at epoch={epoch}, skipping batch "
+                            f"(recon={recon_val}, reg={reg_val})"
+                        )
+                    continue
+                total_loss.backward()
                 if self.config.grad_clip is not None:
-                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.config.grad_clip)
+                    grad_norm = torch.nn.utils.clip_grad_norm_(
+                        self.model.parameters(), self.config.grad_clip
+                    )
+                    if not torch.isfinite(grad_norm):
+                        skipped_batches += 1
+                        self.optimizer.zero_grad()
+                        if self.global_config.verbose and skipped_batches <= 3:
+                            print(f"WARNING: non-finite grad norm at epoch={epoch}, skipping step")
+                        continue
                 self.optimizer.step()
-                self.epoch_losses.append(loss.item())
+                self.epoch_losses.append(total_loss.item())
                 self.epoch_regularization_losses.append(reg_loss.item())
+            if skipped_batches and self.global_config.verbose:
+                print(f"Epoch {epoch + 1}: skipped {skipped_batches} non-finite batch(es)")
             if self.scheduler:
                     self.scheduler.step()
-            self.losses[epoch] = sum(self.epoch_losses) / len(self.epoch_losses)
-            self.regularization_losses[epoch] = sum(self.epoch_regularization_losses) / len(self.epoch_regularization_losses)
+            if self.epoch_losses:
+                self.losses[epoch] = sum(self.epoch_losses) / len(self.epoch_losses)
+                self.regularization_losses[epoch] = sum(self.epoch_regularization_losses) / len(
+                    self.epoch_regularization_losses
+                )
+            elif epoch > 0 and (epoch - 1) in self.losses:
+                self.losses[epoch] = self.losses[epoch - 1]
+                self.regularization_losses[epoch] = self.regularization_losses[epoch - 1]
+            else:
+                self.losses[epoch] = float("nan")
+                self.regularization_losses[epoch] = float("nan")
             if self.config.validate_per_epoch > 0 and (epoch + 1) % self.config.validate_per_epoch == 0:
                 if isinstance(self.model, CVAEMARHMM) and self.model.training_pipeline == 'cvae':
                     self.validator.validate_cvae_epoch(epoch)

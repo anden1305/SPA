@@ -242,6 +242,7 @@ cvae:
   band_pass_filter_type: frequency_domain # FIXED
   traning_pipeline: cvae
   model_checkpoint_path: null
+  save_pretrained_checkpoint: false
   reinit_marhmm: false
 
 verbose: True

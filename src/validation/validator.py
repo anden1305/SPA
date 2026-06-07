@@ -119,7 +119,7 @@ class Validator:
         self.validations[epoch]["nlpp"] = nlpp
         
         # Compute train NMI if train data loader is available
-        if self.config.nmi and self.train_data_loader is not None:
+        if self.config.validate_train and self.config.nmi and self.train_data_loader is not None:
             x_train, y_train, sub_ids = self.train_data_loader.get_all_data()
             with torch.no_grad():
                 if type(self.model) == CVAEMARHMM:

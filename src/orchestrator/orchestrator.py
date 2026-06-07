@@ -151,10 +151,17 @@ class Orchestrator:
             return max(with_ts, key=lambda pair: pair[1])[0].name
         return max(candidates, key=lambda d: d.stat().st_mtime).name
 
-    def _match_checkpoint_to_run(self, checkpoint: Path, run_dir: Path) -> str | None:
-        if not checkpoint.exists() or not run_dir.exists():
+    def _match_checkpoint_to_run(
+        self, checkpoint: Path, experiment_dir: Path, run_subdir: str | None = None
+    ) -> str | None:
+        if not checkpoint.exists() or not experiment_dir.exists():
             return None
-        candidates = list(run_dir.glob("cvae_final_model_run*.pth"))
+        candidates: list[Path] = []
+        if run_subdir:
+            run_ckpt = experiment_dir / run_subdir / "checkpoints" / "cvae_final_model.pth"
+            if run_ckpt.exists():
+                candidates.append(run_ckpt)
+        candidates.extend(experiment_dir.glob("*/checkpoints/cvae_final_model.pth"))
         if not candidates:
             return None
         try:
@@ -163,9 +170,9 @@ class Orchestrator:
             return None
         size_matches = [c for c in candidates if c.stat().st_size == checkpoint_size]
         if len(size_matches) == 1:
-            return size_matches[0].name
+            return str(size_matches[0].relative_to(experiment_dir))
         if len(size_matches) > 1:
-            return max(size_matches, key=lambda c: c.stat().st_mtime).name
+            return str(max(size_matches, key=lambda c: c.stat().st_mtime).relative_to(experiment_dir))
         return None
 
     def _write_validation_info(
@@ -194,7 +201,7 @@ class Orchestrator:
                 stat = checkpoint.stat()
                 info["checkpoint_size"] = stat.st_size
                 info["checkpoint_mtime"] = stat.st_mtime
-                matched = self._match_checkpoint_to_run(checkpoint, run_dir)
+                matched = self._match_checkpoint_to_run(checkpoint, run_dir, output_subdir)
                 if matched:
                     info["matched_run_checkpoint"] = matched
         if nmi is not None:
@@ -304,6 +311,9 @@ class Orchestrator:
             
     
     def train_cvae(self):
+        if self.global_config.validate_data:
+            self.validator.validate_data()
+            self.visualizer.visualize_experiment_input()
         for i in range(self.global_config.runs):
             self.run_number = i + 1
             self.global_config.seed += 1
@@ -316,8 +326,16 @@ class Orchestrator:
             ckpt_dir.mkdir(parents=True, exist_ok=True)
             self.trainer.results_run_subdir = str(self.run_number)
 
-            if self.global_config.cvae.model_checkpoint_path:
-                self._load_cvae_checkpoint_from(self.global_config.cvae.model_checkpoint_path)
+            ckpt_path = self.global_config.cvae.model_checkpoint_path
+            if ckpt_path and self.global_config.runs > 1:
+                print(
+                    "WARNING: cvae.model_checkpoint_path is set with runs > 1. "
+                    "Each seed loads the same pretrained weights — reported SEM reflects "
+                    "finetune noise only, not independent initializations. "
+                    "For reliability SEM use model_checkpoint_path: null (scratch)."
+                )
+            if ckpt_path:
+                self._load_cvae_checkpoint_from(ckpt_path)
 
             if self.global_config.cvae.traning_pipeline in ['cvae_then_marhmm', 'cvae']:
                 self.model.training_pipeline = 'cvae'
@@ -330,16 +348,14 @@ class Orchestrator:
                     train_details = None
                 if train_details is not None:
                     self.__save_info(train_details=train_details)
-                self.visualizer.visualize_cvae(model=self.model, train_details=train_details)
+                self.visualizer.visualize_cvae(
+                    model=self.model,
+                    train_details=train_details,
+                    output_subdir=str(self.run_number),
+                )
 
                 run_ckpt_path = ckpt_dir / "cvae_final_model.pth"
                 torch.save(self.model.state_dict(), run_ckpt_path)
-                legacy_ckpt = (
-                    Path(self.global_config.results_dir)
-                    / self.global_config.run_name
-                    / f"cvae_final_model_run{self.run_number}.pth"
-                )
-                torch.save(self.model.state_dict(), legacy_ckpt)
                 self._save_cvae_checkpoint_to_config_path()
 
                 prior_nmi: float | None = None
@@ -395,8 +411,6 @@ class Orchestrator:
     
     def _validate_trained_cvae_prior(self, run_dir: Path) -> float:
         """Run prior-based validation on in-memory weights (best or final checkpoint)."""
-        plots_dir = run_dir / "plots"
-        plots_dir.mkdir(parents=True, exist_ok=True)
         prior = getattr(self.model.cvae, "prior", "gmm")
         if prior in ("hmm_gmm", "warm_hmm_gmm"):
             nmi, log_pz, y_hat, y, mu, x, sub_ids, switch_rate, gmm_switch = self.validator.validate_cvae_hmm()

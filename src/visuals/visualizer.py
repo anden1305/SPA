@@ -40,24 +40,65 @@ class Visualizer:
     
     ####### GENERAL METHODS #######
     
-    def visualize_data(self):
+    def _experiment_plots_path(self) -> Path:
         path = Path(self.global_config.results_dir) / self.global_config.run_name / "plots"
         path.mkdir(parents=True, exist_ok=True)
-        try:
-            dv = self.validator.get_data_validations()
-        except Exception as e:
-            print('There was no data validations to visualize.')
+        return path
+
+    def _save_results_npz(self, path: Path, **arrays) -> None:
+        if not self.config.save_results_npz:
             return
+        np.savez(path / "results.npz", **arrays)
+
+    def _has_data_validations(self) -> bool:
+        try:
+            self.validator.get_data_validations()
+            return True
+        except Exception:
+            return False
+
+    def visualize_experiment_input(self) -> None:
+        """Once per experiment: pre-VAE input diagnostics (independent of seed)."""
+        if not self._has_data_validations():
+            print("There was no data validations to visualize (input).")
+            return
+        path = self._experiment_plots_path()
         if self.global_config.visualizer.state_distinctness and self.global_config.validator.state_distinctness:
             self.__plot_state_distinctness(path=path, space="input")
             self.__plot_pairwise_energy_bars(path=path, space="input")
         if self.global_config.visualizer.summary_statistics and self.global_config.validator.summary_statistics:
-            self.__plot_summary_statistics(path=path)
             self.__plot_input_channel_statistics(path=path)
+        self.__plot_feature_separability(
+            path=path,
+            separability_key="input_feature_separability",
+            filename="input_feature_separability_ranking.png",
+        )
+
+    def visualize_latent_run_level(self) -> None:
+        """Once per experiment (seed 1): latent ED / separability at plots/ root."""
+        if not self._has_data_validations():
+            return
+        path = self._experiment_plots_path()
+        if self.global_config.visualizer.state_distinctness and self.global_config.validator.state_distinctness:
+            self.__plot_state_distinctness(path=path, space="latent")
+            self.__plot_pairwise_energy_bars(path=path, space="latent")
+        self.__plot_separability_input_vs_latent(path=path)
+        self.__plot_feature_separability(
+            path=path,
+            separability_key="latent_feature_separability",
+            filename="latent_dim_separability_ranking.png",
+        )
+
+    def visualize_data(self):
+        path = self._experiment_plots_path()
+        if not self._has_data_validations():
+            print('There was no data validations to visualize.')
+            return
+        self.visualize_experiment_input()
+        if self.global_config.visualizer.summary_statistics and self.global_config.validator.summary_statistics:
+            self.__plot_summary_statistics(path=path)
             self.__plot_feature_statistics(path=path)
             self.__plot_feature_correlations(path=path)
-        self.__plot_feature_separability(path=path, separability_key="input_feature_separability",
-                                          filename="input_feature_separability_ranking.png")
     
     
     def visualize(self, train_details: TrainDetails):
@@ -86,7 +127,9 @@ class Visualizer:
             self.__plot_learning_rate(train_details)
         y_hat = train_details.get_trained_predictions()
         subject_ids = subject_ids.flatten().cpu().numpy()
-        np.savez(path / "results.npz", y_hat=y_hat, y_true=y, x_latent=x, x=x_non_norm, sub_ids=subject_ids)
+        self._save_results_npz(
+            path, y_hat=y_hat, y_true=y, x_latent=x, x=x_non_norm, sub_ids=subject_ids
+        )
     
     
     def visualize_cvae_gmm(self, y_hat, y_true, x_latent: torch.Tensor, x: torch.Tensor, nmi, likelihood, sub_ids, output_subdir: str | None = None):
@@ -104,7 +147,9 @@ class Visualizer:
             f.write(f"NMI: {nmi}\n")
             f.write(f"Likelihood: {likelihood}\n")
         # write y_hat, y_true, x_latent to npz
-        np.savez(path / "results.npz", y_hat=y_hat, y_true=y_true, x_latent=x_latent, x=x, sub_ids=sub_ids)
+        self._save_results_npz(
+            path, y_hat=y_hat, y_true=y_true, x_latent=x_latent, x=x, sub_ids=sub_ids
+        )
 
     def visualize_cvae_hmm(self, y_hat, y_true, mu: torch.Tensor, x: torch.Tensor, nmi, log_pz, sub_ids, switch_rate: float, output_subdir: str | None = None):
         path = Path(self.global_config.results_dir) / self.global_config.run_name / "plots"
@@ -123,7 +168,14 @@ class Visualizer:
             f.write(f"HMM switch rate (per 100): {switch_rate}\n")
             f.write(f"Predicted unique states: {len(np.unique(y_hat_np))}\n")
         # write y_hat, y_true, x_latent to npz
-        np.savez(path / "results.npz", y_hat=y_hat_np, y_true=y_true_np, x_latent=x_latent, x=x, sub_ids=sub_ids_np)
+        self._save_results_npz(
+            path,
+            y_hat=y_hat_np,
+            y_true=y_true_np,
+            x_latent=x_latent,
+            x=x,
+            sub_ids=sub_ids_np,
+        )
     
     def visualize_runs(self, train_details: list[TrainDetails], validations: dict[str, Any]):
         path = Path(self.global_config.results_dir) / self.global_config.run_name / "plots"
@@ -139,21 +191,13 @@ class Visualizer:
         if validations.get("nmi"):
             self.__plot_reliability(nmis, cross_nmis, final_losses, path=path)
     
-    def visualize_cvae(self, model: CVAEMARHMM, train_details):
-        path = Path(self.global_config.results_dir) / self.global_config.run_name / "plots"
-        path.mkdir(parents=True, exist_ok=True)
-        x, y, sub_ids = self.data_loader.get_all_data()
-        y = y.flatten().cpu().numpy()
-        model.prepare_for_inference()
-        with torch.no_grad():
-            x_latent = model.get_latent_representation(x, sub_ids).cpu().numpy()
-        self.__plot_feature_statistics(path=path)
-        self.__plot_state_distinctness(path=path, space="latent")
-        self.__plot_pairwise_energy_bars(path=path, space="latent")
-        self.__plot_separability_input_vs_latent(path=path)
-        self.__plot_feature_separability(path=path, separability_key="latent_feature_separability",
-                                          filename="latent_dim_separability_ranking.png")
-        self.__plot_pca_tripanel(train_details, x=x_latent, y=y, overwrite_path=path)
+    def visualize_cvae(self, model: CVAEMARHMM, train_details, output_subdir: str | None = None):
+        run_path = self._experiment_plots_path()
+        seed_path = run_path / output_subdir if output_subdir else run_path
+        seed_path.mkdir(parents=True, exist_ok=True)
+        self.__plot_feature_statistics(path=seed_path)
+        if output_subdir == "1":
+            self.visualize_latent_run_level()
     
     ####### HELPER METHODS #######
     
@@ -304,105 +348,6 @@ class Visualizer:
             fig.tight_layout()
             fig.savefig(path / f'feature_{metric_key.lower()}_per_state.png', dpi=300, bbox_inches='tight')
             plt.close(fig)
-
-            # Heatmap: states x features for this metric
-            mat = np.full((len(states), max_features), np.nan)
-            for row_idx, s in enumerate(states):
-                arr = arrays[s]
-                if arr.size:
-                    mat[row_idx, :min(arr.size, max_features)] = arr[:max_features]
-
-            fig2, ax2 = plt.subplots(figsize=(12, max(2.5, len(states) * 0.6)))
-            sns.heatmap(mat, ax=ax2, cmap='viridis', cbar_kws={'label': metric_title},
-                        xticklabels=feature_labels, yticklabels=[display_labels[s] for s in states])
-            ax2.set_xlabel('Feature')
-            ax2.set_title(f'{metric_title} Heatmap (State × Feature)')
-            # Make x labels much smaller and keep rotation for readability
-            plt.setp(ax2.get_xticklabels(), fontsize=6, rotation=45, ha='right')
-            # Make y labels horizontal
-            plt.setp(ax2.get_yticklabels(), fontsize=9, rotation=0, ha='right')
-            fig2.tight_layout()
-            fig2.savefig(path / f'feature_{metric_key.lower()}_heatmap.png', dpi=250)
-            plt.close(fig2)
-
-        metrics_to_plot = list(metric_store.keys())
-        if not metrics_to_plot or global_max_features == 0:
-            return
-
-        metric_palette = sns.color_palette('deep', len(metrics_to_plot))
-
-        for feat_idx in range(global_max_features):
-            feature_label = f'Feature {feat_idx + 1}'
-            x_positions = np.arange(len(states))
-
-            values_by_metric: list[np.ndarray] = []
-            errors_by_metric: list[np.ndarray | None] = []
-            for metric_key in metrics_to_plot:
-                arrays = metric_store.get(metric_key, {})
-                std_arrays = std_store.get(metric_key)
-
-                metric_values = []
-                metric_errors = []
-                for s in states:
-                    arr = arrays.get(s, np.asarray([], dtype=float))
-                    val = float(arr[feat_idx]) if arr.size > feat_idx else np.nan
-                    metric_values.append(val)
-                    if std_arrays is not None:
-                        std_arr = std_arrays.get(s, np.asarray([], dtype=float))
-                        err_val = float(std_arr[feat_idx]) if std_arr.size > feat_idx else np.nan
-                    else:
-                        err_val = np.nan
-                    metric_errors.append(err_val)
-
-                values_by_metric.append(np.asarray(metric_values, dtype=float))
-                if std_arrays is not None and not np.all(np.isnan(metric_errors)):
-                    errors_by_metric.append(np.asarray(metric_errors, dtype=float))
-                else:
-                    errors_by_metric.append(None)
-
-            if all(np.all(np.isnan(vals)) for vals in values_by_metric):
-                continue
-
-            width = 0.8 / max(1, len(metrics_to_plot))
-            fig_feat, ax_feat = plt.subplots(figsize=(max(7, len(states) * 1.1), 4.5))
-
-            for metric_idx, metric_key in enumerate(metrics_to_plot):
-                offset = (metric_idx - (len(metrics_to_plot) - 1) / 2) * width
-                positions = x_positions + offset
-                values = values_by_metric[metric_idx]
-                errors = errors_by_metric[metric_idx]
-
-                if np.all(np.isnan(values)):
-                    continue
-
-                bar_kwargs: dict[str, Any] = {
-                    'x': positions,
-                    'height': values,
-                    'width': width * 0.9,
-                    'color': metric_palette[metric_idx % len(metric_palette)],
-                    'alpha': 0.9,
-                    'label': metric_key.replace('_', ' ').title(),
-                }
-
-                if errors is not None:
-                    bar_kwargs['yerr'] = errors
-                    bar_kwargs['capsize'] = 4
-                    bar_kwargs['error_kw'] = {'elinewidth': 1, 'alpha': 0.7}
-
-                ax_feat.bar(**bar_kwargs)
-
-            ax_feat.set_xticks(x_positions)
-            ax_feat.set_xticklabels([display_labels[s] for s in states], rotation=30, ha='right')
-            ax_feat.set_ylabel('Value')
-            ax_feat.set_xlabel('State')
-            ax_feat.set_title(f'{feature_label} – Metrics by State')
-            ax_feat.legend(loc='upper right', fontsize='small', frameon=False)
-            ax_feat.grid(True, axis='y', linestyle='--', linewidth=0.4, alpha=0.6)
-
-            fig_feat.tight_layout()
-            out_name = f'feature_summary_{feat_idx + 1:02d}.png'
-            fig_feat.savefig(path / out_name, dpi=250)
-            plt.close(fig_feat)
 
     def __plot_feature_correlations(self, path: Path) -> None:
         """Plot feature-feature correlation heatmaps (overall and per-state) from validator data."""
@@ -964,8 +909,6 @@ class Visualizer:
             plt.tight_layout()
             outfile = "input_pairwise_ed_network.png" if space == "input" else "latent_pairwise_ed_network.png"
             fig.savefig(path / outfile, dpi=200)
-            if space == "latent":
-                fig.savefig(path / "pairwise_ed_network.png", dpi=200)
             plt.close(fig)
 
     def __plot_confusion_matrix(self, train_details: TrainDetails, y: Tensor):
@@ -1430,8 +1373,25 @@ class Visualizer:
             if loss_values:
                 print(f"Min Loss at epoch {min_loss_epoch}: {min_loss:.6g}")
 
+    def _model_display_name(self, *, prior_prediction: bool = False) -> str:
+        """Thesis-style model labels for tripanel titles."""
+        model_type = getattr(self.global_config.model, "type", None)
+        if model_type == "marhmm":
+            return "HMM"
+        if model_type == "cvae_marhmm" and not prior_prediction:
+            return "HMMGMVAE"
+        prior = None
+        if self.model is not None and hasattr(self.model, "cvae"):
+            prior = getattr(self.model.cvae, "prior", None)
+        if prior is None:
+            params = getattr(self.global_config.model, "params", None) or {}
+            prior = params.get("prior", "gmm")
+        if str(prior).lower() in ("hmm_gmm", "warm_hmm_gmm"):
+            return "cHMMGMVAE"
+        return "cGMVAE"
+
     def __plot_pca_tripanel(self, train_details: TrainDetails, x: Tensor, y: Tensor, overwrite_path: str = None, pred_y: np.ndarray = None):
-        """Save tri-panel PCA plots comparing HMM-init, HMM-trained, and True labels."""
+        """Save PCA tripanel plots comparing prior predictions and true labels."""
         
         if len(y.shape) == 3:
             y = y[:, :, 0]
@@ -1439,9 +1399,9 @@ class Visualizer:
         if train_details is None and pred_y is None:
             return
         
+        model_name = self._model_display_name(prior_prediction=(pred_y is not None))
         if pred_y is not None:
-            init_arr = pred_y
-            trained_arr = pred_y
+            pred_arr = pred_y
         else:
             init_arr = train_details.get_initial_predictions()
             trained_arr = train_details.get_trained_predictions()
@@ -1451,12 +1411,19 @@ class Visualizer:
             raise ValueError(f"x must be (T,D) or (B,T,D); got {x.shape}")
         
         try:
-            init_arr = align_labels_hungarian(y, init_arr)
-            trained_arr = align_labels_hungarian(y, trained_arr)
+            if pred_y is not None:
+                pred_arr = align_labels_hungarian(y, pred_arr)
+            else:
+                init_arr = align_labels_hungarian(y, init_arr)
+                trained_arr = align_labels_hungarian(y, trained_arr)
         except Exception as e:
             print(f"Warning: Could not align labels for PCA tripanel due to: {e}")
-        
-        if not (len(y) == len(init_arr) == len(trained_arr) == X.shape[0]):
+
+        if pred_y is not None:
+            if not (len(y) == len(pred_arr) == X.shape[0]):
+                print(f"Lengths: y={len(y)}, pred={len(pred_arr)}, X_rows={X.shape[0]}")
+                raise ValueError("Label lengths must match number of rows in x after flattening")
+        elif not (len(y) == len(init_arr) == len(trained_arr) == X.shape[0]):
             print(f"Lengths: y={len(y)}, init={len(init_arr)}, trained={len(trained_arr)}, X_rows={X.shape[0]}")
             raise ValueError("Label lengths must match number of rows in x after flattening")
         
@@ -1471,12 +1438,15 @@ class Visualizer:
             sampled_indices.extend(sampled)
         sampled_indices = np.array(sampled_indices)
         X = X[sampled_indices]
-        init_arr = init_arr[sampled_indices]
-        trained_arr = trained_arr[sampled_indices]
         y = y[sampled_indices]
-        
-        # PCA via SVD (up to 4 comps)
-        K = min(4, max(2, X.shape[1]))
+        if pred_y is not None:
+            pred_arr = pred_arr[sampled_indices]
+        else:
+            init_arr = init_arr[sampled_indices]
+            trained_arr = trained_arr[sampled_indices]
+
+        # PCA via SVD (up to 3 comps for tripanels — skip PC4 panels)
+        K = min(3, max(2, X.shape[1]))
         U, S, _ = np.linalg.svd(X - X.mean(0, keepdims=True), full_matrices=False)
         proj = U[:, :K] * S[:K]
 
@@ -1487,16 +1457,24 @@ class Visualizer:
             lut = {v: palette[i % len(palette)] for i, v in enumerate(u)}
             return np.array([lut[v] for v in a])
 
-        cols = [colors(init_arr), colors(trained_arr), colors(y)]
-        titles = ["HMM init", "HMM trained", "True"]
-        arrays = [init_arr, trained_arr, y]
+        if pred_y is not None:
+            cols = [colors(pred_arr), colors(y)]
+            titles = [f"{model_name} predicted", "True"]
+            arrays = [pred_arr, y]
+        else:
+            cols = [colors(init_arr), colors(trained_arr), colors(y)]
+            titles = [f"{model_name} init", f"{model_name} trained", "True"]
+            arrays = [init_arr, trained_arr, y]
 
         # human-readable state names (if available)
         state_names = self.data_loader.get_state_names()
 
         saved: list[str] = []
         for a, b in combinations(range(proj.shape[1]), 2):
-            fig, axes = plt.subplots(1, 3, figsize=(15, 4), sharex=True, sharey=True)
+            n_panels = len(arrays)
+            fig, axes = plt.subplots(1, n_panels, figsize=(5 * n_panels, 4), sharex=True, sharey=True)
+            if n_panels == 1:
+                axes = [axes]
             for ax, arr, c, t in zip(axes, arrays, cols, titles):
                 # Create scatter plot
                 scatter = ax.scatter(proj[:, a], proj[:, b], c=c, s=6, alpha=0.85, edgecolors="none")
@@ -1519,7 +1497,10 @@ class Visualizer:
                 
             axes[0].set_ylabel(f"PC{b+1}")
             fig.tight_layout()
-            out_path = Path(overwrite_path) / f"hmm_tripanel_pc{a+1}_pc{b+1}.png" if overwrite_path else train_details.get_path() / "plots" / f"hmm_tripanel_pc{a+1}_pc{b+1}.png"
+            if overwrite_path:
+                out_path = Path(overwrite_path) / f"tripanel_pc{a+1}_pc{b+1}.png"
+            else:
+                out_path = train_details.get_path() / "plots" / f"tripanel_pc{a+1}_pc{b+1}.png"
             fig.savefig(out_path.as_posix(), dpi=160)
             plt.close(fig)
             saved.append(out_path.as_posix())   

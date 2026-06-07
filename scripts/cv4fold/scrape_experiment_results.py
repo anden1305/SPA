@@ -16,14 +16,12 @@ LOG_DIRS = (
 )
 PLOT_NAMES = (
     "feature_amplitude_per_state.png",
-    "feature_variance_per_state.png",
+    "tripanel_pc1_pc2.png",
     "hmm_tripanel_pc1_pc2.png",
-    "input_channel_total_power_per_state.png",
     "input_emg_band_power_per_state.png",
-    "input_eeg_band_power_per_state.png",
     "input_separation_gaps_bar.png",
-    "input_pairwise_energy_bars.png",
-    "latent_pairwise_energy_bars.png",
+    "input_pairwise_ed_network.png",
+    "latent_pairwise_ed_network.png",
     "separability_input_vs_latent.png",
     "latent_dim_separability_ranking.png",
 )

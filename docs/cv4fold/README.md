@@ -4,12 +4,27 @@ Cross-lab validation for cGMVAE / cHMM-GMVAE (Phase 2 of the [decoder conditioni
 
 **HQ cohort only:** 20 mice in [`data/manifests/cv_quality_cohort_v1.yaml`](../../data/manifests/cv_quality_cohort_v1.yaml) (labs 2, 3, 5). All configs are generated from this manifest.
 
+## Selection metric (final cv4fold)
+
+Each YAML runs **`runs: 3`** (three seeds). For **reporting and recipe lock**, use the **best GMM prior NMI** among the three seeds (`plots/<seed>/metrics.txt`), not the mean.
+
+| Context | Metric |
+|---------|--------|
+| **Final cv4fold / thesis tables** | **Best-of-3** prior NMI per YAML × fold |
+| **Ablation tie-break / stability check** | Also note all three seeds; discard configs with **≥2 collapsed seeds** (~0.0–0.1 NMI) even if one seed peaks |
+| **Reliability SEM (10 seeds)** | Mean ± SEM on scratch runs — separate from cv4fold best-of-3 ([cvae_checkpointing.md](../cvae_checkpointing.md)) |
+
+Scrape helper (shows best + all seeds): `python3 scripts/cv4fold/scrape_experiment_results.py`
+
+**Status (2026-06-07):** Per-lab incohort largely locked (lab_2/lab_3 prepro + lab_3 arch). lab_5 weakest; lab_2 montage + REM input still in flight. **Not yet on full cross-lab holdout** — see [ablation_lab2_findings_20260607.md](ablation_lab2_findings_20260607.md).
+
 | Doc | Contents |
 |-----|----------|
 | [cross_lab_cv4fold.md](cross_lab_cv4fold.md) | Story, folds, conditioning ablations, fold-4 results, next steps |
-| [ablation_prepro_lab2_lab5.md](ablation_prepro_lab2_lab5.md) | Preprocessing ablations (rounds 1–3) |
+| [ablation_prepro_lab2_lab5.md](ablation_prepro_lab2_lab5.md) | Preprocessing ablations (rounds 1–4, incl. lab_3/5 EEG 0.3–25 Hz) |
 | [ablation_lab2_rem.md](ablation_lab2_rem.md) | lab_2 REM input ablations + input-space EEG/EMG diagnostics |
 | [ablation_lab2_signals.md](ablation_lab2_signals.md) | lab_2 EEG1+EEG4 vs EEG1+EEG3 montage (winner prepro) |
+| [ablation_lab2_findings_20260607.md](ablation_lab2_findings_20260607.md) | **Interim findings**, curve interpretation, prioritized next ablations |
 | [latent_separability_guide.md](latent_separability_guide.md) | Which plots/metrics matter; input vs latent; what to skip |
 | [overnight_experiments_20260606.md](overnight_experiments_20260606.md) | **Overnight plan:** arch sweep + job tracker |
 | Phase 1 (lab_3) | [decoder_only_lab3_chmm_experiments.md](../decoder_only_lab3_chmm_experiments.md) |

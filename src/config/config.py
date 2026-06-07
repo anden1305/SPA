@@ -58,6 +58,10 @@ class ValidatorConfig(BaseModel):
     state_distinctness: bool = Field(..., description="Whether to compute state distinctness.")
     summary_statistics: bool = Field(..., description="Whether to compute summary statistics.")
     log_likelihood: bool = Field(..., description="Whether to compute log-likelihood.")
+    validate_train: bool = Field(
+        default=True,
+        description="Whether to run train-set predict/NMI during per-epoch validation.",
+    )
     # No hardcoded constants - all validation metrics are configurable toggles
 
 class VisualizerConfig(BaseModel):
@@ -68,6 +72,10 @@ class VisualizerConfig(BaseModel):
     state_distinctness: bool = Field(..., description="Whether to visualize state distinctness.")
     summary_statistics: bool = Field(..., description="Whether to visualize summary statistics.")
     historic_values: bool = Field(..., description="Whether to visualize historic model values (parameters & confusion matrices).")
+    save_results_npz: bool = Field(
+        default=True,
+        description="Write plots/results.npz (large on full-cohort runs). Disable for W&B tune sweeps.",
+    )
     # Hardcoded in src/visuals/visualizer.py (aesthetic constants)
 
 class TransformsConfig(BaseModel):
@@ -86,6 +94,11 @@ class DataLoaderConfig(BaseModel):
     shuffle: bool = Field(..., description="Whether to shuffle data each epoch.")
     normalize: bool = Field(..., description="Whether to normalize data using mean and std.")
     use_legacy: bool = Field(True, description="Whether to use legacy data loading behavior.")
+    max_batches_per_epoch: int | None = Field(
+        default=None,
+        ge=1,
+        description="Cap batch indices consumed each training epoch (smoke/debug). None = full dataset.",
+    )
     # No hardcoded constants - all data loading behavior is configurable
 
 class DatasetConfig(BaseModel):

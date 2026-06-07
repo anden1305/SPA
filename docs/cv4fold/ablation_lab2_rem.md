@@ -69,6 +69,31 @@ Walltime `4:00`.
 
 ## Success criteria
 
-Primary: GMM prior NMI (same as other ablations).  
+Primary: **best-of-3** GMM prior NMI ([README.md](README.md#selection-metric-final-cv4fold)).  
 REM-specific: improved REM recall in confusion matrix; `input_emg_band_power_per_state`
 shows REM EMG < NREM EMG; latent tripanel less Awake↔REM smear.
+
+## Results (best-of-3, 2026-06-07)
+
+All on **`no_postnorm_widebp`** unless noted. EEG3 montage unless `*_eeg4`.
+
+| Variant | Best | seeds | Stable? | Notes |
+|---------|------|-------|---------|-------|
+| `rem_winner` (EEG3) | **0.575** | [0.575, 0.539, 0.522] | yes | Baseline REM dir |
+| `rem_append_rms` | **0.568** | [0.392, 0.568, 0.511] | mostly | Ties prepro best on one seed |
+| `rem_winner_append_rms` | 0.560 | [0.560, 0.555, 0.537] | yes | Below winner |
+| `rem_emg_wide` (EEG3) | 0.549 | [0.523, 0.549, **0.097**] | **no** | s3 collapse — discard |
+| `rem_emg_low` (EEG3) | 0.523 | [0.520, 0.476, 0.523] | yes | No gain vs winner |
+| `rem_paper_robust` | 0.512 | [0.181, 0.512, 0.397] | no | Paper front-end worse |
+| `rem_paper_robust_append_rms` | 0.485 | [0.439, 0.485, 0.399] | yes | Worse |
+| `rem_paper_robust_emg_wide` | — | — | — | Completed elsewhere; poor |
+| **`rem_emg_low_eeg4`** | **0.566** | [0.566, 0.555, 0.565] | **yes** | DONE — stable, ≈ prepro |
+| **`rem_emg_wide_eeg4`** | **0.593** | [0.593] (1/3) | TBD | **RUN** — leading candidate |
+
+**Takeaway:** Wide EMG on EEG3 **collapses** one seed; on **EEG4**, `rem_emg_wide` s1 **0.593** exceeds prepro **0.568** — wait for 3 seeds before lock. `rem_emg_low_eeg4` matches prepro but does not beat **`rem_emg_wide_eeg4`** on best seed.
+
+Training curves / queue: [ablation_lab2_findings_20260607.md](ablation_lab2_findings_20260607.md).
+
+## Interim findings (superseded table — see Results above)
+
+Prior one-seed notes kept for W&B curve context only; use **Results** table for decisions.
