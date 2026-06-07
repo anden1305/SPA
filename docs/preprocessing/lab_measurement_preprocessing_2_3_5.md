@@ -3,7 +3,7 @@
 **Added 2026-06-06.** Acquisition and preprocessing differences between the labs we
 train on, pulled from the data paper, the OpenNeuro dataset files, and our own
 metadata. Motivation: explain why per-lab cGMVAE behaves differently (esp. the
-lab_2 `post_normalize` finding in [`cv4fold/ablation_prepro_lab2_lab5.md`](cv4fold/ablation_prepro_lab2_lab5.md)).
+lab_2 `post_normalize` finding in [`cv4fold/ablations/ablation_prepro_lab2_lab5.md`](../cv4fold/ablations/ablation_prepro_lab2_lab5.md)).
 
 ## Sources
 

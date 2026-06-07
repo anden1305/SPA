@@ -60,7 +60,7 @@ cvae:
 
 Hotstart matches thesis ~0.72; scratch ablation often ~0.68–0.70 for cGMVAE GMM.
 
-Lab_3 experiment matrix (submit scripts, mermaid): [decoder_only_lab3_chmm_experiments.md](decoder_only_lab3_chmm_experiments.md).
+Lab_3 experiment matrix (submit scripts, mermaid): [decoder_only_lab3_chmm_experiments.md](../decoder_only/decoder_only_lab3_chmm_experiments.md).
 
 ## What happens on `train_vae`
 
@@ -103,7 +103,7 @@ Reliability / cHMM YAMLs point at the fixed paths above so finetuning starts fro
 
 ## How to check what a run actually used
 
-See [decoder_only_checkpoint_tracing.md](decoder_only_checkpoint_tracing.md) (WandB, HPC log, `config.json`, `validation_info.json`, `.pth` shape check).
+See [decoder_only_checkpoint_tracing.md](../decoder_only/decoder_only_checkpoint_tracing.md) (WandB, HPC log, `config.json`, `validation_info.json`, `.pth` shape check).
 
 ## Code
 

@@ -11,7 +11,7 @@ alwaysApply: true
 
 **Exploration:** Read targeted files first; avoid broad repo scans and huge grep dumps unless necessary. Prefer one parallel batch of reads over many sequential passes.
 
-**Commands:** Run only commands needed to verify the change. Do not run full training or full HPC sweeps on the login node. **Never run `pytest` on the login node** — submit `bsub < hpc/submit/tests/run_pytest.sh` or ask the user to run tests on `linuxsh`. Do not run `pytest` unless the user asked or it is required to confirm a fix.
+**Commands:** Run only commands needed to verify the change. **Login node = edit/git/bsub only.** CPU work (pytest, data exploration, `.npy` loads, plot scripts) → **`linuxsh`**. GPU smoke → **`sxm2sh` / `voltash` / `a100sh`**; long GPU jobs → **`bsub`**. Never run `pytest` on login. Do not run `pytest` unless the user asked or it is required to confirm a fix.
 
 **Commits / PRs:** Only when the user explicitly asks.
 

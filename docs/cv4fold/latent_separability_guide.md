@@ -2,7 +2,7 @@
 
 **Added 2026-06-07.** Distilled from the `chmmgmm_fold` latent-separability notes, trimmed for the **per-lab → holdout → cross-lab** path on `vae_decoder_chmm_cv4`. No cyclical β, no full 20-mouse Bayes sweep as a prerequisite.
 
-Related: [decoder_conditioning_roadmap.md](../decoder_conditioning_roadmap.md), [ablation_lab2_rem.md](ablation_lab2_rem.md), [overnight_experiments_20260606.md](overnight_experiments_20260606.md).
+Related: [decoder_conditioning_roadmap.md](../decoder_conditioning_roadmap.md), [ablation_lab2_rem.md](ablations/ablation_lab2_rem.md), [overnight_experiments_20260606.md](overnight_experiments_20260606.md).
 
 ---
 
@@ -102,7 +102,7 @@ When you move to **joint or holdout** training:
 | **Per-lab preprocessing** | lab_2: drop `post_normalize`, EEG 0–30 Hz; lab_3: postnorm + wide_mlp; lab_5: long epochs |
 | **Per-lab arch** | lab_3 `wide_mlp`; lab_2 arch ≈ tie — bottleneck is input/REM not width |
 | **Input diagnostics** | Always on with `summary_statistics: true` |
-| **HQ cohort + signals** | Manifest mice only; lab_2 EEG1+EEG3 (EEG1+EEG4 ablation running) |
+| **HQ cohort + signals** | Manifest mice only; **lab_2 EEG1+EEG4+EMG** (locked 2026-06-07) |
 | **decoder_only_conditioning** | Encoder lab-agnostic; subject in decoder only |
 
 ---

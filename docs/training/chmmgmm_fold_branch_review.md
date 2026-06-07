@@ -95,7 +95,7 @@ These are **newer or better** on the current branch; `chmmgmm_fold` would overwr
 | **Decoder-only submit layout** | `hpc/submit/decoder_only/{baseline,reliability}/` — cleaner than flat + lab_2/lab_5 trees |
 | **cv4fold docs** | `latent_separability_guide.md`, interim findings, cross-lab story |
 | **`887b6ed` fix** | `start_t` when sequence shorter than requested windows |
-| **Checkpoint docs** | `docs/cvae_checkpointing.md` (SEM / scratch vs hotstart guidance) |
+| **Checkpoint docs** | `docs/training/cvae_checkpointing.md` (SEM / scratch vs hotstart guidance) |
 | **Agent / HPC rules** | `.cursor/rules/*` (discipline, bsub communication, document-changes) |
 
 **Already shared (both branches, possibly with small diffs):** `hmm_gmm_prior.py`, core HMM-GMM prior training, `checkpoint_score` composite, noise scripts per lab, `generate_configs.py` / manifest utils, quality cohort manifest.
@@ -114,11 +114,11 @@ Port as **small cherry-picks**, not a merge.
 | **Trainer non-finite guards** | Prevents bad batches from poisoning weights; no behaviour change on clean runs | Low |
 | **`validate_train: bool`** | Skip expensive train-set NMI during sweeps | Low — default can stay `True` |
 | **`max_batches_per_epoch`** | Smoke / debug without full epoch | Low |
-| **`save_results_npz: bool`** | Saves disk on W&B sweeps | Low |
-| **cv4fold postprocess scripts** | `postprocess_fold.py`, `split_per_mouse.py`, `aggregate_val_nmi_by_lab.py`, `select_best_vae_run.py`, summarize helpers — **missing on current** | Low — scripts only |
-| **`docs/cvae_wandb_checkpoint_metrics.md`** | Complements `cvae_checkpointing.md`; documents W&B keys + \(S(\varepsilon)\) | None |
+| **`save_results_npz: bool`** | Saves disk on W&B sweeps | Low — **ported**; default `false` on cv4fold via `locked_recipes.py` |
+| **cv4fold postprocess scripts** | `postprocess_fold.py`, … — **ported lean** | See [cv4fold/postprocess.md](../cv4fold/postprocess.md) |
+| **`docs/training/cvae_wandb_checkpoint_metrics.md`** | Complements `cvae_checkpointing.md`; documents W&B keys + \(S(\varepsilon)\) | None |
 | **`scripts/noise/main.py`** | One entry point to run all lab noise analyses | Low |
-| **`latent_autocorr` in `validate_cvae_epoch`** | Cheap trajectory metric when `sequence_length > 1` | Low |
+| **`latent_autocorr` in `validate_cvae_epoch`** | Cheap trajectory metric when `sequence_length > 1` | Low — **ported** |
 | **Pytest dev group + selected tests** | `test_hmmgmm_checkpoint_score`, `test_warm_schedule`, `test_vae_prior_compat` — skip duplicating what you already have | Low — run on compute node |
 
 ### ❌ Do not copy (would bloat or break current work)
@@ -141,7 +141,7 @@ Port as **small cherry-picks**, not a merge.
 | Item | Copy if… | Skip if… |
 |------|----------|----------|
 | **`conditioning_source` + lab embeddings** | You resume **decoder conditioning / LOLO lab holdout** (roadmap Phase 2) | Staying on per-lab incohort + ablations only |
-| **`pretrained_checkpoint_path` split** | You want read-only hotstart path separate from `model_checkpoint_path` writes | Current single-knob checkpointing is enough (`docs/cvae_checkpointing.md`) |
+| **`pretrained_checkpoint_path` split** | You want read-only hotstart path separate from `model_checkpoint_path` writes | Current single-knob checkpointing is enough (`docs/training/cvae_checkpointing.md`) |
 | **CNN `raw_cnn` front-end** | You want Story A (learned spectral front) as a **dedicated experiment** | FFT + ablation prepro is the current winning path |
 | **`validate_cvae_all_runs` in `main.py`** | You prefer orchestrator-native batch validation | `validate_decoder_only_all.py` already covers decoder-only |
 | **W&B sweep runner Bayes mode** | You rerun cv4fold joint Bayes50 tuning | Manual ablation grid is sufficient |
@@ -186,7 +186,7 @@ Keep the current **`prior_pred_nmi`** behaviour unless you explicitly want pre-c
 2. Trainer non-finite guards
 3. Config toggles: `validate_train`, `max_batches_per_epoch`, `save_results_npz`
 4. cv4fold postprocess scripts (no training code touched)
-5. `latent_autocorr` logging + `docs/cvae_wandb_checkpoint_metrics.md`
+5. `latent_autocorr` logging + `docs/training/cvae_wandb_checkpoint_metrics.md`
 6. Pytest additions for anything you port
 7. **Only then** consider larger tracks: conditioning, CNN front, preprocessing audit
 

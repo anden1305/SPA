@@ -18,7 +18,7 @@ declare -A JOB_QUEUES=(
   ["lab_2_rem_emg_wide"]="gpuv100"
   ["lab_2_rem_emg_low"]="gpuv100"
   ["lab_2_rem_append_rms"]="gpuv100"
-  ["lab_2_rem_paper_robust_emg_wide"]="gpua10"
+  ["lab_2_rem_paper_robust_emg_wide"]="gpuv100"
   ["lab_2_rem_winner_append_rms"]="gpua100"
   ["lab_2_rem_paper_robust_append_rms"]="gpul40s"
 )

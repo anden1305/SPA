@@ -6,7 +6,7 @@
 #   PYTHONPATH=. python3 scripts/cv4fold/generate_ablation_prepro.py
 # Run with bash (wrapper that calls bsub in a loop), NOT `bsub < ...`.
 # References (baseline/no_postnorm) are from rounds 1-2 — not resubmitted here.
-# See docs/cv4fold/ablation_prepro_lab2_lab5.md
+# See docs/cv4fold/ablations/ablation_prepro_lab2_lab5.md
 
 set -euo pipefail
 SPA_ROOT="/work3/s204070/SPA"

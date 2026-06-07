@@ -4,7 +4,7 @@
 
 **Selection metric:** for each YAML, **`runs: 3`** → report **best** GMM prior NMI across seeds (`scrape_experiment_results.py`). Mean shown for stability only. See [README.md](README.md#selection-metric-final-cv4fold).
 
-Architecture sweep: [`overnight_experiments_20260606.md`](overnight_experiments_20260606.md).
+Architecture sweep: [`overnight_experiments_20260606.md`](../overnight_experiments_20260606.md).
 
 ## Baselines (80 ep, per-lab in-cohort, from scratch)
 
@@ -65,13 +65,13 @@ Mid band + paper-style high-pass 0.3 Hz. Compare to locked winners above.
 
 **Interim:** bp25 unlikely to replace locked recipes; let jobs finish then archive.
 
-## Locked per-lab preprocessing (best-of-3, from-scratch HQ incohort)
+## Locked per-lab recipes (best-of-3, from-scratch HQ incohort)
 
-| Lab | Recipe | Best NMI | Arch add-on (R4) | Combined best |
-|-----|--------|----------|------------------|---------------|
-| **lab_2** | `post_normalize: false`, EEG **0–30 Hz** | **0.568** (`no_postnorm_widebp`) | none beats prepro (`wide_lat16` 0.564) | **0.568** |
-| **lab_3** | `post_normalize: true`, EEG **0–20 Hz**, 200 ep | **0.713** (`baseline_long`) | **`wide_mlp` 0.737** | **0.737** |
-| **lab_5** | `post_normalize: true`, EEG **0–20 Hz**, 200 ep | **0.508** (`long`) | `wide_mlp` 0.534 | **0.534** (arch) |
+| Lab | Config source | Montage / prepro | Best NMI |
+|-----|---------------|------------------|----------|
+| **lab_2** | `ablation_rem/.../rem_emg_wide_eeg4.yaml` | **EEG1+EEG4+EMG**, EMG 3–100 Hz, no postnorm, EEG 0–30 Hz | **0.593** |
+| **lab_3** | `baseline_long` + `wide_mlp` arch | EEG1+EEG2+EMG, postnorm, EEG 0–20 Hz | **0.737** |
+| **lab_5** | `long` + `wide_mlp` arch | EEG1+EEG2+EMG, postnorm, EEG 0–20 Hz | **0.534** |
 
 lab_5 remains the **weakest lab** (best ~0.53 with arch); gate >0.45 passed but no ~0.72-class ceiling yet.
 
@@ -93,5 +93,6 @@ source .venv/bin/activate && PYTHONPATH=. python3 scripts/cv4fold/scrape_experim
 
 ## Changelog
 
+- **2026-06-07 (eve)** — lab_2 montage locked **EEG1+EEG4+EMG** (`rem_emg_wide_eeg4`, 0.593).
 - **2026-06-07** — R2–R3 complete; R4 bp25 partial; locked winners table (best-of-3); paper_robust rejected.
 - **2026-06-06** — Initial R1 log.

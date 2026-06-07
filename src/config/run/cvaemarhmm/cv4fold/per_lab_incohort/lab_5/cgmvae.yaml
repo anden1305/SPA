@@ -1,5 +1,5 @@
 trainer:
-  epochs: 80
+  epochs: 200
   learning_rate: 0.0003
   optimizer: adam
   grad_clip: 0.5
@@ -40,6 +40,25 @@ dataloader:
   normalize: true
   use_legacy: false
   transforms: []
+cvae:
+  normalize_global: false
+  pre_normalize: false
+  post_normalize: true
+  percentile_clip_channels: false
+  perform_hanning_window: false
+  band_pass_filter_fft: true
+  band_pass_freqs:
+  - - null
+    - 20.0
+  - - null
+    - 20.0
+  - - 5.0
+    - 60.0
+  band_pass_filter_type: frequency_domain
+  traning_pipeline: cvae
+  model_checkpoint_path: null
+  save_pretrained_checkpoint: false
+  reinit_marhmm: false
 model:
   type: cvae_marhmm
   covariance_type: full
@@ -57,11 +76,13 @@ model:
     sticky_kappa: 0.9
     latent_dim: 8
     enc_hidden_dims:
+    - 512
     - 256
     - 128
     dec_hidden_dims:
     - 128
     - 256
+    - 512
     conv_channels:
     - 32
     - 64
@@ -93,29 +114,11 @@ model:
     gmm_warmup_epochs: 0
     free_nats_per_dim: 0.0
     no_beta_epochs: 10
-cvae:
-  normalize_global: false
-  pre_normalize: false
-  post_normalize: true
-  percentile_clip_channels: false
-  perform_hanning_window: false
-  band_pass_filter_fft: true
-  band_pass_freqs:
-  - - null
-    - 20.0
-  - - null
-    - 20.0
-  - - 5.0
-    - 60.0
-  band_pass_filter_type: frequency_domain
-  traning_pipeline: cvae
-  model_checkpoint_path: null
-  save_pretrained_checkpoint: false
-  reinit_marhmm: false
+    num_gmm_states: 3
 verbose: true
-seed: 123
-runs: 3
 validate_data: true
+runs: 3
+seed: 123
 train_datasets:
 - type: mssv
   id: sub-087

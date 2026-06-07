@@ -35,7 +35,7 @@ isProject: false
 
 | Layer | Status on `vae_decoder_chmm_cv4` |
 |-------|----------------------------------|
-| Phase 1 lab_3 | Done — decoder-only ~**0.65**, enc+dec ~**0.74** prior NMI ([decoder_only_lab3_chmm_experiments.md](docs/decoder_only_lab3_chmm_experiments.md)) |
+| Phase 1 lab_3 | Done — decoder-only ~**0.65**, enc+dec ~**0.74** prior NMI ([decoder_only_lab3_chmm_experiments.md](../decoder_only/decoder_only_lab3_chmm_experiments.md)) |
 | Baseline job `28605085` | Finishing 3 seeds; use best `cvae_best_prior_pred_nmi.pth` as canonical hotstart |
 | cv4fold infra | **Docs only** — no `data/manifests/`, `scripts/cv4fold/`, or `hpc/submit/cv4fold/` on this branch |
 | `chmmgmm_fold` | Full pipeline: manifest, `generate_configs.py`, tune winners, joint/per_lab folds, `conditioning_source` + `lab_emb` — but **compact** subject indexing and fold-4 **subject_lab collapse** |
@@ -43,7 +43,7 @@ isProject: false
 ## What not to copy blindly from `chmmgmm_fold`
 
 1. **Compact `subject_emb` `[N,4]`** — stay on **legacy `[92,4]`** (`sub-041` → row 41) per your checkpoint line.
-2. **`subject_lab` tune winners on holdout** — pooled NMI **~0** on fold 4; pause until fold-4 re-tune ([cross_lab_cv4fold.md](docs/cv4fold/cross_lab_cv4fold.md)).
+2. **`subject_lab` tune winners on holdout** — pooled NMI **~0** on fold 4; pause until fold-4 re-tune ([cross_lab_cv4fold.md](../cv4fold/cross_lab_cv4fold.md)).
 3. **`seq_len=1` for cross-lab** — lab_3 recipe; cv4fold pilot needs **`sequence_length: 64`** for temporal prior.
 4. **Config path `cvaeprior/`** — this branch trains via [`cvaemarhmm`](src/config/run/cvaemarhmm/); templates must live under `cvaemarhmm/cv4fold/` (or generator rewrites paths).
 5. **Any mouse outside the quality cohort** — do not use full `metadata.csv` or old lab_3 YAMLs that list non-cohort mice.
@@ -127,7 +127,7 @@ Cherry-pick or re-copy (adapt paths, do not merge whole branch):
 | Config generator (trimmed) | `scripts/cv4fold/generate_configs.py` | new phase: `per_lab_incohort` only |
 | Postprocess | `scripts/cv4fold/postprocess_fold.py`, `aggregate_val_nmi_by_lab.py` | same |
 | HPC | `hpc/submit/cv4fold/cv4fold_bsub.sh` + one submit script | `submit_per_lab_incohort.sh` |
-| Docs | Extend [docs/cv4fold/README.md](docs/cv4fold/README.md) with workflow | link from [decoder_conditioning_roadmap.md](docs/decoder_conditioning_roadmap.md) |
+| Docs | Extend [docs/cv4fold/README.md](../cv4fold/README.md) with workflow | link from [decoder_conditioning_roadmap.md](../decoder_conditioning_roadmap.md) |
 
 **Generator changes for this branch:**
 
@@ -176,7 +176,7 @@ Cherry-pick or re-copy (adapt paths, do not merge whole branch):
 **Goal:** LODO **within one lab** before joint 3-lab holdout.
 
 - Use manifest `splits.fold_k.{lab_2|lab_3|lab_5}` but **scope = per_lab** only (train pool = that lab’s mice minus holdout).
-- Start with **fold 4** holdouts you already know ([cross_lab_cv4fold.md](docs/cv4fold/cross_lab_cv4fold.md)): lab_2 `sub-080/081`, lab_3 `056/059/060`, lab_5 `sub-092`.
+- Start with **fold 4** holdouts you already know ([cross_lab_cv4fold.md](../cv4fold/cross_lab_cv4fold.md)): lab_2 `sub-080/081`, lab_3 `056/059/060`, lab_5 `sub-092`.
 - Recipe: **`sequence_length: 64`**, decoder-only **subject**, scratch **or** hotstart from lab_3 baseline (ablation).
 
 **Gate:** per-lab holdout NMI **> 0** with stable seeds; compare hotstart vs scratch for that lab only.
@@ -189,7 +189,7 @@ Only after Steps 2–3 pass.
 
 - Port `generate_configs --phase subject_tune_winners --folds 4` (adapt to `cvaemarhmm`).
 - Reproduce fold-4 pilot **B** (~0.31 pooled NMI) as regression; report **per-lab** NMI (`val_nmi_by_lab.csv`), not pooled only.
-- Fix **seed collapse** (runs 2–3 → NMI ≈ 0) before scaling to folds 1–3 — investigate GMM init, `checkpoint_score`, seed offsets (known issue in [cross_lab_cv4fold.md](docs/cv4fold/cross_lab_cv4fold.md)).
+- Fix **seed collapse** (runs 2–3 → NMI ≈ 0) before scaling to folds 1–3 — investigate GMM init, `checkpoint_score`, seed offsets (known issue in [cross_lab_cv4fold.md](../cv4fold/cross_lab_cv4fold.md)).
 
 ---
 
@@ -207,7 +207,7 @@ From [`chmmgmm_fold` cv4fold README](docs on that branch):
 
 **Do not** re-enable `subject_lab` from `chmmgmm_fold` without fold-4 re-tune.
 
-Instead (aligns with [decoder_conditioning_roadmap.md](docs/decoder_conditioning_roadmap.md) and `.github/prompts/plan-labConditionedDecoder.md`):
+Instead (aligns with [decoder_conditioning_roadmap.md](../decoder_conditioning_roadmap.md) and `.github/prompts/plan-labConditionedDecoder.md`):
 
 - Port **only** `lab_emb` on **decoder** + `lab_map` from metadata (`lab_2/3/5` → 3 rows + unknown).
 - Keep **legacy `[92,4]` subject** for in-cohort; at LODO test, prior metric still uses unconditioned encoder — lab helps **reconstruction**, not current NMI path unless encoder stays clean.
@@ -233,7 +233,7 @@ Checkpoints: same lineage within cv4fold; orchestrator skips incompatible subjec
 2. Cherry-pick manifest + `manifest_utils` + minimal `generate_configs` phase `per_lab_incohort`.
 3. Add templates + one HPC submit script; **manual** `bsub` after you confirm commands.
 4. Run lab_5 then lab_2 in-cohort (lab_5 smaller → faster iteration).
-5. Document gates in [docs/cv4fold/cross_lab_cv4fold.md](docs/cv4fold/cross_lab_cv4fold.md) (per-lab section).
+5. Document gates in [docs/cv4fold/cross_lab_cv4fold.md](../cv4fold/cross_lab_cv4fold.md) (per-lab section).
 6. Steps 3–6 only after gates pass.
 
 ---

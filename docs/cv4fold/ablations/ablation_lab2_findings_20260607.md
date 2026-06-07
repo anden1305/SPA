@@ -6,7 +6,7 @@ selection metric, and cross-lab readiness.
 Related: [ablation_lab2_signals.md](ablation_lab2_signals.md),
 [ablation_lab2_rem.md](ablation_lab2_rem.md),
 [ablation_prepro_lab2_lab5.md](ablation_prepro_lab2_lab5.md),
-[latent_separability_guide.md](latent_separability_guide.md),
+[latent_separability_guide.md](../latent_separability_guide.md),
 [README.md](README.md#selection-metric-final-cv4fold).
 
 ---
@@ -23,13 +23,13 @@ Also record all three seeds — **reject** configs with **≥2 collapsed seeds**
 
 | Lab | Prepro | Arch | Montage / input | Best NMI |
 |-----|--------|------|-----------------|----------|
-| **lab_2** | no postnorm, EEG 0–30 Hz | default (arch ≈ tie) | EEG3 **0.575** (`rem_winner`); EEG4 **`rem_emg_wide` 0.593*** | 0.568 prepro-only |
+| **lab_2** | no postnorm, EEG 0–30 Hz | default | **EEG1+EEG4+EMG**, EMG **3–100 Hz** | **0.593** ✅ |
 | **lab_3** | postnorm, EEG 0–20 Hz, 200 ep | **`wide_mlp`** | EEG1+EEG2+EMG | **0.737** |
 | **lab_5** | postnorm, EEG 0–20 Hz, 200 ep | **`wide_mlp`** | EEG1+EEG2+EMG | **0.534** |
 
-\*`rem_emg_wide_eeg4` — **1/3 seeds done** at scrape time; confirm before manifest lock.
+**lab_2 locked (28607461):** best **0.593**, seeds **[0.593, 0.578, 0.541]** — all healthy. +0.018 vs `rem_winner`, +0.025 vs prepro-only.
 
-**Cross-lab cv4fold:** **not yet** — finish EEG4 REM seeds + lab_5 confirmation, then **per-lab holdout folds** before 20-mouse joint training ([cross_lab_cv4fold.md](cross_lab_cv4fold.md)).
+**Cross-lab cv4fold:** **not yet** — per-lab **holdout folds** next ([cross_lab_cv4fold.md](../cross_lab_cv4fold.md)).
 
 ---
 
@@ -56,7 +56,7 @@ Also record all three seeds — **reject** configs with **≥2 collapsed seeds**
 | `rem_emg_wide` EEG3 | 0.549 | [0.523, 0.549, **0.097**] | Unstable — discard |
 | `rem_emg_low` EEG3 | 0.523 | [0.520, 0.476, 0.523] | No gain |
 | `rem_emg_low_eeg4` | 0.566 | [0.566, 0.555, 0.565] | Stable, ≈ prepro |
-| **`rem_emg_wide_eeg4`** | **0.593** | [0.593, —, —] | **RUN** — best candidate |
+| **`rem_emg_wide_eeg4`** | **0.593** | [0.593, 0.578, 0.541] | **LOCK** — lab_2 winner |
 
 ### Architecture (lab_2 — no beat prepro)
 
@@ -89,8 +89,8 @@ Both montages show **expected** shapes on locked recipe (`no_beta_epochs: 10`, e
 |--------|--------|
 | **Data / cohort** | HQ manifest OK; per-lab incohort works |
 | **Preprocessing** | **Per-lab required** — lab_2 no postnorm; lab_3/5 postnorm; paper_robust rejected; bp25 trending worse |
-| **Montage (lab_2)** | EEG4 stable vs EEG3; **`rem_emg_wide_eeg4`** may be new lab_2 best if 3 seeds hold |
-| **REM / latent separability** | Still hardest on lab_2; arch did not fix; wide EMG + EEG4 most promising |
+| **Montage (lab_2)** | **Locked:** EEG1+EEG4+EMG + wide EMG **0.593** |
+| **REM / latent separability** | Best incohort NMI so far on lab_2; holdout still required |
 | **Architecture** | **lab_3 `wide_mlp` essential** (0.737); lab_2/lab_5 marginal vs prepro |
 | **LR / warmup** | **Settled** — no change |
 
@@ -102,23 +102,32 @@ Both montages show **expected** shapes on locked recipe (`no_beta_epochs: 10`, e
 
 | Job | Status | Action |
 |-----|--------|--------|
-| `rem_emg_wide_eeg4` (28607461) | RUN | Wait for seeds 2–3 |
-| lab_3/5 `no_postnorm_bp25` | RUN | Archive when done; unlikely to win |
+| ~~`rem_emg_wide_eeg4` (28607461)~~ | **DONE** | **0.593** [0.593, 0.578, 0.541] — lab_2 locked |
+| lab_3/5 `no_postnorm_bp25` | RUN/PEND | Archive when done; unlikely to win |
+
+### P1b — `no_beta_epochs` ablation (all labs)
+
+Test **`no_beta_epochs: 0`** on each lab's locked winner; control **10** = existing best runs:
+
+| Lab | Control (10) | Test config |
+|-----|--------------|-------------|
+| lab_2 | `rem_emg_wide_eeg4` **0.593** | `ablation_beta/lab_2/no_beta_epochs_0_*` |
+| lab_3 | `wide_mlp` **0.737** | `ablation_beta/lab_3/no_beta_epochs_0_*` |
+| lab_5 | `wide_mlp` **0.534** | `ablation_beta/lab_5/no_beta_epochs_0_*` |
 
 ```bash
-bjobs -u $USER | grep -E 'eeg4|bp25'
-source .venv/bin/activate && PYTHONPATH=. python3 scripts/cv4fold/scrape_experiment_results.py | tail -20
+PYTHONPATH=. python3 scripts/cv4fold/generate_ablation_no_beta_epochs.py
+bash hpc/submit/cv4fold/submit_ablation_no_beta_epochs.sh
 ```
 
-### P1 — Lock lab_2 recipe (after P0)
+See [ablation_no_beta_epochs.md](ablation_no_beta_epochs.md).
 
-If **`rem_emg_wide_eeg4` best-of-3 ≥ 0.568** and **≥2/3 seeds healthy**:
+### P1 — lab_2 recipe ✅ LOCKED
 
 - Montage: **EEG1, EEG4, EMG**
-- EMG band: **3–100 Hz** (`rem_emg_wide`)
-- Regenerate manifest / `generate_configs.py` lab_2 `signals`
-
-Else: keep **EEG1+EEG3** + `no_postnorm_widebp` (**0.575** best on `rem_winner`).
+- EMG band: **3–100 Hz**
+- Prepro: **no postnorm**, EEG **0–30 Hz**
+- Next: wire into `generate_configs.py` / manifest, then **holdout folds**
 
 ### P2 — lab_5
 
@@ -128,9 +137,9 @@ Keep **`long` + postnorm + `wide_mlp`** (best **0.534**). Weakest lab — accept
 
 Before joint cross-lab cv4fold:
 
-1. Lock templates in `generate_configs.py` (prepro + arch + lab_2 montage/EMG).
-2. Run **holdout folds 1–3 per lab** with locked recipe.
-3. Gate: best-of-3 on **held-out mice only** (not incohort pooled).
+1. Lock templates in `generate_configs.py` / `locked_recipes.py` (prepro + arch + lab_2 montage/EMG).
+2. **Pilot:** fold 4 within-lab holdout — see [per_lab_holdout_pilot.md](../per_lab_holdout_pilot.md).
+3. Run folds 1–3 with same recipe; gate on **best-of-3 holdout NMI**.
 
 ### P4 — Cross-lab cv4fold (Phase 2)
 
@@ -144,15 +153,12 @@ Only after P3: **seq64 + `subject`**, not `subject_lab` (fold-4 collapse). Apply
 
 ---
 
-## Live queue (2026-06-07 pm)
+## Live queue (2026-06-07)
 
 | JOBID | Name | STAT |
 |-------|------|------|
-| 28607461 | `rem_emg_wide_eeg4` | RUN |
-| 28607237 | lab_3 `no_postnorm_bp25` | RUN |
-| 28607238 | lab_5 `no_postnorm_bp25` | RUN |
-
-**Done since AM:** `rem_emg_low_eeg4` (best **0.566**, 3/3 stable); all signal montage + most REM EEG3 variants; R4 arch all labs.
+| ~~28607461~~ | `rem_emg_wide_eeg4` | **DONE** best=0.593 |
+| 28607237/38 | lab_3/5 `no_postnorm_bp25` | RUN/PEND |
 
 ---
 
@@ -170,5 +176,5 @@ Only after P3: **seq64 + `subject`**, not `subject_lab` (fold-4 collapse). Apply
 
 ## Changelog
 
-- **2026-06-07 (pm)** — Full scrape; best-of-3 metric; locked per-lab table; cross-lab gate; EEG4 REM leading.
+- **2026-06-07 (eve)** — **`rem_emg_wide_eeg4` DONE** (28607461): best **0.593**, seeds [0.593, 0.578, 0.541]; lab_2 locked.
 - **2026-06-07** — Initial interim synthesis from W&B curves and partial REM/signal runs.

@@ -2,7 +2,7 @@
 
 How to confirm which pretrained weights a reliability run used.
 
-For load/save behaviour see [cvae_checkpointing.md](cvae_checkpointing.md).
+For load/save behaviour see [cvae_checkpointing.md](../training/cvae_checkpointing.md).
 
 ## 1. WandB config
 

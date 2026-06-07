@@ -4,7 +4,7 @@
 Compares EEG1+EEG3+EMG (current HQ montage) with EEG1+EEG4+EMG (P + second
 frontal; EEG4 slightly cleaner on sub-072). Same prepro/arch as prepro winner.
 
-See docs/cv4fold/ablation_lab2_signals.md
+See docs/cv4fold/ablations/ablation_lab2_signals.md
 """
 
 from __future__ import annotations

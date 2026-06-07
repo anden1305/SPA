@@ -1,6 +1,6 @@
 > Raw paper-methods dump. For a structured per-lab summary of acquisition &
 > preprocessing for the labs we train on (2, 3, 5), see
-> [`lab_measurement_preprocessing_2_3_5.md`](lab_measurement_preprocessing_2_3_5.md).
+> [`lab_measurement_preprocessing_2_3_5.md`](../preprocessing/lab_measurement_preprocessing_2_3_5.md).
 
 Methods
 Data collection overview

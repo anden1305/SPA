@@ -18,7 +18,7 @@ We answer in two stages: **controlled proof** → **cross-lab holdout**.
 
 | Phase | Question | Setting | Detail doc |
 |-------|----------|---------|------------|
-| **1 — lab_3 proof** | Does the model work at all? Does cHMM beat cGMVAE? Does hotstart help? | Single lab, same mice train/val, decoder-only + enc+dec ablations | [decoder_only_lab3_chmm_experiments.md](decoder_only_lab3_chmm_experiments.md) |
+| **1 — lab_3 proof** | Does the model work at all? Does cHMM beat cGMVAE? Does hotstart help? | Single lab, same mice train/val, decoder-only + enc+dec ablations | [decoder_only_lab3_chmm_experiments.md](decoder_only/decoder_only_lab3_chmm_experiments.md) |
 | **2 — cv4fold** | Does it transfer to **new mice** and **other labs**? Which conditioning / recipe? | 4-fold holdout, labs 2/3/5, population joint training, tune-winner hyperparams | [cv4fold/cross_lab_cv4fold.md](cv4fold/cross_lab_cv4fold.md) |
 | **3 — thesis line** *(planned)* | Locked recipe, all folds, reliability | TBD after Phase 2 decision | — |
 
@@ -64,8 +64,8 @@ flowchart LR
 
 | Topic | Doc |
 |-------|-----|
-| Checkpoint load/save | [cvae_checkpointing.md](cvae_checkpointing.md) |
-| Tracing which `.pth` a run used | [decoder_only_checkpoint_tracing.md](decoder_only_checkpoint_tracing.md) |
+| Checkpoint load/save | [cvae_checkpointing.md](training/cvae_checkpointing.md) |
+| Tracing which `.pth` a run used | [decoder_only_checkpoint_tracing.md](decoder_only/decoder_only_checkpoint_tracing.md) |
 | cv4fold index | [cv4fold/README.md](cv4fold/README.md) |
 
 ## Results roots

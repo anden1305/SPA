@@ -5,7 +5,7 @@
 
 Per-epoch Weights & Biases logging and optional **collapse-aware checkpoint** aligned with thesis composite score \(S(\varepsilon)\). Implementation: [`src/validation/validator.py`](../src/validation/validator.py), [`src/validation/hmmgmm_metrics.py`](../src/validation/hmmgmm_metrics.py), [`src/training/trainer.py`](../src/training/trainer.py), [`src/orchestrator/orchestrator.py`](../src/orchestrator/orchestrator.py).
 
-Related: [cvae_checkpointing.md](cvae_checkpointing.md), [cv4fold README](cv4fold/README.md).
+Related: [cvae_checkpointing.md](cvae_checkpointing.md), [cv4fold README](../cv4fold/README.md).
 
 ---
 

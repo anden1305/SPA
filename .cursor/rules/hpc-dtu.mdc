@@ -1,22 +1,51 @@
 ---
-description: DTU HPC — login node vs compute; bsub vs linuxsh
+description: DTU HPC — login vs interactive compute vs bsub; node names and multi-user safety
 alwaysApply: true
 ---
 
 # HPC (DTU)
 
-**Do not run heavy work on the login node** (`hpclogin*`). Login is for editing, git, and `bsub` submission only.
+**Do not run heavy work on the login node** (`hpclogin*`). Login is for editing, git, light file ops, and `bsub` submission only.
+
+## Where to run work
 
 | Task | Where |
 |------|--------|
-| Train / validate / **pytest** / data loading at scale | **Compute node** |
-| Interactive shell on compute | `linuxsh` then `cd /work3/s204070/SPA` and `source .venv/bin/activate` |
-| Batch jobs | `bsub < hpc/submit/...` (scripts must `cd` to repo root) |
+| Edit code, git, `bsub` submit | **Login node** (`hpclogin*`) |
+| **CPU** interactive: pytest, data exploration, loading `.npy` / manifests at scale, plot scripts | **`linuxsh`** → `cd /work3/s204070/SPA` → `source .venv/bin/activate` |
+| **GPU** interactive: short smoke tests, one-epoch debug, `nvidia-smi` checks | **`sxm2sh`**, **`voltash`**, or **`a100sh`** (pick an idle node) — same `cd` + venv |
+| Train / validate / full sweeps / multi-hour jobs | **`bsub < hpc/submit/...`** (production queues) |
 
-**Prefer `bsub` over long interactive runs** when a submit script exists (`hpc/submit/decoder_only/`, etc.).
+**`gpuv100` preference:** Student quota allows **~4 concurrent GPU jobs** on `gpuv100` — usually the **fastest** queue. Default new ablations to `gpuv100`; when rebalancing a backlog, **keep the top-priority jobs PEND/RUN on `gpuv100`** and spill only the rest to `gpua10` / `gpua100` / `gpul40s`. Check `bqueues` before moving (avoid `gpul40s` / `gpua100` if PEND is huge).
 
-**Never run `pytest` on the login node** — not even a single test file. Use `bsub < hpc/submit/tests/run_pytest.sh` or an interactive compute shell (`linuxsh`, then activate venv and run pytest there).
+**Agent rule:** Before running any command that loads sleep EEG data, runs pytest, generates exploration plots from raw signals, or touches a GPU — use an **interactive compute shell**, not the login node. If unsure, default to `linuxsh` (CPU) or `bsub`.
 
-**Do not** start full training, multi-epoch smoke, or validation on the login node either.
+**Prefer `bsub`** when a submit script exists (`hpc/submit/cv4fold/`, `hpc/submit/decoder_only/`, `hpc/submit/tests/run_pytest.sh`, etc.).
 
-After code changes that affect training, point the user to the matching submit script rather than re-running old checkpoints.
+**Never run `pytest` on the login node** — not even one file. Use `bsub < hpc/submit/tests/run_pytest.sh` or `linuxsh` + venv + pytest.
+
+**Do not** start full training, multi-epoch smoke, or validation on the login node.
+
+Examples that belong on **`linuxsh`**, not login:
+
+- `PYTHONPATH=. python3 scripts/data_exploration/hq_lab_review.py`
+- `PYTHONPATH=. python3 scripts/noise/main.py`
+- Any script that loads `data/ds006366_processed/**/*.npy`
+
+## Interactive GPU nodes (multi-user safety)
+
+Interactive GPU shells boot into a **fresh, unconfigured** Linux state. Every new session:
+
+1. `module load` as needed (if your site requires it).
+2. `cd /work3/s204070/SPA && source .venv/bin/activate`.
+3. **`nvidia-smi` first** — confirm which device(s) are idle; do not step on another user's active job.
+
+**Automatic partitioning:** The environment sets `CUDA_VISIBLE_DEVICES` so your session is isolated to a **single designated GPU**. Respect that — do not override to grab extra devices.
+
+**Heavy-job boundary:** Submit **`bsub`** (not an interactive shell) when the job:
+
+- needs **multiple GPUs**,
+- runs **more than a few minutes** at full load, or
+- needs **maximum dedicated RAM** / long walltime.
+
+After code changes that affect training, point the user to the matching submit script rather than re-running old checkpoints on login.

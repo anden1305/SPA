@@ -18,7 +18,7 @@ from src.models.base_model import BaseModel
 from src.models.cvae_mar_hmm import CVAEMARHMM
 from src.orchestrator.train_details import TrainDetails
 from src.helpers.state_distinctness import compute_state_distinctness
-from src.validation.hmmgmm_metrics import checkpoint_score, entropy_norm, state_switch_rate
+from src.validation.hmmgmm_metrics import checkpoint_score, entropy_norm, latent_autocorr, state_switch_rate
 
 PRIOR_PRED_NMI_KEY = "prior_pred_nmi"
 
@@ -288,6 +288,14 @@ class Validator:
         nmi = self.__calculate_kmeans_nmi(x_latent, y, n_clusters)
         self.validations[epoch]['cvae_latent_kmeans_nmi'] = nmi
         print(f"CVAE Latent KMeans NMI: {nmi:.4f}")
+        if x_latent_seq.dim() == 3 and x_latent_seq.shape[1] > 1:
+            try:
+                autocorr = latent_autocorr(x_latent_seq, lag=1)
+                self.validations[epoch]["latent_autocorr_lag1"] = autocorr
+                if self.global_config.verbose:
+                    print(f"Latent autocorr (lag 1): {autocorr:.4f}")
+            except Exception as e:
+                print(f"Skipping latent autocorr at epoch {epoch + 1}: {e}")
         self._validate_cvae_prior_metrics(epoch, x, y, sub_ids)
         self.model.prepare_for_training()
 

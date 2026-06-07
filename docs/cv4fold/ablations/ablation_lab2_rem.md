@@ -88,9 +88,9 @@ All on **`no_postnorm_widebp`** unless noted. EEG3 montage unless `*_eeg4`.
 | `rem_paper_robust_append_rms` | 0.485 | [0.439, 0.485, 0.399] | yes | Worse |
 | `rem_paper_robust_emg_wide` | — | — | — | Completed elsewhere; poor |
 | **`rem_emg_low_eeg4`** | **0.566** | [0.566, 0.555, 0.565] | **yes** | DONE — stable, ≈ prepro |
-| **`rem_emg_wide_eeg4`** | **0.593** | [0.593] (1/3) | TBD | **RUN** — leading candidate |
+| **`rem_emg_wide_eeg4`** | **0.593** | [0.593, 0.578, 0.541] | **LOCK** — lab_2 winner (job 28607461) |
 
-**Takeaway:** Wide EMG on EEG3 **collapses** one seed; on **EEG4**, `rem_emg_wide` s1 **0.593** exceeds prepro **0.568** — wait for 3 seeds before lock. `rem_emg_low_eeg4` matches prepro but does not beat **`rem_emg_wide_eeg4`** on best seed.
+**Takeaway:** Wide EMG on EEG3 **collapses** one seed; on **EEG4**, `rem_emg_wide` **locks lab_2** at **0.593** best-of-3. `rem_emg_low_eeg4` stable but lower.
 
 Training curves / queue: [ablation_lab2_findings_20260607.md](ablation_lab2_findings_20260607.md).
 

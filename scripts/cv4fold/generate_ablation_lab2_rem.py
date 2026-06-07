@@ -6,8 +6,8 @@ beats parallel expert-feature pipelines). Only preprocessing / VAE *input*
 knobs change: bandpass, paper robust scaling, optional per-channel RMS bin
 appended to the FFT tensor before the encoder.
 
-Base template: per-lab winner ``no_postnorm_widebp`` (NMI ~0.568).
-See docs/cv4fold/ablation_lab2_rem.md.
+Base template: locked winner ``rem_emg_wide_eeg4`` (NMI **0.593**, EEG1+EEG4+EMG).
+See docs/cv4fold/ablations/ablation_lab2_rem.md.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from pathlib import Path
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-WINNER = REPO_ROOT / "src/config/run/cvaemarhmm/cv4fold/ablation_prepro/lab_2/no_postnorm_widebp.yaml"
+WINNER = REPO_ROOT / "src/config/run/cvaemarhmm/cv4fold/ablation_rem/lab_2/rem_emg_wide_eeg4.yaml"
 OUT_ROOT = REPO_ROOT / "src/config/run/cvaemarhmm/cv4fold/ablation_rem/lab_2"
 
 MONTAGE_SIGNALS = {
@@ -104,8 +104,8 @@ def main() -> int:
     parser.add_argument(
         "--montage",
         choices=("eeg3", "eeg4"),
-        default="eeg3",
-        help="Signal montage (default EEG1+EEG3+EMG; eeg4 uses EEG1+EEG4+EMG).",
+        default="eeg4",
+        help="Signal montage (default EEG1+EEG4+EMG; eeg3 legacy EEG1+EEG3+EMG).",
     )
     parser.add_argument(
         "--variants",

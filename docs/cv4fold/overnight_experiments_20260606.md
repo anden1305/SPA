@@ -4,7 +4,7 @@
 
 **Window:** ~5 h GPU queue time from ~23:15; jobs submitted without further approval.
 
-Related: [`ablation_prepro_lab2_lab5.md`](ablation_prepro_lab2_lab5.md), [`lab_measurement_preprocessing_2_3_5.md`](../lab_measurement_preprocessing_2_3_5.md), [`cross_lab_cv4fold.md`](cross_lab_cv4fold.md).
+Related: [`ablation_prepro_lab2_lab5.md`](ablations/ablation_prepro_lab2_lab5.md), [`lab_measurement_preprocessing_2_3_5.md`](../preprocessing/lab_measurement_preprocessing_2_3_5.md), [`cross_lab_cv4fold.md`](cross_lab_cv4fold.md).
 
 ---
 
@@ -39,8 +39,8 @@ Fixed per run: best prepro from R1–2, `epochs: 200`, `runs: 3`, from scratch, 
 
 | Scope | Setup | Typical GMM prior NMI | Source |
 |-------|--------|----------------------|--------|
-| **Thesis / reliability (canonical)** | lab_3, **hotstart** from `cvae_decoder_only_model.pth` | **~0.72** | [cvae_checkpointing.md](../cvae_checkpointing.md), W&B runs yklyqlsh / cme0uc0e |
-| Phase 1 decoder-only | lab_3 HQ, hotstart, decoder-only | **~0.65–0.67** | job `28605085`, [decoder_only_lab3_chmm_experiments.md](../decoder_only_lab3_chmm_experiments.md) |
+| **Thesis / reliability (canonical)** | lab_3, **hotstart** from `cvae_decoder_only_model.pth` | **~0.72** | [cvae_checkpointing.md](../training/cvae_checkpointing.md), W&B runs yklyqlsh / cme0uc0e |
+| Phase 1 decoder-only | lab_3 HQ, hotstart, decoder-only | **~0.65–0.67** | job `28605085`, [decoder_only_lab3_chmm_experiments.md](../decoder_only/decoder_only_lab3_chmm_experiments.md) |
 | Encoder+decoder | lab_3, hotstart | **~0.74** | job D in same doc |
 | **This ablation (R2/R4)** | 10 HQ mice, **from scratch**, per-lab incohort | **~0.59** interim (R2 s1) | not comparable to ~0.72 without hotstart + full recipe |
 
@@ -93,13 +93,13 @@ _Update this table as jobs finish (`scrape_experiment_results.py`)._
 
 ### Round 2 / 3 / 4 prepro — complete (bp25 partial)
 
-See [ablation_prepro_lab2_lab5.md](ablation_prepro_lab2_lab5.md) for full tables.
+See [ablation_prepro_lab2_lab5.md](ablations/ablation_prepro_lab2_lab5.md) for full tables.
 
 **Locked (best-of-3):** lab_2 `no_postnorm_widebp` **0.568**; lab_3 `baseline_long` + **`wide_mlp` → 0.737**; lab_5 `long` + **`wide_mlp` → 0.534**.
 
 ### lab_2 REM + montage (2026-06-07)
 
-See [ablation_lab2_findings_20260607.md](ablation_lab2_findings_20260607.md). Leading candidate: **`rem_emg_wide_eeg4` best 0.593** (1/3 seeds at scrape).
+See [ablation_lab2_findings_20260607.md](ablations/ablation_lab2_findings_20260607.md). Leading candidate: **`rem_emg_wide_eeg4` best 0.593** (1/3 seeds at scrape).
 
 ---
 
@@ -118,7 +118,7 @@ results/cv4fold/<experiment>/<lab>/<run_name>/plots/
   <seed>/results.npz
 ```
 
-**lab_2 REM round:** [ablation_lab2_rem.md](ablation_lab2_rem.md) — 8 variants, VAE encoder unchanged.
+**lab_2 REM round:** [ablation_lab2_rem.md](ablations/ablation_lab2_rem.md) — 8 variants, VAE encoder unchanged.
 
 | Run | Path (representative) | Observation |
 |-----|----------------------|-------------|

@@ -29,7 +29,7 @@ Reference prepro winner: `no_postnorm_widebp` **best 0.568** (prepro ablation di
 
 **W&B fold-1 detail:** EEG4 still climbing at ep 200 (0.584); EEG3 peaked ep 71 then drifted — do not early-stop on prior NMI. Full curves: [ablation_lab2_findings_20260607.md](ablation_lab2_findings_20260607.md).
 
-**Provisional lock:** adopt **EEG1+EEG4+EMG** for downstream REM ablations if **`rem_emg_wide_eeg4`** best-of-3 beats prepro winner **0.568** when complete (see REM doc).
+**Provisional lock → LOCKED (28607461):** **`rem_emg_wide_eeg4`** best **0.593**, seeds [0.593, 0.578, 0.541]. Adopt **EEG1+EEG4+EMG** + EMG **3–100 Hz** for lab_2 downstream.
 
 ## Submit
 

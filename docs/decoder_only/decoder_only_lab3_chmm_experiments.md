@@ -2,7 +2,7 @@
 
 Added 2026-06-05. Branch: `vae_decoder_chmm`.
 
-**Context:** Detail doc for **Phase 1** of the [decoder conditioning roadmap](decoder_conditioning_roadmap.md). **Next step (cross-lab holdout):** [cv4fold/cross_lab_cv4fold.md](cv4fold/cross_lab_cv4fold.md).
+**Context:** Detail doc for **Phase 1** of the [decoder conditioning roadmap](../decoder_conditioning_roadmap.md). **Next step (cross-lab holdout):** [cv4fold/cross_lab_cv4fold.md](../cv4fold/cross_lab_cv4fold.md).
 
 ## Matrix
 
@@ -85,7 +85,7 @@ bsub -w "done(<J0b>)" < hpc/submit/decoder_only/reliability/run_chmm_encoder_dec
 bsub < hpc/submit/decoder_only/reliability/run_chmm_encoder_decoder_scratch.sh
 ```
 
-See: [cvae_checkpointing.md](cvae_checkpointing.md).
+See: [cvae_checkpointing.md](../training/cvae_checkpointing.md).
 
 ## Results (2026-06-06)
 
@@ -156,4 +156,4 @@ After retraining with checkpoint saving ported from `chmmgmm_fold`, each seed ke
 | `{run_name}/{N}/checkpoints/cvae_final_model.pth` | Weights at last epoch |
 | `{run_name}/{N}/checkpoints/validation_checkpoint.txt` | Which file was used for post-train prior validation |
 
-Post-train plots use **best prior-pred NMI** (or best score if enabled), not necessarily the final epoch. See [cvae_checkpointing.md](cvae_checkpointing.md).
+Post-train plots use **best prior-pred NMI** (or best score if enabled), not necessarily the final epoch. See [cvae_checkpointing.md](../training/cvae_checkpointing.md).

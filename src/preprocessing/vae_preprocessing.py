@@ -231,6 +231,23 @@ class VAEPreprocessing(BaseTransform):
         upper = np.percentile(x, upper_percentile, axis=axis, keepdims=True)
         return np.clip(x, lower, upper)
     
+    def __zero_notch_bins(self, x: np.ndarray) -> np.ndarray:
+        """Zero narrow bands around configured line-noise frequencies (complex rFFT)."""
+        notch_freqs = getattr(self.global_config.cvae, "notch_freqs", None)
+        if not notch_freqs:
+            return x
+        half_width_hz = 0.5
+        for freq_hz in notch_freqs:
+            low_hz = float(freq_hz) - half_width_hz
+            high_hz = float(freq_hz) + half_width_hz
+            low_fft = int(np.floor(low_hz * self.window_size / self.sampling_rate))
+            high_fft = int(np.ceil(high_hz * self.window_size / self.sampling_rate))
+            low_fft = max(low_fft, 0)
+            high_fft = min(high_fft, x.shape[-1])
+            if low_fft < high_fft:
+                x[..., low_fft:high_fft] = 0
+        return x
+
     def band_pass_filter_fft(self, x: np.ndarray) -> np.ndarray:
         for c in range(x.shape[1]):
             low, high = self._BANDPASS_HZ.get(c, (None, None))
@@ -262,6 +279,8 @@ class VAEPreprocessing(BaseTransform):
         if self.global_config.cvae.perform_hanning_window and not for_raw:
             x = self.__perform_hanning_window(x=x)
         x = self.__perform_fft(x=x)
+        if not for_raw:
+            x = self.__zero_notch_bins(x)
         if self.global_config.cvae.band_pass_filter_fft and self.global_config.cvae.band_pass_filter_type == "frequency_domain" and not for_raw:
             x = self.band_pass_filter_fft(x)
         x = self.__complex_to_real_features(x, for_raw)

@@ -1,6 +1,6 @@
 # Phase 2 — cross-lab cv4fold
 
-Added 2026-06-06. **Phase 1 (lab_3 proof):** [decoder_only_lab3_chmm_experiments.md](../decoder_only_lab3_chmm_experiments.md). **Roadmap:** [decoder_conditioning_roadmap.md](../decoder_conditioning_roadmap.md).
+Added 2026-06-06. **Phase 1 (lab_3 proof):** [decoder_only_lab3_chmm_experiments.md](../decoder_only/decoder_only_lab3_chmm_experiments.md). **Roadmap:** [decoder_conditioning_roadmap.md](../decoder_conditioning_roadmap.md).
 
 ---
 
@@ -103,7 +103,7 @@ Train+val on **all HQ mice within one lab** before holdout (see [README.md](READ
 
 - Manifest: `data/manifests/cv_quality_cohort_v1.yaml` (20 mice only)
 - **Locked winners (best-of-3 scratch):** lab_2 prepro **0.568** (+ EEG4 REM candidate **0.593** pending); lab_3 **`wide_mlp` 0.737**; lab_5 **`wide_mlp` 0.534**
-- Details: [ablation_prepro_lab2_lab5.md](ablation_prepro_lab2_lab5.md), [ablation_lab2_findings_20260607.md](ablation_lab2_findings_20260607.md)
+- Details: [ablation_prepro_lab2_lab5.md](ablations/ablation_prepro_lab2_lab5.md), [ablation_lab2_findings_20260607.md](ablations/ablation_lab2_findings_20260607.md)
 
 ## Next steps
 
@@ -118,5 +118,5 @@ Train+val on **all HQ mice within one lab** before holdout (see [README.md](READ
 
 ## Related
 
-- [cvae_checkpointing.md](../cvae_checkpointing.md) — `model_checkpoint_path`, best prior ckpt
-- [decoder_only_checkpoint_tracing.md](../decoder_only_checkpoint_tracing.md)
+- [cvae_checkpointing.md](../training/cvae_checkpointing.md) — `model_checkpoint_path`, best prior ckpt
+- [decoder_only_checkpoint_tracing.md](../decoder_only/decoder_only_checkpoint_tracing.md)

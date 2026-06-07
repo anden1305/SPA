@@ -22,12 +22,15 @@ Skip docs for: typos, formatting, trivial renames, test-only fixes with no behav
 | Topic | Location |
 |-------|----------|
 | cv4fold, folds, tune winners, subject_lab | `docs/cv4fold/` — extend `README.md` or add a focused `.md` and link from README |
-| cGMVAE / cHMM-GMVAE training, priors, losses | `docs/cgmvae_training.md`, `docs/cHMM_GMVAE.md`, or new `docs/cvae_*.md` |
-| W&B metrics, checkpoint scores | `docs/cvae_wandb_checkpoint_metrics.md` |
-| Preprocessing audit | `docs/preprocessing_audit_*.md` |
-| Conditioning (subject / lab) | `docs/conditioning_story_map.md` |
-| HPC submit / queues / wall times | `docs/HPC_SUBMIT_GUIDE.md` or `hpc/docs/` |
-| CNN / data path | `docs/CNN_data_preprocessing.md` |
+| cv4fold ablations | `docs/cv4fold/ablations/` — link from `docs/cv4fold/README.md` |
+| cGMVAE / cHMM-GMVAE training, priors, losses | `docs/training/` — e.g. `cvae_checkpointing.md`, new `cvae_*.md` |
+| W&B metrics, checkpoint scores | `docs/training/cvae_wandb_checkpoint_metrics.md` |
+| Decoder-only / Phase 1 | `docs/decoder_only/` |
+| Preprocessing / acquisition | `docs/preprocessing/` — audit docs: `preprocessing_audit_*.md` |
+| Conditioning roadmap | `docs/decoder_conditioning_roadmap.md` |
+| Data / cohorts | `docs/data/` |
+| HPC submit / queues / wall times | `hpc/docs/HPC_SUBMIT_GUIDE.md` |
+| CNN / data path | `docs/CNN_data_preprocessing.md` (if added) |
 
 Prefer **one canonical doc per feature**; link from subsystem READMEs instead of duplicating tables.
 
@@ -43,5 +46,5 @@ Prefer **one canonical doc per feature**; link from subsystem READMEs instead of
 
 1. Implement the change.
 2. Create or update the doc in the same session (do not leave “TODO: document later”).
-3. If `docs/cv4fold/README.md` (or similar index) lists workflows, add a **one-line link** to the new doc.
+3. If `docs/README.md` or a subsystem `README.md` (e.g. `docs/cv4fold/README.md`) lists workflows, add a **one-line link** to the new doc.
 4. Do **not** edit `.cursor/plans/*.plan.md` unless the user asks.

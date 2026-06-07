@@ -1,0 +1,316 @@
+trainer:
+  epochs: 200
+  learning_rate: 0.0003
+  optimizer: adam
+  grad_clip: 0.5
+  validate_per_epoch: 1
+  early_stopping:
+    enabled: false
+    patience: 100
+    min_delta: 0.001
+  scheduler:
+    enabled: false
+    type: exponential
+    step_size: null
+    gamma: 0.99
+validator:
+  nmi: true
+  accuracy: true
+  cross_nmi: true
+  learning_rate: true
+  state_distinctness: true
+  summary_statistics: true
+  log_likelihood: true
+visualizer:
+  losses: true
+  learning_rate: true
+  pca_tripanel: true
+  confusion_matrix: true
+  state_distinctness: true
+  summary_statistics: true
+  historic_values: true
+dataloader:
+  num_batches: 64
+  batch_size: 128
+  validation_batch_size: 128
+  window_size: 512
+  stride: 512
+  sequence_length: 1
+  shuffle: true
+  normalize: true
+  use_legacy: false
+  transforms: []
+model:
+  type: cvae_marhmm
+  covariance_type: full
+  init_strategy: random_uniform
+  init_noisy: true
+  features: false
+  params:
+    lags:
+    - 1
+    - 2
+    - 4
+    ridge: 0.1
+    var_reg: 0.05
+    sticky_coef: 0.1
+    sticky_kappa: 0.9
+    latent_dim: 8
+    enc_hidden_dims:
+    - 256
+    - 128
+    dec_hidden_dims:
+    - 128
+    - 256
+    conv_channels:
+    - 32
+    - 64
+    - 128
+    - 128
+    kernel_sizes:
+    - 7
+    - 5
+    - 5
+    - 3
+    strides:
+    - 2
+    - 2
+    - 2
+    - 2
+    paddings:
+    - 3
+    - 2
+    - 2
+    - 1
+    emb_dim: 4
+    decoder_only_conditioning: true
+    use_rms: false
+    prior: gmm
+    min_beta: 0.01
+    max_beta: 1.0
+    beta_warmup_epochs: 0
+    beta_slowdown_epochs: 0
+    gmm_warmup_epochs: 0
+    free_nats_per_dim: 0.0
+    no_beta_epochs: 0
+cvae:
+  normalize_global: false
+  pre_normalize: false
+  post_normalize: false
+  percentile_clip_channels: false
+  perform_hanning_window: false
+  band_pass_filter_fft: true
+  band_pass_freqs:
+  - - null
+    - 30.0
+  - - null
+    - 30.0
+  - - 3.0
+    - 100.0
+  band_pass_filter_type: frequency_domain
+  traning_pipeline: cvae
+  model_checkpoint_path: null
+  save_pretrained_checkpoint: false
+  reinit_marhmm: false
+  robust_normalize: false
+  append_channel_rms: false
+verbose: true
+seed: 123
+runs: 3
+validate_data: true
+train_datasets:
+- type: mssv
+  id: sub-071
+  run: 1
+  remove_artifact: true
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+- type: mssv
+  id: sub-071
+  run: 2
+  remove_artifact: true
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+- type: mssv
+  id: sub-072
+  run: 1
+  remove_artifact: true
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+- type: mssv
+  id: sub-072
+  run: 2
+  remove_artifact: true
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+- type: mssv
+  id: sub-076
+  run: 1
+  remove_artifact: true
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+- type: mssv
+  id: sub-076
+  run: 2
+  remove_artifact: true
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+- type: mssv
+  id: sub-077
+  run: 1
+  remove_artifact: true
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+- type: mssv
+  id: sub-077
+  run: 2
+  remove_artifact: true
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+- type: mssv
+  id: sub-080
+  run: 1
+  remove_artifact: true
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+- type: mssv
+  id: sub-080
+  run: 2
+  remove_artifact: true
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+- type: mssv
+  id: sub-081
+  run: 1
+  remove_artifact: true
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+- type: mssv
+  id: sub-081
+  run: 2
+  remove_artifact: true
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+val_datasets:
+- type: mssv
+  id: sub-071
+  run: 1
+  remove_artifact: true
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+- type: mssv
+  id: sub-071
+  run: 2
+  remove_artifact: true
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+- type: mssv
+  id: sub-072
+  run: 1
+  remove_artifact: true
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+- type: mssv
+  id: sub-072
+  run: 2
+  remove_artifact: true
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+- type: mssv
+  id: sub-076
+  run: 1
+  remove_artifact: true
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+- type: mssv
+  id: sub-076
+  run: 2
+  remove_artifact: true
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+- type: mssv
+  id: sub-077
+  run: 1
+  remove_artifact: true
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+- type: mssv
+  id: sub-077
+  run: 2
+  remove_artifact: true
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+- type: mssv
+  id: sub-080
+  run: 1
+  remove_artifact: true
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+- type: mssv
+  id: sub-080
+  run: 2
+  remove_artifact: true
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+- type: mssv
+  id: sub-081
+  run: 1
+  remove_artifact: true
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+- type: mssv
+  id: sub-081
+  run: 2
+  remove_artifact: true
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+results_dir: results/cv4fold/ablation_beta/lab_2
+run_name: abl_lab_2_no_beta_epochs_0_rem_emg_wide_eeg4

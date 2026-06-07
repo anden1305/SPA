@@ -3,7 +3,7 @@
 
 Bases are the per-lab in-cohort configs (correct HQ datasets + signals + null
 checkpoint). Each variant tweaks only the knob under test so differences are
-attributable. See docs/cv4fold/ablation_prepro_lab2_lab5.md.
+attributable. See docs/cv4fold/ablations/ablation_prepro_lab2_lab5.md.
 
 Round 1 (done): lab_2 {baseline_long, no_postnorm, widebp, no_postnorm_widebp},
                 lab_5 {long}.

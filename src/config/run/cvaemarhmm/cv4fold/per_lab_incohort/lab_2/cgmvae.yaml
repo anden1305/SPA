@@ -1,5 +1,5 @@
 trainer:
-  epochs: 80
+  epochs: 200
   learning_rate: 0.0003
   optimizer: adam
   grad_clip: 0.5
@@ -40,6 +40,27 @@ dataloader:
   normalize: true
   use_legacy: false
   transforms: []
+cvae:
+  normalize_global: false
+  pre_normalize: false
+  post_normalize: false
+  percentile_clip_channels: false
+  perform_hanning_window: false
+  band_pass_filter_fft: true
+  band_pass_freqs:
+  - - null
+    - 30.0
+  - - null
+    - 30.0
+  - - 3.0
+    - 100.0
+  band_pass_filter_type: frequency_domain
+  traning_pipeline: cvae
+  model_checkpoint_path: null
+  save_pretrained_checkpoint: false
+  reinit_marhmm: false
+  robust_normalize: false
+  append_channel_rms: false
 model:
   type: cvae_marhmm
   covariance_type: full
@@ -93,29 +114,11 @@ model:
     gmm_warmup_epochs: 0
     free_nats_per_dim: 0.0
     no_beta_epochs: 10
-cvae:
-  normalize_global: false
-  pre_normalize: false
-  post_normalize: true
-  percentile_clip_channels: false
-  perform_hanning_window: false
-  band_pass_filter_fft: true
-  band_pass_freqs:
-  - - null
-    - 20.0
-  - - null
-    - 20.0
-  - - 5.0
-    - 60.0
-  band_pass_filter_type: frequency_domain
-  traning_pipeline: cvae
-  model_checkpoint_path: null
-  save_pretrained_checkpoint: false
-  reinit_marhmm: false
+    num_gmm_states: 3
 verbose: true
-seed: 123
-runs: 3
 validate_data: true
+runs: 3
+seed: 123
 train_datasets:
 - type: mssv
   id: sub-071
@@ -123,7 +126,7 @@ train_datasets:
   remove_artifact: true
   signals:
   - EEG1
-  - EEG3
+  - EEG4
   - EMG
 - type: mssv
   id: sub-071
@@ -131,7 +134,7 @@ train_datasets:
   remove_artifact: true
   signals:
   - EEG1
-  - EEG3
+  - EEG4
   - EMG
 - type: mssv
   id: sub-072
@@ -139,7 +142,7 @@ train_datasets:
   remove_artifact: true
   signals:
   - EEG1
-  - EEG3
+  - EEG4
   - EMG
 - type: mssv
   id: sub-072
@@ -147,7 +150,7 @@ train_datasets:
   remove_artifact: true
   signals:
   - EEG1
-  - EEG3
+  - EEG4
   - EMG
 - type: mssv
   id: sub-076
@@ -155,7 +158,7 @@ train_datasets:
   remove_artifact: true
   signals:
   - EEG1
-  - EEG3
+  - EEG4
   - EMG
 - type: mssv
   id: sub-076
@@ -163,7 +166,7 @@ train_datasets:
   remove_artifact: true
   signals:
   - EEG1
-  - EEG3
+  - EEG4
   - EMG
 - type: mssv
   id: sub-077
@@ -171,7 +174,7 @@ train_datasets:
   remove_artifact: true
   signals:
   - EEG1
-  - EEG3
+  - EEG4
   - EMG
 - type: mssv
   id: sub-077
@@ -179,7 +182,7 @@ train_datasets:
   remove_artifact: true
   signals:
   - EEG1
-  - EEG3
+  - EEG4
   - EMG
 - type: mssv
   id: sub-080
@@ -187,7 +190,7 @@ train_datasets:
   remove_artifact: true
   signals:
   - EEG1
-  - EEG3
+  - EEG4
   - EMG
 - type: mssv
   id: sub-080
@@ -195,7 +198,7 @@ train_datasets:
   remove_artifact: true
   signals:
   - EEG1
-  - EEG3
+  - EEG4
   - EMG
 - type: mssv
   id: sub-081
@@ -203,7 +206,7 @@ train_datasets:
   remove_artifact: true
   signals:
   - EEG1
-  - EEG3
+  - EEG4
   - EMG
 - type: mssv
   id: sub-081
@@ -211,7 +214,7 @@ train_datasets:
   remove_artifact: true
   signals:
   - EEG1
-  - EEG3
+  - EEG4
   - EMG
 val_datasets:
 - type: mssv
@@ -220,7 +223,7 @@ val_datasets:
   remove_artifact: true
   signals:
   - EEG1
-  - EEG3
+  - EEG4
   - EMG
 - type: mssv
   id: sub-071
@@ -228,7 +231,7 @@ val_datasets:
   remove_artifact: true
   signals:
   - EEG1
-  - EEG3
+  - EEG4
   - EMG
 - type: mssv
   id: sub-072
@@ -236,7 +239,7 @@ val_datasets:
   remove_artifact: true
   signals:
   - EEG1
-  - EEG3
+  - EEG4
   - EMG
 - type: mssv
   id: sub-072
@@ -244,7 +247,7 @@ val_datasets:
   remove_artifact: true
   signals:
   - EEG1
-  - EEG3
+  - EEG4
   - EMG
 - type: mssv
   id: sub-076
@@ -252,7 +255,7 @@ val_datasets:
   remove_artifact: true
   signals:
   - EEG1
-  - EEG3
+  - EEG4
   - EMG
 - type: mssv
   id: sub-076
@@ -260,7 +263,7 @@ val_datasets:
   remove_artifact: true
   signals:
   - EEG1
-  - EEG3
+  - EEG4
   - EMG
 - type: mssv
   id: sub-077
@@ -268,7 +271,7 @@ val_datasets:
   remove_artifact: true
   signals:
   - EEG1
-  - EEG3
+  - EEG4
   - EMG
 - type: mssv
   id: sub-077
@@ -276,7 +279,7 @@ val_datasets:
   remove_artifact: true
   signals:
   - EEG1
-  - EEG3
+  - EEG4
   - EMG
 - type: mssv
   id: sub-080
@@ -284,7 +287,7 @@ val_datasets:
   remove_artifact: true
   signals:
   - EEG1
-  - EEG3
+  - EEG4
   - EMG
 - type: mssv
   id: sub-080
@@ -292,7 +295,7 @@ val_datasets:
   remove_artifact: true
   signals:
   - EEG1
-  - EEG3
+  - EEG4
   - EMG
 - type: mssv
   id: sub-081
@@ -300,7 +303,7 @@ val_datasets:
   remove_artifact: true
   signals:
   - EEG1
-  - EEG3
+  - EEG4
   - EMG
 - type: mssv
   id: sub-081
@@ -308,7 +311,7 @@ val_datasets:
   remove_artifact: true
   signals:
   - EEG1
-  - EEG3
+  - EEG4
   - EMG
 results_dir: results/cv4fold/per_lab_incohort/lab_2
 run_name: per_lab_incohort_lab_2_cgmvae

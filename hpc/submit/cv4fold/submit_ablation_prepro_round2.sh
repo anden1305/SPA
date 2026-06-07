@@ -4,7 +4,7 @@
 #   cd /work3/s204070/SPA && source .venv/bin/activate
 #   PYTHONPATH=. python3 scripts/cv4fold/generate_ablation_prepro.py
 # Run with bash (wrapper calls bsub in a loop), NOT `bsub < ...`.
-# See docs/cv4fold/ablation_prepro_lab2_lab5.md
+# See docs/cv4fold/ablations/ablation_prepro_lab2_lab5.md
 
 set -euo pipefail
 SPA_ROOT="/work3/s204070/SPA"

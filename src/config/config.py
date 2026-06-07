@@ -132,6 +132,13 @@ class CVAE(BaseModel):
     band_pass_filter_fft: bool = Field(..., description="Whether to apply band-pass filtering in the FFT domain.")
     band_pass_freqs: list[list] | None = Field(default=None, description="List of [low, high] frequency pairs for band-pass filtering per channel.")
     band_pass_filter_type: str | None = Field(default=None, pattern="^(frequency_domain|time_domain)$", description="Type of band-pass filter to apply.")
+    notch_freqs: list[float] | None = Field(
+        default=None,
+        description=(
+            "Optional line-noise frequencies (Hz) to zero in the rFFT spectrum after "
+            "band-pass. Each entry uses a ±0.5 Hz band (e.g. 50.0 → 49.5–50.5 Hz)."
+        ),
+    )
     traning_pipeline: str = Field(..., pattern="^(cvae|marhmm|cvae_then_marhmm)$", description="Training pipeline to use.")
     model_checkpoint_path: str | None = Field(default=None, description="Path to a pre-trained CVAE model checkpoint.")
     save_pretrained_checkpoint: bool = Field(
