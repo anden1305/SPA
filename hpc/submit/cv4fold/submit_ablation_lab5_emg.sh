@@ -3,8 +3,13 @@
 # Generate first:
 #   source .venv/bin/activate
 #   PYTHONPATH=. python3 scripts/cv4fold/generate_ablation_lab5_emg.py
-# Submit:
+# Submit (batch — long PEND on gpuv100/gpua10 is normal):
 #   bash hpc/submit/cv4fold/submit_ablation_lab5_emg.sh
+#
+# Interactive fallback (after bkill on PEND jobs):
+#   voltash   # or sxm2sh / a100sh — one shell per variant
+#   bash hpc/submit/cv4fold/run_ablation_lab5_emg_interactive.sh wide_mlp_emg_wide
+#   bash hpc/submit/cv4fold/run_ablation_lab5_emg_interactive.sh wide_mlp_emg_wide_notch50
 
 set -euo pipefail
 SPA_ROOT="/work3/s204070/SPA"
