@@ -154,6 +154,19 @@ class VAEPreprocessing(BaseTransform):
             std = np.std(x, axis=(0, 1, 3), keepdims=True) + 1e-8
         return (x - mean) / std
     
+    def __robust_normalize(self, x: np.ndarray) -> np.ndarray:
+        """Paper-style per-channel robust scaling on the continuous signal.
+
+        x: (C, T). Scales each channel to median 0 and IQR 1, then clips at
+        +-20xIQR (i.e. +-20 after scaling), matching the U-Sleep preprocessing
+        in Rose et al. 2025. Lab-agnostic alternative to mean/std normalization.
+        """
+        median = np.median(x, axis=1, keepdims=True)
+        q75, q25 = np.percentile(x, [75, 25], axis=1, keepdims=True)
+        iqr = (q75 - q25) + 1e-8
+        x = (x - median) / iqr
+        return np.clip(x, -20.0, 20.0).astype(np.float32)
+
     def __build_bandpass_sos(self) -> dict[int, np.ndarray]:
         nyq = 0.5 * float(self.sampling_rate)
         sos_by_c = {}
@@ -234,15 +247,26 @@ class VAEPreprocessing(BaseTransform):
             x = self.percentile_clip_channels(x)
         if self.global_config.cvae.band_pass_filter_fft and self.global_config.cvae.band_pass_filter_type == "time_domain" and not for_raw:
             x = self.__bandpass_filter_continuous(x)
+        if getattr(self.global_config.cvae, "robust_normalize", False) and not for_raw:
+            x = self.__robust_normalize(x)
         if self.global_config.cvae.pre_normalize and not for_raw:
             x = self.__normalize(x, TYPE="pre-norm")
         x, y = self.__reshape_input(x, y)
+        rms_bins = None
+        if getattr(self.global_config.cvae, "append_channel_rms", False):
+            rms = np.sqrt(np.mean(x.astype(np.float64) ** 2, axis=-1, keepdims=True))
+            if for_raw:
+                rms_bins = rms.astype(np.float32)
+            else:
+                rms_bins = np.log(rms ** 2 + 1e-12).astype(np.float32)
         if self.global_config.cvae.perform_hanning_window and not for_raw:
             x = self.__perform_hanning_window(x=x)
         x = self.__perform_fft(x=x)
         if self.global_config.cvae.band_pass_filter_fft and self.global_config.cvae.band_pass_filter_type == "frequency_domain" and not for_raw:
             x = self.band_pass_filter_fft(x)
         x = self.__complex_to_real_features(x, for_raw)
+        if rms_bins is not None:
+            x = np.concatenate([x, rms_bins], axis=-1)
         y = self.__downsample_by_majority_voting(y_windows=y)
         x, y = self.__apply_sequence_length(x, y)
         if self.global_config.cvae.post_normalize and not for_raw:

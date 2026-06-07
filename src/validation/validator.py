@@ -7,6 +7,7 @@ from src.data.data_loader_collection import DataLoaderCollection
 from src.helpers.accuracy import accuracy
 from src.helpers.align_labels import align_labels_hungarian
 from src.helpers.frequency_statistics import compute_feature_statistics
+from src.helpers.input_channel_statistics import compute_input_channel_statistics
 from src.helpers.metrics_aggregation import summarize_metrics
 from src.helpers.nmi import calculate_nmi
 from src.helpers.summary_statistics import compute_summary_statistics
@@ -216,6 +217,10 @@ class Validator:
             self.data_validations.update(distinctness)
         if self.config.summary_statistics:
             self.data_validations.update(compute_summary_statistics(x, y, self.data_loader))
+            if x.ndim == 4:
+                self.data_validations.update(
+                    compute_input_channel_statistics(x, y, self.data_loader)
+                )
             if has_features:
                 self.data_validations.update(compute_feature_statistics(x, y, self.data_loader, has_features))
                 # Also compute feature-feature correlations (overall and per state)

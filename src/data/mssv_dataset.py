@@ -73,6 +73,16 @@ class MSSVDataset(BaseDataset):
             signals.append('EEG4')
         if metadata['EMG']:
             signals.append('EMG')
+        if self.dataset_config.signals is not None:
+            override = list(self.dataset_config.signals)
+            available = set(signals)
+            missing = [s for s in override if s not in available]
+            if missing:
+                raise ValueError(
+                    f"Signals {missing} not available for {self.id} run {self.run}; "
+                    f"metadata has {sorted(available)}"
+                )
+            signals = override
         config['n_channels'] = len(signals)
         config['signals'] = signals
         config['run'] = self.run

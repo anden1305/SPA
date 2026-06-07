@@ -24,11 +24,29 @@ def is_legacy_subject_emb_checkpoint(
     cvae_state: dict[str, torch.Tensor],
     emb_dim: int,
 ) -> bool:
-    """True when checkpoint uses legacy sub-NNN indexing ([92, emb_dim])."""
+    """True when checkpoint uses legacy sub-NNN indexing ([92|93, emb_dim])."""
     shape = subject_emb_shape_from_cvae_state(cvae_state)
     if shape is None:
         return True
-    return shape == expected_subject_emb_shape(emb_dim)
+    rows, dim = shape
+    return dim == emb_dim and rows in (92, LEGACY_SUBJECT_EMB_NUM_ROWS)
+
+
+def pad_subject_emb_to_legacy(
+    cvae_state: dict[str, torch.Tensor],
+    emb_dim: int,
+) -> dict[str, torch.Tensor]:
+    """Expand pre-sub-092 checkpoints ([92, emb_dim]) to [93, emb_dim] for sub-092."""
+    weight = cvae_state.get(SUBJECT_EMB_WEIGHT_KEY)
+    if weight is None:
+        return cvae_state
+    rows, dim = weight.shape
+    if rows == LEGACY_SUBJECT_EMB_NUM_ROWS:
+        return cvae_state
+    if rows == 92 and LEGACY_SUBJECT_EMB_NUM_ROWS == 93 and dim == emb_dim:
+        pad = torch.zeros(1, dim, dtype=weight.dtype)
+        return {**cvae_state, SUBJECT_EMB_WEIGHT_KEY: torch.cat([weight, pad], dim=0)}
+    return cvae_state
 
 
 def incompatible_subject_emb_message(

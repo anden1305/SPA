@@ -52,6 +52,7 @@ class Visualizer:
             self.__plot_state_distinctness(path=path)
         if self.global_config.visualizer.summary_statistics and self.global_config.validator.summary_statistics:
             self.__plot_summary_statistics(path=path)
+            self.__plot_input_channel_statistics(path=path)
             self.__plot_feature_statistics(path=path)
             self.__plot_feature_correlations(path=path)
         self.__plot_feature_separability(path=path)
@@ -494,6 +495,121 @@ class Visualizer:
         fig.tight_layout()
         fig.savefig(path / 'feature_separability_ranking.png', dpi=220, bbox_inches='tight')
         plt.close(fig)
+
+    def __plot_input_channel_statistics(self, path: Path) -> None:
+        """Plot pre-encoder EEG/EMG band power by sleep state."""
+        dv = self.validator.get_data_validations()
+        stats = dv.get("input_channel_statistics", {})
+        if not stats:
+            return
+
+        per_state = stats.get("per_state", {})
+        channels = stats.get("channels", [])
+        if not per_state or not channels:
+            return
+
+        state_names = self.data_loader.get_state_names() or []
+        state_keys = sorted(per_state.keys(), key=lambda k: int(k))
+
+        def _label(state_key: str) -> str:
+            try:
+                idx = int(state_key)
+                if 0 <= idx < len(state_names):
+                    return state_names[idx]
+            except Exception:
+                pass
+            return state_key
+
+        display_labels = [_label(k) for k in state_keys]
+        sns.set_style("whitegrid")
+        palette = sns.color_palette("tab10", len(state_keys))
+
+        # 1) Total log-power per channel (EEG + EMG).
+        totals = np.full((len(state_keys), len(channels)), np.nan)
+        for row, sk in enumerate(state_keys):
+            for col, ch in enumerate(channels):
+                means = per_state[sk].get(ch, {}).get("mean", {})
+                totals[row, col] = means.get(
+                    "emg_total" if ch.upper().startswith("EMG") else "total", np.nan
+                )
+
+        fig, ax = plt.subplots(figsize=(max(8, len(channels) * 2.5), 5))
+        x = np.arange(len(channels))
+        width = 0.8 / max(len(state_keys), 1)
+        for row, label in enumerate(display_labels):
+            offset = (row - (len(state_keys) - 1) / 2) * width
+            ax.bar(x + offset, totals[row], width=width, label=label, color=palette[row], alpha=0.9)
+        ax.set_xticks(x)
+        ax.set_xticklabels(channels, rotation=20, ha="right")
+        ax.set_ylabel("Mean log-power (total band)")
+        ax.set_title("Input-space total power per channel and state (pre-VAE encoder)")
+        ax.legend(frameon=False, fontsize="small")
+        fig.tight_layout()
+        fig.savefig(path / "input_channel_total_power_per_state.png", dpi=220, bbox_inches="tight")
+        plt.close(fig)
+
+        # 2) EEG spectral bands (mean across EEG channels).
+        eeg_channels = [c for c in channels if not c.upper().startswith("EMG")]
+        eeg_bands = list(stats.get("eeg_bands_hz", {}).keys())
+        if eeg_channels and eeg_bands:
+            band_vals = np.full((len(state_keys), len(eeg_bands)), np.nan)
+            for row, sk in enumerate(state_keys):
+                for col, band in enumerate(eeg_bands):
+                    vals = [
+                        per_state[sk].get(ch, {}).get("mean", {}).get(band, np.nan)
+                        for ch in eeg_channels
+                    ]
+                    band_vals[row, col] = float(np.nanmean(vals))
+            fig2, ax2 = plt.subplots(figsize=(max(8, len(eeg_bands) * 1.8), 5))
+            xb = np.arange(len(eeg_bands))
+            for row, label in enumerate(display_labels):
+                offset = (row - (len(state_keys) - 1) / 2) * width
+                ax2.bar(xb + offset, band_vals[row], width=width, label=label, color=palette[row], alpha=0.9)
+            ax2.set_xticks(xb)
+            ax2.set_xticklabels(eeg_bands, rotation=25, ha="right")
+            ax2.set_ylabel("Mean log-power")
+            ax2.set_title("Input-space EEG bands (mean across EEG channels)")
+            ax2.legend(frameon=False, fontsize="small")
+            fig2.tight_layout()
+            fig2.savefig(path / "input_eeg_band_power_per_state.png", dpi=220, bbox_inches="tight")
+            plt.close(fig2)
+
+        # 3) EMG bands (atonia diagnostic).
+        emg_channels = [c for c in channels if c.upper().startswith("EMG")]
+        emg_bands = list(stats.get("emg_bands_hz", {}).keys())
+        if emg_channels and emg_bands:
+            fig3, axes = plt.subplots(1, len(emg_channels), figsize=(5 * len(emg_channels), 4), squeeze=False)
+            for ax_idx, ch in enumerate(emg_channels):
+                ax3 = axes[0, ax_idx]
+                band_vals = np.full((len(state_keys), len(emg_bands)), np.nan)
+                for row, sk in enumerate(state_keys):
+                    for col, band in enumerate(emg_bands):
+                        band_vals[row, col] = per_state[sk].get(ch, {}).get("mean", {}).get(band, np.nan)
+                xb = np.arange(len(emg_bands))
+                for row, label in enumerate(display_labels):
+                    offset = (row - (len(state_keys) - 1) / 2) * width
+                    ax3.bar(xb + offset, band_vals[row], width=width, label=label, color=palette[row], alpha=0.9)
+                ax3.set_xticks(xb)
+                ax3.set_xticklabels(emg_bands, rotation=25, ha="right")
+                ax3.set_title(f"EMG bands — {ch}")
+                ax3.set_ylabel("Mean log-power")
+            axes[0, 0].legend(frameon=False, fontsize="small")
+            fig3.suptitle("Input-space EMG band power (REM atonia cue)", y=1.02)
+            fig3.tight_layout()
+            fig3.savefig(path / "input_emg_band_power_per_state.png", dpi=220, bbox_inches="tight")
+            plt.close(fig3)
+
+        # 4) Separation gaps text summary.
+        gaps = stats.get("separation_gaps", {})
+        if gaps:
+            lines = [f"{k}: {v:.4f}" for k, v in sorted(gaps.items())]
+            fig4, ax4 = plt.subplots(figsize=(10, max(2, 0.35 * len(lines))))
+            ax4.axis("off")
+            ax4.text(0.01, 0.99, "Input-space separation gaps (REM troubleshooting)\n" + "\n".join(lines),
+                     va="top", ha="left", fontsize=9, family="monospace")
+            fig4.tight_layout()
+            fig4.savefig(path / "input_separation_gaps.png", dpi=150, bbox_inches="tight")
+            plt.close(fig4)
     
     def __plot_summary_statistics(self, path: Path):
         # load from validator

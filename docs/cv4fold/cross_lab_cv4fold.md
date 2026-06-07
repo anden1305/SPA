@@ -95,6 +95,17 @@ Batch analysis example: `results/cv4fold/subject_lab_tune_winners/analysis_repor
 
 ---
 
+## Per-lab in-cohort (Step 2 — in progress)
+
+Train+val on **all HQ mice within one lab** before holdout (see [README.md](README.md)):
+
+- Manifest: `data/manifests/cv_quality_cohort_v1.yaml` (20 mice only)
+- Generator: `scripts/cv4fold/generate_configs.py --phase per_lab_incohort`
+- Submit: `hpc/submit/cv4fold/submit_per_lab_incohort.sh` (lab_5, lab_2 first)
+- **Per-lab in-cohort:** `model_checkpoint_path: null` — train from scratch per lab (no lab_3 hotstart).
+- Generated dataset entries include manifest **`signals`** (lab_2: EEG1+EEG3+EMG; lab_3/5: EEG1+EEG2+EMG → 3 channels each).
+- Lab_3 baseline hotstart (`cvae_decoder_only_model.pth`, `[93,4]`) remains for lab_3-only / decoder-only experiments only.
+
 ## Next steps
 
 1. **Lock recipe:** seq64 + `subject` (not subject_lab).

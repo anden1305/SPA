@@ -16,7 +16,7 @@ That is the **only** path the orchestrator uses to load/save pretrained CVAE wei
 
 **Both load and save** when the path is set: load at the **start** of each run (if the file exists), overwrite at the **end** of each run. It is not “load only”.
 
-**Legacy subject embedding:** checkpoints must have `subject_emb.weight` shape **`[92, emb_dim]`** (sub-NNN → row N). Incompatible shapes (e.g. compact `[10, 4]` from another branch) are **skipped** with a log line; training continues from scratch and overwrites the path at run end.
+**Legacy subject embedding:** checkpoints must have `subject_emb.weight` shape **`[93, emb_dim]`** for mice **sub-001 … sub-092** (sub-NNN → row N; row 0 unused). Older **`[92, emb_dim]`** checkpoints are auto-padded with a zero row for sub-092 on load. Compact shapes (e.g. `[10, 4]`) are **skipped** with a log line; training continues from scratch.
 
 ## Should you train from scratch?
 

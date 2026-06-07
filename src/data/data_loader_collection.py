@@ -9,8 +9,8 @@ from src.data.data_loader import DataLoader
 from src.preprocessing.helpers.base_transform import BaseTransform
 from concurrent.futures import ThreadPoolExecutor
 
-# Legacy MSSV subject indexing: participant sub-NNN maps to embedding row N (0..91).
-LEGACY_SUBJECT_EMB_NUM_ROWS = 92
+# Legacy MSSV subject indexing: sub-NNN maps to embedding row N (sub-001..sub-092 → rows 1..92; row 0 unused).
+LEGACY_SUBJECT_EMB_NUM_ROWS = 93
 
 
 class DataLoaderCollection:
@@ -123,6 +123,10 @@ class DataLoaderCollection:
 
     def get_feature_names(self) -> list[str]:
         return self.data_loaders[0].get_feature_names()
+
+    def get_channel_signal_names(self) -> list[str]:
+        """MSSV signal names in channel order (e.g. EEG1, EEG3, EMG)."""
+        return list(self.datasets[0].config.get("signals", []))
 
     def get_all_data(self):
         if self.device.type == "cuda" and not self.pre_load_to_device:

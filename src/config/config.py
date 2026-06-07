@@ -93,12 +93,27 @@ class DatasetConfig(BaseModel):
     id: str = Field(..., description="Dataset identifier or path.")
     run: int | None = Field(default=None, ge=1)
     remove_artifact: bool = Field(False, description="Whether to remove artifacts from the dataset.")
+    signals: list[str] | None = Field(
+        default=None,
+        description="MSSV only: override channel list (e.g. EEG1, EEG3, EMG) from manifest lab_signals.",
+    )
     # No hardcoded constants - dataset selection is fully configurable
     
 class CVAE(BaseModel):
     normalize_global: bool = Field(..., description="Whether to normalize globally.")
     pre_normalize: bool = Field(..., description="Whether to apply pre-normalization.")
     post_normalize: bool = Field(..., description="Whether to apply post-normalization.")
+    robust_normalize: bool = Field(
+        default=False,
+        description="Paper-style time-domain per-channel robust scaling (median 0, IQR 1, clip +-20xIQR) before FFT.",
+    )
+    append_channel_rms: bool = Field(
+        default=False,
+        description=(
+            "Append one log-RMS bin per channel to the VAE FFT input (same F+1 for all "
+            "channels). Still encoded by the conv VAE; not a parallel expert-feature pipeline."
+        ),
+    )
     percentile_clip_channels: bool = Field(..., description="Whether to apply percentile clipping to channels.")
     perform_hanning_window: bool = Field(..., description="Whether to apply a Hanning window.")
     band_pass_filter_fft: bool = Field(..., description="Whether to apply band-pass filtering in the FFT domain.")

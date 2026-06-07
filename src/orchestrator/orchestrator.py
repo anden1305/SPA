@@ -22,7 +22,13 @@ from src.orchestrator.train_details import TrainDetails
 from src.training.trainer import Trainer
 from src.validation.validator import Validator
 from src.helpers.profiling import write_cprofile_outputs
-from src.helpers.cvae_checkpoint import expected_subject_emb_shape, incompatible_subject_emb_message, is_legacy_subject_emb_checkpoint, subject_emb_shape_from_cvae_state
+from src.helpers.cvae_checkpoint import (
+    expected_subject_emb_shape,
+    incompatible_subject_emb_message,
+    is_legacy_subject_emb_checkpoint,
+    pad_subject_emb_to_legacy,
+    subject_emb_shape_from_cvae_state,
+)
 from src.visuals.visualizer import Visualizer
 import matplotlib.pyplot as plt
 import numpy as np
@@ -66,6 +72,7 @@ class Orchestrator:
             )
             return False
 
+        cvae_state = pad_subject_emb_to_legacy(cvae_state, emb_dim)
         print(f"Loading CVAE model from checkpoint: {checkpoint}")
         self.model.cvae.load_state_dict(cvae_state, strict=False)
         prior = getattr(self.model.cvae, "prior", None)
