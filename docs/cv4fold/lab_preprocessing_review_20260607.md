@@ -68,6 +68,7 @@ Results: `results/cv4fold/ablation_rem/lab_2/abl_lab_2_rem_emg_wide_eeg4_notch50
 
 ### P1 — lab_5: EMG wide + optional notch
 
+- **`wide_mlp_notch50`:** locked `wide_mlp` + `notch_freqs: [50]` only (EMG **5–60 Hz** unchanged).
 - **`wide_mlp_emg_wide`:** EMG **3–100 Hz**, keep postnorm + EEG 0–20 Hz.
 - **`wide_mlp_emg_wide_notch50`:** above + `notch_freqs: [50]`.
 - Generator: [`generate_ablation_lab5_emg.py`](../../scripts/cv4fold/generate_ablation_lab5_emg.py).

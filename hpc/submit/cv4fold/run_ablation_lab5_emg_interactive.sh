@@ -4,6 +4,7 @@
 #   bkill <JOBID>
 #
 # Usage (on compute, one job per shell — or set CUDA_VISIBLE_DEVICES):
+#   bash hpc/submit/cv4fold/run_ablation_lab5_emg_interactive.sh wide_mlp_notch50
 #   bash hpc/submit/cv4fold/run_ablation_lab5_emg_interactive.sh wide_mlp_emg_wide
 #   bash hpc/submit/cv4fold/run_ablation_lab5_emg_interactive.sh wide_mlp_emg_wide_notch50
 #
@@ -15,6 +16,9 @@ cd "${SPA_ROOT}"
 
 VARIANT="${1:-}"
 case "${VARIANT}" in
+  wide_mlp_notch50)
+    CONFIG="src/config/run/cvaemarhmm/cv4fold/ablation_emg/lab_5/wide_mlp_notch50.yaml"
+    ;;
   wide_mlp_emg_wide)
     CONFIG="src/config/run/cvaemarhmm/cv4fold/ablation_emg/lab_5/wide_mlp_emg_wide.yaml"
     ;;
@@ -22,7 +26,7 @@ case "${VARIANT}" in
     CONFIG="src/config/run/cvaemarhmm/cv4fold/ablation_emg/lab_5/wide_mlp_emg_wide_notch50.yaml"
     ;;
   *)
-    echo "Usage: $0 {wide_mlp_emg_wide|wide_mlp_emg_wide_notch50}" >&2
+    echo "Usage: $0 {wide_mlp_notch50|wide_mlp_emg_wide|wide_mlp_emg_wide_notch50}" >&2
     exit 1
     ;;
 esac

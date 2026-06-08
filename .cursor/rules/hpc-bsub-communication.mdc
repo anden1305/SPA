@@ -9,7 +9,9 @@ When submitting or monitoring batch jobs, **the user stays in control**. Do not 
 
 ## Before submitting — **wait for confirmation**
 
-**Never run `bsub` (or `bmod`/`bkill` on the user's jobs) until the user explicitly confirms** after seeing the full plan — e.g. "yes submit", "go ahead", "submit them". Discussing experiments, fixing scripts, or saying "you need to run X" is **not** permission to submit.
+**Never run `bsub` (or `bkill` on the user's jobs) until the user explicitly confirms** after seeing the full plan — e.g. "yes submit", "go ahead", "submit them". Discussing experiments, fixing scripts, or saying "you need to run X" is **not** permission to submit.
+
+**Never run `bmod`** — admin-only on DTU; always fails. To change queue/walltime: `bkill` + resubmit with updated `#BSUB -q` (see [hpc-no-bmod.mdc](hpc-no-bmod.mdc)).
 
 **Default:** Give the exact copy-paste commands only; user runs them. Agent submits only when clearly asked.
 

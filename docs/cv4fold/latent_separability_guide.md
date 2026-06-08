@@ -20,9 +20,12 @@ Related: [decoder_conditioning_roadmap.md](../decoder_conditioning_roadmap.md), 
 |---------------|-------|-------|-------------|
 | `input_*_per_state.png`, `input_channel_statistics` in `data_validations.json` | **Pre-VAE** | **`plots/` once** | REM/atonia before encoder (lab_2) |
 | `input_pairwise_ed_network.png`, `input_feature_separability_ranking.png` | **Pre-VAE** | **`plots/` once** | Input separability summary |
-| `latent_pairwise_ed_network.png`, `latent_dim_separability_ranking.png`, `separability_input_vs_latent.png` | **Post-VAE** | **`plots/` once** (seed 1 encoder) | Latent geometry vs input |
+| `latent_pairwise_ed_network.png`, `latent_dim_separability_ranking.png`, `separability_input_vs_latent.png` | **Post-prior μ** | **`plots/` root** (best NMI seed) + **`plots/<seed>/`** (every seed) | Latent geometry vs input |
 | `plots/<seed>/tripanel_pc1_pc2.png` | Latent PCA | **per seed** | Prior pred vs True |
-| `plots/<seed>/feature_amplitude_per_state.png` | Post-VAE μ | **per seed** | Which latent dims encode stages |
+| `plots/<seed>/feature_amplitude_per_state.png` | Post-prior μ | **per seed** | Which latent dims encode stages |
+| `plots/<seed>/losses.png` | Training | **per seed** | Loss curve (from trainer even if epoch predictions missing) |
+
+**Plot pipeline (2026-06-08):** `ensure_cv4fold_diagnostics()` in [`locked_recipes.py`](../../scripts/cv4fold/locked_recipes.py) turns on `validate_data` + separability flags. After each seed, encoder + prior-μ diagnostics land under `plots/<seed>/`; root `plots/` copies from the **best prior-NMI** seed.
 
 If **input** EMG/EEG bands do not separate REM from NREM, fixing **arch or prior alone** rarely helps (lab_2 lesson). If **input** separates but **latent** does not, look at capacity / training / collapse.
 
@@ -32,13 +35,16 @@ Code: [`src/helpers/input_channel_statistics.py`](../../src/helpers/input_channe
 
 ## How to read `feature_amplitude_per_state.png`
 
-Built after training from **encoder means** μ (not samples, not decoder, not raw EMG).
+Built after training from **prior posterior means** μ (HMM-GMM path; encoder μ before prior validation is overwritten — see plot pipeline note below). Not samples, not decoder, not raw EMG.
 
-- Each line = mean value of latent dimension *k* for Awake / NREM / REM; band = ±1 std **within that stage**.
-- **Good enough for staging:** several dimensions with state-specific means; at least one axis where REM band does not sit on top of both others.
+- Each line = mean value of **latent dimension *k*** for Awake / NREM / REM; band = ±1 std **within that stage**.
+- **Good enough for staging:** several dimensions with state-specific means; at least one axis where REM band does not sit on top of both others (e.g. lab_5 seq32 seed 2 **Feature 7** for REM, **Feature 4** for NREM).
 - **Red flags:** most dimensions ≈ 0 for all states (**dead latents**); only 1–2 “hero” dims while REM overlaps everywhere else; pretty Awake/NREM split but REM smeared (typical lab_2 ~0.56 NMI).
+- **Seed-specific structure:** a strong REM axis on one seed may be flat on others — check all three seeds before locking (lab_5 seq32: 0.640 vs 0.488/0.507).
 
 **Do not** treat non-overlapping bands on a single dimension as “solved” — 3-way classification uses the **full** vector. Prefer `state_distinctness` numbers or the tripanel over one feature line.
+
+Case study: [ablation_findings_20260608.md](ablations/ablation_findings_20260608.md#lab_5-seq32-seed-2-nmi-0640--feature-7--rem).
 
 ---
 
@@ -63,6 +69,8 @@ From `data_validations.json` after `validate_data` + `validate_cvae`:
 | `input_*` / `latent_*` prefixed keys | Same metrics in **pre-VAE** vs **latent** space | Compare with `separability_input_vs_latent.png` |
 
 Use these to **rank tie-breakers** among similar NMI runs, not to override NMI.
+
+**W&B during training:** `val/entropy_norm` measures prior-prediction spread (0 = collapse, 1 = uniform ~33% per state). Target the **val-label baseline** (~0.80 for ~48/46/6% awake/NREM/REM; lower if val is sleep-heavy) — not 1.0. See [cvae_wandb_checkpoint_metrics.md §2.1](../training/cvae_wandb_checkpoint_metrics.md#21-what-is-a-good-valentropy_norm).
 
 ### 3. Ignore for selection (exploratory only)
 

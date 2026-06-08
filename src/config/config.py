@@ -49,6 +49,11 @@ class TrainerConfig(BaseModel):
     early_stopping: EarlyStoppingConfig = Field(default_factory=EarlyStoppingConfig, description="Early stopping settings. Set enabled=False to disable.")
     scheduler: SchedulerConfig = Field(default_factory=SchedulerConfig)
     checkpoint_score: CheckpointScoreConfig = Field(default_factory=CheckpointScoreConfig)
+    validation_checkpoint: str = Field(
+        "prior_pred_nmi",
+        pattern="^(prior_pred_nmi|rem_recall)$",
+        description="Training checkpoint used for post-train prior validation.",
+    )
 
 class ValidatorConfig(BaseModel):
     nmi: bool = Field(..., description="Whether to compute NMI.")

@@ -1,5 +1,5 @@
 trainer:
-  epochs: 200
+  epochs: 300
   learning_rate: 0.0003
   optimizer: adam
   grad_clip: 0.5

@@ -29,14 +29,14 @@ visualizer:
   state_distinctness: true
   summary_statistics: true
   historic_values: true
-  save_results_npz: false
+  save_results_npz: true
 dataloader:
   num_batches: 64
   batch_size: 128
   validation_batch_size: 128
   window_size: 512
   stride: 512
-  sequence_length: 1
+  sequence_length: 64
   shuffle: true
   normalize: true
   use_legacy: false
@@ -107,17 +107,14 @@ model:
     emb_dim: 4
     decoder_only_conditioning: true
     use_rms: false
-    prior: warm_hmm_gmm
+    prior: hmm_gmm
     min_beta: 0.01
     max_beta: 1.0
     beta_warmup_epochs: 0
     beta_slowdown_epochs: 0
-    gmm_warmup_epochs: 18
     free_nats_per_dim: 0.0
     no_beta_epochs: 10
     num_gmm_states: 3
-    hmm_warmup_epochs: 37
-    hmm_transition_ramp_epochs: 18
     hmm_sticky_kappa: 0.86
     hmm_estimate_transitions: true
 verbose: true

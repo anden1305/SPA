@@ -16,7 +16,7 @@ alwaysApply: true
 | **GPU** interactive: short smoke tests, one-epoch debug, `nvidia-smi` checks | **`sxm2sh`**, **`voltash`**, or **`a100sh`** (pick an idle node) — same `cd` + venv |
 | Train / validate / full sweeps / multi-hour jobs | **`bsub < hpc/submit/...`** (production queues) |
 
-**`gpuv100` preference:** Student quota allows **~4 concurrent GPU jobs** on `gpuv100` — usually the **fastest** queue. Default new ablations to `gpuv100`; when rebalancing a backlog, **keep the top-priority jobs PEND/RUN on `gpuv100`** and spill only the rest to `gpua10` / `gpua100` / `gpul40s`. Check `bqueues` before moving (avoid `gpul40s` / `gpua100` if PEND is huge).
+**`gpuv100` preference:** Student quota allows **~4 concurrent GPU jobs** on `gpuv100` — usually the **fastest** queue. For multi-job batches: **>50% on `gpuv100`**, spill the rest (see [hpc-gpu-queue-split.mdc](hpc-gpu-queue-split.mdc)). **`gpua100` ≈ 2 concurrent RUN.** Never use `bmod` — kill + resubmit to change queue.
 
 **Agent rule:** Before running any command that loads sleep EEG data, runs pytest, generates exploration plots from raw signals, or touches a GPU — use an **interactive compute shell**, not the login node. If unsure, default to `linuxsh` (CPU) or `bsub`.
 

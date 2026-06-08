@@ -15,12 +15,13 @@ set -euo pipefail
 SPA_ROOT="/work3/s204070/SPA"
 cd "${SPA_ROOT}"
 
-WALLTIME="4:00"
+WALLTIME="6:00"
 MEM="6GB"
 CPUS="4"
 QUEUE="gpuv100"
 
 JOBS=(
+  "lab_5_wide_mlp_notch50:src/config/run/cvaemarhmm/cv4fold/ablation_emg/lab_5/wide_mlp_notch50.yaml"
   "lab_5_wide_mlp_emg_wide:src/config/run/cvaemarhmm/cv4fold/ablation_emg/lab_5/wide_mlp_emg_wide.yaml"
   "lab_5_wide_mlp_emg_wide_notch50:src/config/run/cvaemarhmm/cv4fold/ablation_emg/lab_5/wide_mlp_emg_wide_notch50.yaml"
 )

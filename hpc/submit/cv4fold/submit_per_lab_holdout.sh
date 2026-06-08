@@ -47,8 +47,8 @@ for lab in "${LABS[@]}"; do
   for model in "${MODELS[@]}"; do
     CONFIG="src/config/run/cvaemarhmm/cv4fold/per_lab_holdout/${lab}/fold_${FOLD}/${model}.yaml"
     if [[ ! -f "${CONFIG}" ]]; then
-      echo "Missing ${CONFIG} — run generate_configs.py --phase per_lab_holdout --fold ${FOLD}" >&2
-      exit 1
+      echo "Skip missing ${CONFIG}"
+      continue
     fi
 
     bsub <<EOF

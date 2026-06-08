@@ -1,7 +1,7 @@
 from src.models.cvae_mar_hmm import CVAEMARHMM
 from src.data.data_loader_collection import DataLoaderCollection
 from src.models.base_model import BaseModel
-from src.validation.validator import PRIOR_PRED_NMI_KEY, Validator
+from src.validation.validator import PRIOR_PRED_NMI_KEY, PRIOR_REM_RECALL_KEY, Validator
 from src.config.config import GlobalConfig
 from src.training.early_stopping import create_early_stopper
 from src.training.experiment_logger import create_logger
@@ -29,6 +29,8 @@ class Trainer:
         self.early_stopping = create_early_stopper(self.config, self.global_config.verbose)
         self._best_prior_nmi = -1.0
         self._best_prior_epoch: int | None = None
+        self._best_rem_recall = -1.0
+        self._best_rem_recall_epoch: int | None = None
         self._best_checkpoint_score = float("-inf")
         self._best_checkpoint_score_epoch: int | None = None
         self._experiment_logger = None
@@ -88,6 +90,8 @@ class Trainer:
         self.__init_training()
         self._best_prior_nmi = -1.0
         self._best_prior_epoch = None
+        self._best_rem_recall = -1.0
+        self._best_rem_recall_epoch = None
         self._best_checkpoint_score = float("-inf")
         self._best_checkpoint_score_epoch = None
         for epoch in range(self.config.epochs):
@@ -149,6 +153,7 @@ class Trainer:
                 if isinstance(self.model, CVAEMARHMM) and self.model.training_pipeline == 'cvae':
                     self.validator.validate_cvae_epoch(epoch)
                     self._maybe_save_best_prior_checkpoint(epoch)
+                    self._maybe_save_best_rem_recall_checkpoint(epoch)
                     self._maybe_save_best_checkpoint_score(epoch)
                 else:
                     self.validator.validate_epoch(epoch, self.optimizer)
@@ -210,6 +215,25 @@ class Trainer:
         path = self._checkpoint_dir() / "cvae_best_prior_pred_nmi.pth"
         return path if path.exists() else None
 
+    def _maybe_save_best_rem_recall_checkpoint(self, epoch: int) -> None:
+        metrics = self.validator.validations.get(epoch, {})
+        recall = metrics.get(PRIOR_REM_RECALL_KEY)
+        if recall is None or recall <= self._best_rem_recall:
+            return
+        self._best_rem_recall = float(recall)
+        self._best_rem_recall_epoch = epoch
+        path = self._checkpoint_dir() / "cvae_best_rem_recall.pth"
+        torch.save(self.model.state_dict(), path)
+        if self.global_config.verbose:
+            print(
+                f"Saved best REM-recall checkpoint (recall={recall:.4f}, epoch={epoch + 1}) to {path}",
+                flush=True,
+            )
+
+    def get_best_rem_recall_checkpoint_path(self) -> Path | None:
+        path = self._checkpoint_dir() / "cvae_best_rem_recall.pth"
+        return path if path.exists() else None
+
     def _checkpoint_score_warmup_epoch(self) -> int:
         frac = self.config.checkpoint_score.warmup_frac
         return int(frac * self.config.epochs)
@@ -245,6 +269,9 @@ class Trainer:
         if self._best_prior_epoch is not None:
             summary["val/best_prior_pred_nmi"] = self._best_prior_nmi
             summary["val/best_prior_pred_nmi_epoch"] = self._best_prior_epoch + 1
+        if self._best_rem_recall_epoch is not None:
+            summary["val/best_prior_rem_recall"] = self._best_rem_recall
+            summary["val/best_prior_rem_recall_epoch"] = self._best_rem_recall_epoch + 1
         if self._best_checkpoint_score_epoch is not None:
             summary["val/best_checkpoint_score"] = self._best_checkpoint_score
             summary["val/best_checkpoint_score_epoch"] = self._best_checkpoint_score_epoch + 1
@@ -264,6 +291,8 @@ class Trainer:
         self.current_epoch = 0
         self._best_prior_nmi = -1.0
         self._best_prior_epoch = None
+        self._best_rem_recall = -1.0
+        self._best_rem_recall_epoch = None
         self._best_checkpoint_score = float("-inf")
         self._best_checkpoint_score_epoch = None
         if self.config.early_stopping:

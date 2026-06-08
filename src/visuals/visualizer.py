@@ -74,11 +74,13 @@ class Visualizer:
             filename="input_feature_separability_ranking.png",
         )
 
-    def visualize_latent_run_level(self) -> None:
-        """Once per experiment (seed 1): latent ED / separability at plots/ root."""
+    def visualize_latent_run_level(self, path: Path | None = None) -> None:
+        """Latent ED / separability plots (default: experiment ``plots/`` root)."""
         if not self._has_data_validations():
             return
-        path = self._experiment_plots_path()
+        if path is None:
+            path = self._experiment_plots_path()
+        path.mkdir(parents=True, exist_ok=True)
         if self.global_config.visualizer.state_distinctness and self.global_config.validator.state_distinctness:
             self.__plot_state_distinctness(path=path, space="latent")
             self.__plot_pairwise_energy_bars(path=path, space="latent")
@@ -137,6 +139,7 @@ class Visualizer:
         if output_subdir:
             path = path / output_subdir
         path.mkdir(parents=True, exist_ok=True)
+        self._plot_prior_latent_diagnostics(path=path, x_latent=x_latent, y=y_true)
         y_hat = y_hat.flatten().cpu().numpy()
         y_true = y_true.flatten().cpu().numpy()
         x_latent = x_latent.detach().cpu().numpy()
@@ -176,6 +179,19 @@ class Visualizer:
             x=x,
             sub_ids=sub_ids_np,
         )
+        self._plot_prior_latent_diagnostics(path=path, x_latent=mu, y=y)
+
+    def _plot_prior_latent_diagnostics(self, path: Path, x_latent: torch.Tensor, y: torch.Tensor) -> None:
+        """Post-prior μ: per-state amplitude + latent separability under ``path/``."""
+        from src.helpers.frequency_statistics import compute_feature_statistics
+
+        stats = compute_feature_statistics(x_latent, y, self.data_loader, True)
+        self.validator.data_validations.update(stats)
+        separability = self.validator.calculate_feature_separability(x_latent, y)
+        if separability:
+            self.validator.data_validations["latent_feature_separability"] = separability
+        self.__plot_feature_statistics(path=path)
+        self.visualize_latent_run_level(path=path)
     
     def visualize_runs(self, train_details: list[TrainDetails], validations: dict[str, Any]):
         path = Path(self.global_config.results_dir) / self.global_config.run_name / "plots"
@@ -196,8 +212,19 @@ class Visualizer:
         seed_path = run_path / output_subdir if output_subdir else run_path
         seed_path.mkdir(parents=True, exist_ok=True)
         self.__plot_feature_statistics(path=seed_path)
-        if output_subdir == "1":
-            self.visualize_latent_run_level()
+        self.visualize_latent_run_level(path=seed_path)
+
+    def plot_training_losses(self, losses: dict[int, float], path: Path) -> None:
+        """Plot per-epoch training loss when full TrainDetails are unavailable."""
+        if not losses:
+            return
+        path.mkdir(parents=True, exist_ok=True)
+        plt.plot(list(losses.values()))
+        plt.title("Losses")
+        plt.xlabel("Epoch")
+        plt.ylabel("Loss")
+        plt.savefig(path / "losses.png")
+        plt.close()
     
     ####### HELPER METHODS #######
     

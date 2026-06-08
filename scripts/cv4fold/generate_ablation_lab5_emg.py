@@ -20,8 +20,12 @@ BASE = REPO_ROOT / "src/config/run/cvaemarhmm/cv4fold/ablation_arch/lab_5/wide_m
 OUT_ROOT = REPO_ROOT / "src/config/run/cvaemarhmm/cv4fold/ablation_emg/lab_5"
 
 EMG_WIDE = [[None, 20.0], [None, 20.0], [3.0, 100.0]]
+TRAINER_EPOCHS = 300  # lab_5 prior NMI peaks late vs 200 ep locked wide_mlp
 
 VARIANTS: dict[str, dict] = {
+    "wide_mlp_notch50": {
+        "notch_freqs": [50.0],
+    },
     "wide_mlp_emg_wide": {
         "band_pass_freqs": EMG_WIDE,
     },
@@ -54,6 +58,7 @@ def main() -> int:
         if variant not in VARIANTS:
             raise SystemExit(f"Unknown variant: {variant}")
         cfg = copy.deepcopy(template)
+        cfg.setdefault("trainer", {})["epochs"] = TRAINER_EPOCHS
         cfg.setdefault("cvae", {})
         for key, val in VARIANTS[variant].items():
             cfg["cvae"][key] = copy.deepcopy(val)

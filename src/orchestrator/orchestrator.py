@@ -2,6 +2,7 @@
 
 import copy
 import json
+import shutil
 from pathlib import Path
 import datetime
 import uuid
@@ -314,6 +315,8 @@ class Orchestrator:
         if self.global_config.validate_data:
             self.validator.validate_data()
             self.visualizer.visualize_experiment_input()
+        best_prior_nmi: float | None = None
+        best_run_number: int | None = None
         for i in range(self.global_config.runs):
             self.run_number = i + 1
             self.global_config.seed += 1
@@ -346,8 +349,19 @@ class Orchestrator:
                 except Exception as e:
                     print(f"Error collecting training details: {e}")
                     train_details = None
+                seed_plot_path = (
+                    Path(self.global_config.results_dir)
+                    / self.global_config.run_name
+                    / "plots"
+                    / str(self.run_number)
+                )
                 if train_details is not None:
                     self.__save_info(train_details=train_details)
+                    self.visualizer.plot_training_losses(train_details.losses, seed_plot_path)
+                else:
+                    self.visualizer.plot_training_losses(
+                        self.trainer.get_losses(), seed_plot_path
+                    )
                 self.visualizer.visualize_cvae(
                     model=self.model,
                     train_details=train_details,
@@ -361,13 +375,22 @@ class Orchestrator:
                 prior_nmi: float | None = None
                 try:
                     cs_enabled = self.global_config.trainer.checkpoint_score.enabled
+                    vc_metric = self.global_config.trainer.validation_checkpoint
                     score_ckpt = self.trainer.get_best_checkpoint_score_path()
                     prior_ckpt = self.trainer.get_best_prior_checkpoint_path()
+                    rem_ckpt = self.trainer.get_best_rem_recall_checkpoint_path()
                     if cs_enabled and score_ckpt is not None:
                         validation_ckpt = score_ckpt
                         best_ep = self.trainer._best_checkpoint_score_epoch
                         print(
                             f"Validating with best checkpoint-score: {validation_ckpt} "
+                            f"(epoch {(best_ep + 1) if best_ep is not None else '?'})"
+                        )
+                    elif vc_metric == "rem_recall" and rem_ckpt is not None:
+                        validation_ckpt = rem_ckpt
+                        best_ep = self.trainer._best_rem_recall_epoch
+                        print(
+                            f"Validating with best REM-recall checkpoint: {validation_ckpt} "
                             f"(epoch {(best_ep + 1) if best_ep is not None else '?'})"
                         )
                     elif prior_ckpt is not None:
@@ -383,6 +406,28 @@ class Orchestrator:
                     (ckpt_dir / "validation_checkpoint.txt").write_text(str(validation_ckpt))
                     self._load_cvae_checkpoint_from(validation_ckpt)
                     prior_nmi = self._validate_trained_cvae_prior(run_dir)
+                    if prior_nmi is not None and (
+                        best_prior_nmi is None or prior_nmi > best_prior_nmi
+                    ):
+                        best_prior_nmi = prior_nmi
+                        best_run_number = self.run_number
+                        exp_plots = (
+                            Path(self.global_config.results_dir)
+                            / self.global_config.run_name
+                            / "plots"
+                        )
+                        seed_plots = exp_plots / str(self.run_number)
+                        for name in (
+                            "latent_dim_separability_ranking.png",
+                            "latent_pairwise_ed_network.png",
+                            "latent_pairwise_energy_bars.png",
+                            "separability_input_vs_latent.png",
+                            "feature_amplitude_per_state.png",
+                            "feature_variance_per_state.png",
+                        ):
+                            src = seed_plots / name
+                            if src.exists():
+                                shutil.copy2(src, exp_plots / name)
                 except Exception as e:
                     print(f"Warning: post-train prior validation failed: {e}")
                 finally:
@@ -407,6 +452,11 @@ class Orchestrator:
                 train_details = self.__collect_training_details()
                 self.visualizer.visualize(train_details=train_details)
                 torch.save(self.model.state_dict(), f"{self.global_config.results_dir}/{self.global_config.run_name}/cvaehmm_final_model.pth")
+        if best_run_number is not None:
+            print(
+                f"Best prior NMI: run {best_run_number} ({best_prior_nmi:.4f}); "
+                f"root plots/ synced from plots/{best_run_number}/"
+            )
     
     
     def _validate_trained_cvae_prior(self, run_dir: Path) -> float:

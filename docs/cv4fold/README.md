@@ -18,11 +18,12 @@ Scrape helper (shows best + all seeds): `python3 scripts/cv4fold/scrape_experime
 
 **After cv4fold / holdout jobs finish:** run postprocess — [postprocess.md](postprocess.md) and [per_lab_holdout_pilot.md § When jobs finish](per_lab_holdout_pilot.md#when-jobs-finish-postprocess).
 
-**Status (2026-06-07):** **lab_2 locked** — `rem_emg_wide_eeg4` best **0.593** [0.593, 0.578, 0.541] (28607461). lab_3/lab_5 prepro+arch locked. Next: [per_lab_holdout_pilot.md](per_lab_holdout_pilot.md) or optional [ablation_lab2_beta.md](ablations/ablation_lab2_beta.md).
+**Status (2026-06-08):** Incohort locks — **lab_2 cGMVAE** 0.593; **lab_3 cHMM warm** 0.734 T=64; **lab_5 cHMM** seq32 0.640 (1/3 seeds — reliability before thesis lock). Enc+dec worse on lab_2. **Next:** [per_lab_holdout_pilot.md](per_lab_holdout_pilot.md) fold 4. Full write-up: [ablation_findings_20260608.md](ablations/ablation_findings_20260608.md).
 
 | Doc | Contents |
 |-----|----------|
 | [cross_lab_cv4fold.md](cross_lab_cv4fold.md) | Story, folds, conditioning ablations, fold-4 results, next steps |
+| [incohort_to_cross_lab_strategy.md](incohort_to_cross_lab_strategy.md) | **How incohort locks → holdout → joint cv4fold** (strategies & pitfalls) |
 | [lab_2_locked_montage.md](lab_2_locked_montage.md) | **Locked EEG1+EEG4+EMG** + `rem_emg_wide_eeg4` recipe (0.593) |
 | [per_lab_holdout_pilot.md](per_lab_holdout_pilot.md) | **Within-lab holdout** (fold 4): cgmvae vs chmmgmvae, locked recipes |
 | [postprocess.md](postprocess.md) | **Lean postprocess** — best-of-3 JSON/CSV; disk-safe defaults |
@@ -41,6 +42,12 @@ Scrape helper (shows best + all seeds): `python3 scripts/cv4fold/scrape_experime
 | [ablation_lab2_findings_20260607.md](ablations/ablation_lab2_findings_20260607.md) | **Interim findings**, curve interpretation, prioritized next ablations |
 | [ablation_no_beta_epochs.md](ablations/ablation_no_beta_epochs.md) | `no_beta_epochs` 0 vs 10 on **all labs'** locked best-NMI recipes |
 | [ablation_lab2_beta.md](ablations/ablation_lab2_beta.md) | Pointer to `no_beta_epochs` ablation |
+| [ablation_chmm_incohort.md](ablations/ablation_chmm_incohort.md) | **cHMM-GMVAE incohort** — `hmm_gmm` vs `warm_hmm_gmm`, scratch only |
+| [cgmvae_incohort_analysis_20260608.md](ablations/cgmvae_incohort_analysis_20260608.md) | **cGMVAE incohort synthesis** — separability, curves, prioritized next ablations |
+| [ablation_incohort_followup.md](ablations/ablation_incohort_followup.md) | **Follow-up matrix** (wide_mlp, 300ep, EMG/notch, REM-recall ckpt) |
+| [ablation_enc_dec_conditioning.md](ablations/ablation_enc_dec_conditioning.md) | **cGMVAE enc+dec conditioning** vs locked decoder-only winners |
+| [ablation_findings_20260608.md](ablations/ablation_findings_20260608.md) | **Overnight synthesis** — cHMM locks, seq T, Feature 7/REM, plot pipeline, holdout plan |
+| [ablation_chmm_lab2_seq64.md](ablations/ablation_chmm_lab2_seq64.md) | **lab_2 cHMM T=64 stability** — warm, notch, 300ep, REM-recall ckpt |
 
 ## Per-lab in-cohort (baby step)
 

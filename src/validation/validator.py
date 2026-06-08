@@ -21,6 +21,7 @@ from src.helpers.state_distinctness import compute_state_distinctness
 from src.validation.hmmgmm_metrics import checkpoint_score, entropy_norm, latent_autocorr, state_switch_rate
 
 PRIOR_PRED_NMI_KEY = "prior_pred_nmi"
+PRIOR_REM_RECALL_KEY = "prior_rem_recall"
 
 
 class Validator:
@@ -275,6 +276,12 @@ class Validator:
         if separability:
             self.data_validations["latent_feature_separability"] = separability
         self._save_data_validations()
+
+    def calculate_feature_separability(
+        self, x: torch.Tensor, y: torch.Tensor
+    ) -> dict[str, Any]:
+        """Public wrapper for per-feature Fisher-style separability."""
+        return self.__calculate_feature_separability(x, y)
     
     def validate_cvae_epoch(self, epoch: int):
         self.validations[epoch] = {}
@@ -332,10 +339,12 @@ class Validator:
         y_np = y.detach().cpu().numpy().flatten()
         preds_np = y_hat.detach().cpu().numpy().flatten()
         prior_nmi = float(calculate_nmi(preds_np, y_np))
+        rem_recall = self._prior_rem_recall(y_np, preds_np)
         ent_norm = entropy_norm(preds_np, k_pred)
         score = checkpoint_score(log_likelihood, ent_norm, beta=beta)
 
         self.validations[epoch][PRIOR_PRED_NMI_KEY] = prior_nmi
+        self.validations[epoch][PRIOR_REM_RECALL_KEY] = rem_recall
         self.validations[epoch]["entropy_norm"] = ent_norm
         self.validations[epoch]["checkpoint_score"] = score
         self.validations[epoch]["n_unique_pred_states"] = int(len(np.unique(preds_np)))
@@ -349,10 +358,23 @@ class Validator:
         if self.global_config.verbose:
             sw = self.validations[epoch]["prior_switch_rate_per100"]
             print(
-                f"Prior val — NMI: {prior_nmi:.4f}, log-lik: {log_likelihood:.4f}, "
+                f"Prior val — NMI: {prior_nmi:.4f}, REM recall: {rem_recall:.4f}, "
+                f"log-lik: {log_likelihood:.4f}, "
                 f"H_norm: {ent_norm:.4f}, S: {score:.4f}, n_states: "
                 f"{self.validations[epoch]['n_unique_pred_states']}, switch/100: {sw:.4f}"
             )
+
+    @staticmethod
+    def _prior_rem_recall(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+        """Recall for REM (class 2) from prior predictions."""
+        from sklearn.metrics import confusion_matrix
+
+        labels = [0, 1, 2]
+        cm = confusion_matrix(y_true, y_pred, labels=labels)
+        row_sum = float(cm[2].sum())
+        if row_sum <= 0:
+            return 0.0
+        return float(cm[2, 2] / row_sum)
     
     def validate_cvae_gmm(self):
         assert type(self.model) == CVAEMARHMM, "Model must be of type CVAEMARHMM to validate CVAE latent representations."

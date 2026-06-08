@@ -9,7 +9,12 @@ from pathlib import Path
 
 import yaml
 
-from scripts.cv4fold.locked_recipes import apply_model_variant, load_locked_recipe
+from scripts.cv4fold.locked_recipes import (
+    LOCKED_CHMM_SEQUENCE_LENGTH,
+    apply_locked_sequence_length,
+    apply_model_variant,
+    load_locked_recipe,
+)
 from scripts.cv4fold.manifest_utils import (
     all_mice,
     dataset_entries,
@@ -80,8 +85,14 @@ def generate_per_lab_holdout(
         val_entries = dataset_entries(manifest, holdout)
 
         for model in models:
+            if model == "chmmgmvae" and lab not in LOCKED_CHMM_SEQUENCE_LENGTH:
+                print(f"Skip {lab} chmmgmvae (no locked seq T; use cgmvae holdout)")
+                continue
+
             cfg = load_locked_recipe(lab)
-            cfg = apply_model_variant(cfg, model)
+            cfg = apply_model_variant(cfg, model, lab=lab)
+            cfg = apply_locked_sequence_length(cfg, model, lab)
+            cfg.setdefault("visualizer", {})["save_results_npz"] = True
             cfg["train_datasets"] = copy.deepcopy(train_entries)
             cfg["val_datasets"] = copy.deepcopy(val_entries)
             cfg["results_dir"] = f"results/cv4fold/per_lab_holdout/{lab}/fold_{fold}/{model}"

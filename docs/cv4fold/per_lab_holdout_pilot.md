@@ -56,10 +56,16 @@ Source: [`scripts/cv4fold/locked_recipes.py`](../../scripts/cv4fold/locked_recip
 
 | Model | Prior | Extra |
 |-------|-------|-------|
-| **cgmvae** | `gmm` | static GMM |
-| **chmmgmvae** | `warm_hmm_gmm` | GMM/HMM warmups from lab_3 reliability recipe |
+| **cgmvae** | `gmm` | static GMM; `sequence_length: 1` |
+| **chmmgmvae** | per-lab (`simple` lab_2/5, `warm` lab_3) | **`sequence_length` locked:** lab_2 **64**, lab_3 **64**, lab_5 **32** (T>1 only — temporal HMM) |
 
-Shared with incohort ablations: `sequence_length: 1`, LR `3e-4`, scratch, `decoder_only_conditioning: true`.
+Shared: LR `3e-4`, scratch, `decoder_only_conditioning: true`, `save_results_npz: true` on holdout.
+
+Regenerate after lock changes:
+
+```bash
+PYTHONPATH=. python3 scripts/cv4fold/generate_configs.py --phase per_lab_holdout --fold 4
+```
 
 **lab_2 montage locked 2026-06-07:** manifest + all new configs use **EEG1+EEG4+EMG** via [`rem_emg_wide_eeg4`](../../src/config/run/cvaemarhmm/cv4fold/ablation_rem/lab_2/rem_emg_wide_eeg4.yaml) (best **0.593**, seeds [0.593, 0.578, 0.541]).
 

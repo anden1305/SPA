@@ -1,0 +1,35 @@
+---
+description: Never use LSF bmod — admin-only on DTU; kill + resubmit instead
+alwaysApply: true
+---
+
+# Never use `bmod`
+
+**Do not run `bmod` under any circumstances.** On DTU LSF it is **admin-only** (`bsub error: Only administrators can run bmod!`) and will always fail for student accounts.
+
+This applies to the agent **and** to advice given to the user — do not suggest `bmod` as a fix.
+
+## Change queue, walltime, or resources
+
+1. **`bkill <JOBID>`** — only when the user explicitly asks to cancel or move/resubmit a job.
+2. Set the correct queue in the **submit script** (`#BSUB -q gpuv100`, etc.) or inline `bsub` heredoc.
+3. **`bsub`** again (or `bash hpc/submit/...`) to get a new JOBID.
+
+Example (move PEND job from `gpua100` → `gpuv100`):
+
+```bash
+bkill <JOBID>
+bash hpc/submit/cv4fold/submit_ablation_incohort_followup.sh   # script already uses gpuv100
+# or resubmit a single job with #BSUB -q gpuv100
+```
+
+## Allowed LSF job commands
+
+| Command | Agent may use when |
+|---------|-------------------|
+| `bjobs`, `bhist`, `tail` | Checking status (snapshot only) |
+| `bsub` | User explicitly confirmed submit |
+| `bkill` | User explicitly asked to cancel or resubmit/move |
+| **`bmod`** | **Never** |
+
+See also: [hpc-bsub-communication.mdc](hpc-bsub-communication.mdc), [hpc-gpu-queue-split.mdc](hpc-gpu-queue-split.mdc).

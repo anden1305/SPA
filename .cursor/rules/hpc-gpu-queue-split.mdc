@@ -1,0 +1,77 @@
+---
+description: DTU GPU queues — never bmod; split submits with >50% on gpuv100
+alwaysApply: true
+---
+
+# GPU queue split (DTU LSF)
+
+## Never use `bmod`
+
+**Students cannot change queue/walltime on existing jobs** (`bmod` → "Only administrators can run bmod").
+
+To move a **PEND** job to another queue:
+
+1. **`bkill <JOBID>`** (only when the user asked to rebalance or resubmit).
+2. **`bsub`** again with the new `#BSUB -q`.
+
+Do **not** suggest or run `bmod`. Design queue mix in the **submit script** up front, or kill + resubmit on request.
+
+---
+
+## Student GPU concurrency (approximate)
+
+| Queue | Typical student parallel RUN cap | Notes |
+|-------|----------------------------------|--------|
+| **`gpuv100`** | **~4** | **Fastest drain** — default for most jobs |
+| **`gpua100`** | **~2** | Long PEND when backlog is large |
+| `gpua10`, `gpua40`, `gpul40s` | spill only | Check `bqueues` PEND before using |
+
+Check live load:
+
+```bash
+bqueues | egrep 'gpuv100|gpua10|gpua40|gpua100|gpul40s'
+bjobs -u $USER
+```
+
+---
+
+## Split rule for multi-job submits
+
+When submitting **2+ GPU jobs** in one batch:
+
+1. Put **>50% on `gpuv100`** (strict majority — e.g. 3/4, 4/6, 5/8).
+2. Spill the rest across **`gpua10` → `gpua40` → `gpua100` → `gpul40s`**, preferring lower PEND.
+3. Respect **`gpua100` ≈ 2 concurrent RUN** — do not put more than ~2 of your jobs there if you already have A100 RUN/PEND filling quota.
+4. **Priority jobs** (follow-ups, blockers) stay on **`gpuv100`**; spill lower-priority or long-walltime jobs first.
+
+### Examples
+
+| Jobs | `gpuv100` | Spill |
+|------|-----------|--------|
+| 4 | **3** | 1 (`gpua10` or `gpua40`) |
+| 6 | **4** | 1× `gpua100`, 1× `gpul40s` |
+| 12 | **7–8** | rest mixed per `bqueues` |
+
+### Submit-script pattern
+
+Use a per-job queue map (see `hpc/submit/cv4fold/submit_ablation_chmm_sweep.sh`):
+
+```bash
+JOB_QUEUES=(
+  ["lab_2/foo"]="gpuv100"
+  ["lab_3/bar"]="gpuv100"
+  ["lab_5/baz"]="gpua10"
+)
+```
+
+Default single-queue scripts to `QUEUE="gpuv100"`; override per job when batch size ≥ 2.
+
+---
+
+## Rebalancing an existing backlog
+
+Only after **user confirms** (`bkill` is destructive for pending work):
+
+- Keep **RUN** jobs alone unless user asks to kill.
+- Move **PEND** jobs by **bkill + bsub** with the split rule above.
+- Report old JOBID → new JOBID and new queue in the reply.

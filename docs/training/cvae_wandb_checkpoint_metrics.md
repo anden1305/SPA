@@ -1,6 +1,6 @@
 # CVAE / cHMM-GMVAE — W&B metrics and thesis checkpoint score
 
-**Added:** 2026-06-07  
+**Added:** 2026-06-07 · **Updated:** 2026-06-08 (`val/entropy_norm` interpretation)  
 **Scope:** `train_vae` for cGMVAE and cHMM-GMVAE (cv4fold, decoder-only reliability, ablations).
 
 Per-epoch Weights & Biases logging and optional **collapse-aware checkpoint** aligned with thesis composite score \(S(\varepsilon)\). Implementation: [`src/validation/validator.py`](../src/validation/validator.py), [`src/validation/hmmgmm_metrics.py`](../src/validation/hmmgmm_metrics.py), [`src/training/trainer.py`](../src/training/trainer.py), [`src/orchestrator/orchestrator.py`](../src/orchestrator/orchestrator.py).
@@ -32,7 +32,40 @@ H_{\mathrm{norm}}(\hat{Y}) = \frac{H(\hat{Y})}{\log K_{\mathrm{pred}}} \in [0, 1
 \]
 
 - \(0\) = all mass on one state (collapse)
-- \(1\) = uniform usage over \(K_{\mathrm{pred}}\) states
+- \(1\) = **uniform** usage over \(K_{\mathrm{pred}}\) states (~33% each for \(K=3\)) — **not** the ideal target for sleep staging (real hypnograms are skewed)
+
+### 2.1 What is a good `val/entropy_norm`?
+
+`val/entropy_norm` is \(H_{\mathrm{norm}}(\hat{Y})\) on **prior predictions** (GMM marginal or HMM Viterbi labels) over the validation set — see [`entropy_norm`](../../src/validation/hmmgmm_metrics.py).
+
+**Target = validation label baseline.** Compute normalized entropy on **scored val stages** once per fold/lab; a healthy prior should stay near that value while `val/prior_pred_nmi` rises. Do **not** expect values near 1.0 unless predictions are artificially uniform.
+
+```python
+from src.validation.hmmgmm_metrics import entropy_norm
+# y_val: flattened scored stage labels on the val split; k_pred = 3
+baseline = entropy_norm(y_val.astype(int), k_pred=3)
+```
+
+**Typical ranges (REM ≈ 6%, wake + NREM split the rest):**
+
+| Wake | NREM | REM | Baseline \(H_{\mathrm{norm}}\) |
+|------|------|-----|--------------------------------|
+| 5% | 89% | 6% | ~0.38 (very sleep-heavy val) |
+| 10% | 84% | 6% | ~0.50 |
+| 15% | 79% | 6% | ~0.58 |
+| 20% | 74% | 6% | ~0.65 |
+| 48% | 46% | 6% | ~0.80 (HQ-like mix; see [lab preprocessing review](../cv4fold/lab_preprocessing_review_20260607.md)) |
+
+**How to read curves:**
+
+| `entropy_norm` vs baseline | Likely meaning |
+|--------------------------|----------------|
+| Stable within ~±0.05–0.10, `prior_pred_nmi` ↑ | Healthy marginal calibration |
+| → 0, `n_unique_pred_states` → 1 | Collapse |
+| → 1.0 while true REM ~6% | Over-uniform predictions (e.g. too much REM/wake) |
+| Plausible entropy but low REM recall | REM merged into NREM — check confusion matrix; entropy alone is not enough |
+
+Pair with `val/n_unique_pred_states` (expect 3) and confusion-matrix REM recall.
 
 **Composite score:**
 
@@ -141,11 +174,14 @@ dataloader:
 
 | Pattern | Likely meaning |
 |---------|----------------|
-| `prior_pred_nmi` ↑, `entropy_norm` stable ~0.8–1 | Healthy learning |
+| `prior_pred_nmi` ↑, `entropy_norm` stable near val-label baseline (~0.5–0.8 for typical mixes) | Healthy learning |
 | `log_likelihood` ↑, `entropy_norm` → 0, `n_unique_pred_states` → 1 | Collapse — do not trust peak KMeans NMI alone |
+| `entropy_norm` → 1.0 while scored REM ~6% | Over-uniform prior marginals — inspect confusion matrix |
 | `cvae_latent_kmeans_nmi` high, `prior_pred_nmi` low | Latent separability without good prior alignment |
 | `prior_switch_rate_per100` → 0 (chmm) | Sticky or collapsed HMM path |
 | `checkpoint_score` peaks before final epoch | Enable `checkpoint_score.enabled: true` or inspect prior-pred-best epoch |
+
+See [§2.1](#21-what-is-a-good-valentropy_norm) for baseline tables and the one-off `entropy_norm(y_val, 3)` recipe.
 
 Rank experiments by **`metrics.txt` / prior-pred NMI**, not latent KMeans alone.
 
