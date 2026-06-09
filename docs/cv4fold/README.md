@@ -26,6 +26,7 @@ Scrape helper (shows best + all seeds): `python3 scripts/cv4fold/scrape_experime
 | [incohort_to_cross_lab_strategy.md](incohort_to_cross_lab_strategy.md) | **How incohort locks → holdout → joint cv4fold** (strategies & pitfalls) |
 | [lab_2_locked_montage.md](lab_2_locked_montage.md) | **Locked EEG1+EEG4+EMG** + `rem_emg_wide_eeg4` recipe (0.593) |
 | [per_lab_holdout_pilot.md](per_lab_holdout_pilot.md) | **Within-lab holdout** (fold 4): cgmvae vs chmmgmvae, locked recipes |
+| [unified_holdout_paper_line.md](unified_holdout_paper_line.md) | **Paper main line** — 3 models × 2 scopes, unified recipes + per-lab prepro |
 | [postprocess.md](postprocess.md) | **Lean postprocess** — best-of-3 JSON/CSV; disk-safe defaults |
 | [lab_preprocessing_review_20260607.md](lab_preprocessing_review_20260607.md) | **Data-driven lab review**, HQ plots, notch/EMG ablation backlog |
 | [latent_separability_guide.md](latent_separability_guide.md) | Which plots/metrics matter; input vs latent; what to skip |
@@ -48,6 +49,7 @@ Scrape helper (shows best + all seeds): `python3 scripts/cv4fold/scrape_experime
 | [ablation_enc_dec_conditioning.md](ablations/ablation_enc_dec_conditioning.md) | **cGMVAE enc+dec conditioning** vs locked decoder-only winners |
 | [ablation_findings_20260608.md](ablations/ablation_findings_20260608.md) | **Overnight synthesis** — cHMM locks, seq T, Feature 7/REM, plot pipeline, holdout plan |
 | [ablation_chmm_lab2_seq64.md](ablations/ablation_chmm_lab2_seq64.md) | **lab_2 cHMM T=64 stability** — warm, notch, 300ep, REM-recall ckpt |
+| [ablation_joint_chmm_fold4.md](ablations/ablation_joint_chmm_fold4.md) | **Joint fold-4 cHMM ablations** — 9 deltas toward NMI ≥ 0.52 |
 
 ## Per-lab in-cohort (baby step)
 

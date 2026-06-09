@@ -1,4 +1,5 @@
 
+import copy
 from typing import Iterator
 import torch
 import numpy as np
@@ -66,9 +67,17 @@ class DataLoader(Iterator):
         assert self.config.window_size is not None, "window_size must be set for non-legacy data loading."
         assert self.config.sequence_length is not None, "sequence_length must be set for non-legacy data loading."
         
+        effective_config = copy.deepcopy(self.global_config)
+        overrides = getattr(self.dataset.dataset_config, "cvae_overrides", None)
+        if overrides:
+            merged = effective_config.cvae.model_dump()
+            for key, val in overrides.items():
+                merged[key] = copy.deepcopy(val)
+            effective_config.cvae = type(effective_config.cvae)(**merged)
+
         # create preprocessing object
         vae_preprocessing = VAEPreprocessing(
-            self.global_config,
+            effective_config,
             window_size=self.config.window_size,
             stride=self.config.stride,
             sequence_length=self.config.sequence_length,

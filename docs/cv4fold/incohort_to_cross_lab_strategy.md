@@ -246,7 +246,7 @@ Reference only — not a target for holdout to match.
 
 **Hyperparams:** Do **not** copy manifest `tune_winners` wholesale. Start from locked recipe trainer settings (LR 3e-4, 200 ep lab_2/3, 300 ep lab_5), `conditioning_source: subject` only, `sequence_length` = locked T.
 
-**Status:** Joint config generator is **not** in `generate_configs.py` yet — add `--phase joint_holdout` when you commit to a harmonised recipe (see [Implementation gaps](#implementation-gaps) below).
+**Status:** Paper main line implemented — see [unified_holdout_paper_line.md](unified_holdout_paper_line.md) (`within_lab_holdout`, `joint_holdout`, per-lab `cvae_overrides`).
 
 ---
 
@@ -323,11 +323,12 @@ Same fold IDs as manifest `splits.fold_k` across per-lab and joint runs so you c
 | Piece                                            | Status  | Action                                                                                                                             |
 | ------------------------------------------------ | ------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | `generate_configs.py --phase per_lab_holdout`    | ✓       | Use now; set `sequence_length` in locked recipe when T is known                                                                    |
-| **`save_results_npz: true` on holdout/joint**    | ✗ pilot | **Enable before holdout/joint submit** — required for per-mouse NMI ([postprocess.md](postprocess.md))                             |
+| **`save_results_npz: true` on holdout/joint**    | ✓       | Enabled on `within_lab_holdout` / `joint_holdout` YAMLs ([unified_holdout_paper_line.md](unified_holdout_paper_line.md))          |
 | **`postprocess_fold.py --per-mouse-metrics`**    | ✓       | Run on every holdout and joint result dir                                                                                          |
 | Per-mouse summary CSV across folds               | manual  | Pivot `per_mouse/*/metrics.json` into mouse × fold table (script TBD)                                                              |
-| `generate_configs.py --phase joint_holdout`      | ✗       | Add: `scope=joint`, harmonised cvae, `conditioning_source: subject`, `save_results_npz: true`                                      |
-| Per-lab cvae in one joint job                    | ✗       | Strategy C — design per-dataset overrides                                                                                          |
+| `generate_configs.py --phase joint_holdout`      | ✓       | [unified_holdout_paper_line.md](unified_holdout_paper_line.md) — Phase 0 pilot fold 4 chmmgmvae first                            |
+| `generate_configs.py --phase within_lab_holdout` | ✓       | Unified recipes; 3 models × 4 folds × 3 labs                                                                                       |
+| Per-lab cvae in one joint job                    | ✓       | `DatasetConfig.cvae_overrides` + merge in `DataLoader.process_data`                                                                |
 | `LOCKED_CHMM_PRIOR_TIER` + seq T in holdout YAML | partial | `apply_model_variant(..., lab=lab)` reads prior tier; seq length still default 1 in holdout configs — **update after seq compare** |
 | Scrape helper for `ablation_chmm`                | partial | Extend `scrape_experiment_results.py` search roots if needed                                                                       |
 

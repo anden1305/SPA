@@ -18,6 +18,7 @@ Added 2026-06-07. Entry point for thesis / experiment docs.
 | [preprocessing/](preprocessing/) | Per-lab acquisition & preprocessing notes |
 | [data/](data/) | Paper cohort dump, lab mapping |
 | [plans/](plans/) | Working plans (not canonical runbooks) |
+| [paper/](paper/README.md) | Journal paper: related work, holdout ladder, Overleaf skeleton |
 
 ## External
 

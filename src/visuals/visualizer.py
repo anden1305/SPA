@@ -179,7 +179,7 @@ class Visualizer:
             x=x,
             sub_ids=sub_ids_np,
         )
-        self._plot_prior_latent_diagnostics(path=path, x_latent=mu, y=y)
+        self._plot_prior_latent_diagnostics(path=path, x_latent=mu, y=y_true)
 
     def _plot_prior_latent_diagnostics(self, path: Path, x_latent: torch.Tensor, y: torch.Tensor) -> None:
         """Post-prior μ: per-state amplitude + latent separability under ``path/``."""

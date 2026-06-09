@@ -1,5 +1,5 @@
 ---
-description: DTU GPU queues — never bmod; split submits with >50% on gpuv100
+description: DTU GPU queue mix (5/10 v100), walltimes, kill+resubmit — never bmod
 alwaysApply: true
 ---
 
@@ -7,71 +7,50 @@ alwaysApply: true
 
 ## Never use `bmod`
 
-**Students cannot change queue/walltime on existing jobs** (`bmod` → "Only administrators can run bmod").
+Students cannot change queue/walltime on existing jobs. To rebalance **PEND** jobs: **`bkill` + `bsub`** (user confirms). See [hpc-no-bmod.mdc](hpc-no-bmod.mdc).
 
-To move a **PEND** job to another queue:
-
-1. **`bkill <JOBID>`** (only when the user asked to rebalance or resubmit).
-2. **`bsub`** again with the new `#BSUB -q`.
-
-Do **not** suggest or run `bmod`. Design queue mix in the **submit script** up front, or kill + resubmit on request.
+Parse job IDs for `bkill` with: `bjobs -u $USER -p -noheader | awk '$1 ~ /^[0-9]+$/'` — raw `bjobs` output includes non-ID lines.
 
 ---
 
-## Student GPU concurrency (approximate)
+## Canonical queue mix (user preference)
 
-| Queue | Typical student parallel RUN cap | Notes |
-|-------|----------------------------------|--------|
-| **`gpuv100`** | **~4** | **Fastest drain** — default for most jobs |
-| **`gpua100`** | **~2** | Long PEND when backlog is large |
-| `gpua10`, `gpua40`, `gpul40s` | spill only | Check `bqueues` PEND before using |
+**Per 10 jobs:** 5× `gpuv100`, 2× `gpua100`, 1× `gpua10`, 1× `gpul40s`, 1× `gpua40`.
 
-Check live load:
+Implementation: [`hpc/submit/cv4fold/_queue_mix.sh`](/work3/s204070/SPA/hpc/submit/cv4fold/_queue_mix.sh)
 
 ```bash
-bqueues | egrep 'gpuv100|gpua10|gpua40|gpua100|gpul40s'
-bjobs -u $USER
+_pick_queue          # increments global JOB_IDX, sets PICKED_QUEUE
+queue="${PICKED_QUEUE}"
 ```
+
+**Never** use `queue="$(_pick_queue)"` — command substitution runs in a subshell and **JOB_IDX never increments** (all jobs land on v100).
+
+Batch resubmit (kill PEND + mixed queues): `bash hpc/submit/cv4fold/submit_redistribute_pending_queues.sh`
 
 ---
 
-## Split rule for multi-job submits
+## Walltimes (scheduling)
 
-When submitting **2+ GPU jobs** in one batch:
+Request **~2× observed runtime** so LSF backfills faster (not 6h when ~1h suffices).
 
-1. Put **>50% on `gpuv100`** (strict majority — e.g. 3/4, 4/6, 5/8).
-2. Spill the rest across **`gpua10` → `gpua40` → `gpua100` → `gpul40s`**, preferring lower PEND.
-3. Respect **`gpua100` ≈ 2 concurrent RUN** — do not put more than ~2 of your jobs there if you already have A100 RUN/PEND filling quota.
-4. **Priority jobs** (follow-ups, blockers) stay on **`gpuv100`**; spill lower-priority or long-walltime jobs first.
+| Model | Wall | Basis |
+|-------|------|--------|
+| cHMM-GMVAE (3 seeds, 200 ep, joint) | **2:00** | ~60 min observed × 2 |
+| cGMVAE (3 seeds, joint) | **1:30** | ~45 min est × 2 |
 
-### Examples
-
-| Jobs | `gpuv100` | Spill |
-|------|-----------|--------|
-| 4 | **3** | 1 (`gpua10` or `gpua40`) |
-| 6 | **4** | 1× `gpua100`, 1× `gpul40s` |
-| 12 | **7–8** | rest mixed per `bqueues` |
-
-### Submit-script pattern
-
-Use a per-job queue map (see `hpc/submit/cv4fold/submit_ablation_chmm_sweep.sh`):
-
-```bash
-JOB_QUEUES=(
-  ["lab_2/foo"]="gpuv100"
-  ["lab_3/bar"]="gpuv100"
-  ["lab_5/baz"]="gpua10"
-)
-```
-
-Default single-queue scripts to `QUEUE="gpuv100"`; override per job when batch size ≥ 2.
+Within-lab runs are often faster but same walls are fine.
 
 ---
 
-## Rebalancing an existing backlog
+## Student GPU notes
 
-Only after **user confirms** (`bkill` is destructive for pending work):
+| Queue | Role |
+|-------|------|
+| **`gpuv100`** | Primary (~50% of batch) |
+| **`gpua100`** | Second (~20%); long cluster PEND when backlog huge |
+| **`gpua10`, `gpua40`, `gpul40s`** | Spill (~10% each) |
 
-- Keep **RUN** jobs alone unless user asks to kill.
-- Move **PEND** jobs by **bkill + bsub** with the split rule above.
-- Report old JOBID → new JOBID and new queue in the reply.
+Check: `bqueues | egrep 'gpuv100|gpua10|gpua40|gpua100|gpul40s'`
+
+`#BSUB -n 4` + `#BSUB -gpu "num=1:mode=exclusive_process"` + `span[hosts=1]` for GPU jobs.

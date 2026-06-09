@@ -115,6 +115,10 @@ class DatasetConfig(BaseModel):
         default=None,
         description="MSSV only: override channel list (e.g. EEG1, EEG3, EMG) from manifest lab_signals.",
     )
+    cvae_overrides: dict[str, Any] | None = Field(
+        default=None,
+        description="Optional per-dataset CVAE preprocessing overrides (bands, postnorm, notch, etc.).",
+    )
     # No hardcoded constants - dataset selection is fully configurable
     
 class CVAE(BaseModel):

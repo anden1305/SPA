@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 from pathlib import Path
 from typing import Any
 
@@ -46,6 +47,27 @@ def train_mice(manifest: dict, fold: int, scope: str, lab: str | None = None) ->
             raise ValueError("lab required for per_lab scope")
         pool = list(manifest["cohort"][lab])
     return [m for m in pool if m not in holdout]
+
+
+def lab_for_mouse(manifest: dict, mouse_id: str) -> str:
+    return manifest["inventory"][mouse_id]["lab"]
+
+
+def dataset_entries_with_lab_prepro(
+    manifest: dict,
+    mouse_ids: list[str],
+    *,
+    extract_cvae_overrides,
+) -> list[dict]:
+    """Build dataset entries with per-lab ``cvae_overrides`` from locked incohort prepro."""
+    entries: list[dict] = []
+    for mouse_id in mouse_ids:
+        lab = lab_for_mouse(manifest, mouse_id)
+        for entry in dataset_entries(manifest, [mouse_id]):
+            entry = copy.deepcopy(entry)
+            entry["cvae_overrides"] = extract_cvae_overrides(lab)
+            entries.append(entry)
+    return entries
 
 
 def dataset_entries(manifest: dict, mouse_ids: list[str]) -> list[dict]:

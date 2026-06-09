@@ -52,6 +52,80 @@ LOCKED_CHMM_SEQUENCE_LENGTH: dict[str, int] = {
 
 LOCKED_CGMVAE_SEQUENCE_LENGTH: int = 1
 
+# Paper main line: one unified recipe per model family (within-lab + joint scopes).
+PAPER_MODELS = ("cgmvae", "hmmgmvae", "chmmgmvae")
+UNIFIED_LATENT_DIM = 6
+UNIFIED_EMB_DIM = 4
+UNIFIED_JOINT_HMM_SEQUENCE_LENGTH = 64
+
+CVAE_OVERRIDE_KEYS = (
+    "normalize_global",
+    "pre_normalize",
+    "post_normalize",
+    "robust_normalize",
+    "band_pass_freqs",
+    "notch_freqs",
+    "append_channel_rms",
+    "percentile_clip_channels",
+    "perform_hanning_window",
+    "band_pass_filter_fft",
+    "band_pass_filter_type",
+)
+
+UNIFIED_WIDE_MLP_PARAMS: dict[str, Any] = {
+    "latent_dim": UNIFIED_LATENT_DIM,
+    "enc_hidden_dims": [512, 256, 128],
+    "dec_hidden_dims": [128, 256, 512],
+    "conv_channels": [32, 64, 128, 128],
+    "kernel_sizes": [7, 5, 5, 3],
+    "strides": [2, 2, 2, 2],
+    "paddings": [3, 2, 2, 1],
+    "lags": [1, 2, 4],
+    "ridge": 0.1,
+    "var_reg": 0.05,
+    "sticky_coef": 0.1,
+    "sticky_kappa": 0.9,
+    "decoder_only_conditioning": True,
+    "use_rms": False,
+    "min_beta": 0.01,
+    "max_beta": 1.0,
+    "beta_warmup_epochs": 0,
+    "beta_slowdown_epochs": 0,
+    "gmm_warmup_epochs": 0,
+    "free_nats_per_dim": 0.0,
+    "no_beta_epochs": 10,
+}
+
+UNIFIED_DATALOADER: dict[str, Any] = {
+    "num_batches": 64,
+    "batch_size": 128,
+    "validation_batch_size": 128,
+    "window_size": 512,
+    "stride": 512,
+    "shuffle": True,
+    "normalize": True,
+    "use_legacy": False,
+    "transforms": [],
+}
+
+UNIFIED_TRAINER_BASE: dict[str, Any] = {
+    "epochs": 200,
+    "optimizer": "adam",
+    "grad_clip": 0.5,
+    "validate_per_epoch": 1,
+    "early_stopping": {
+        "enabled": False,
+        "patience": 100,
+        "min_delta": 0.001,
+    },
+    "scheduler": {
+        "enabled": False,
+        "type": "exponential",
+        "step_size": None,
+        "gamma": 0.99,
+    },
+}
+
 CHMMGMVAE_SIMPLE_OVERRIDES: dict[str, Any] = {
     "prior": "hmm_gmm",
     "num_gmm_states": 3,
@@ -187,11 +261,11 @@ def apply_model_variant(
             "hmm_estimate_transitions",
         ):
             params.pop(key, None)
-    elif model == "chmmgmvae":
+    elif model in ("chmmgmvae", "hmmgmvae"):
         tier = resolve_chmm_prior_tier(lab, prior_tier)
         apply_chmm_prior_tier(params, tier)
     else:
-        raise ValueError(f"Unknown model {model!r}; use cgmvae or chmmgmvae")
+        raise ValueError(f"Unknown model {model!r}; use cgmvae, hmmgmvae, or chmmgmvae")
     return out
 
 
@@ -203,13 +277,90 @@ def apply_locked_sequence_length(
     """Set ``dataloader.sequence_length`` from per-lab locks (cHMM never seq=1)."""
     out = copy.deepcopy(cfg)
     dl = out.setdefault("dataloader", {})
-    if model == "chmmgmvae":
-        if lab not in LOCKED_CHMM_SEQUENCE_LENGTH:
-            raise ValueError(
-                f"No locked cHMM sequence_length for {lab!r}. "
-                "Add an entry to LOCKED_CHMM_SEQUENCE_LENGTH in locked_recipes.py."
-            )
-        dl["sequence_length"] = LOCKED_CHMM_SEQUENCE_LENGTH[lab]
+    if model in ("chmmgmvae", "hmmgmvae"):
+        if lab is not None and lab in LOCKED_CHMM_SEQUENCE_LENGTH:
+            dl["sequence_length"] = LOCKED_CHMM_SEQUENCE_LENGTH[lab]
+        else:
+            dl["sequence_length"] = UNIFIED_JOINT_HMM_SEQUENCE_LENGTH
     else:
         dl["sequence_length"] = LOCKED_CGMVAE_SEQUENCE_LENGTH
     return out
+
+
+def extract_lab_cvae_overrides(lab: str) -> dict[str, Any]:
+    """Per-lab front-end from incohort lock (full cvae block minus checkpoint paths)."""
+    if lab not in LOCKED_SOURCES:
+        raise KeyError(f"Unknown lab {lab!r}")
+    prepro = _load_yaml(str(LOCKED_SOURCES[lab]["prepro"]))
+    cvae = copy.deepcopy(prepro.get("cvae", {}))
+    for key in ("model_checkpoint_path", "save_pretrained_checkpoint", "traning_pipeline"):
+        cvae.pop(key, None)
+    return {k: cvae[k] for k in CVAE_OVERRIDE_KEYS if k in cvae}
+
+
+def _deep_merge_cvae(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    out = copy.deepcopy(base)
+    for key, val in override.items():
+        out[key] = copy.deepcopy(val)
+    return out
+
+
+def apply_unified_sequence_length(cfg: dict[str, Any], model: str) -> dict[str, Any]:
+    out = copy.deepcopy(cfg)
+    dl = out.setdefault("dataloader", {})
+    if model == "cgmvae":
+        dl["sequence_length"] = LOCKED_CGMVAE_SEQUENCE_LENGTH
+    else:
+        dl["sequence_length"] = UNIFIED_JOINT_HMM_SEQUENCE_LENGTH
+    return out
+
+
+def apply_unified_recipe(cfg: dict[str, Any], model: str) -> dict[str, Any]:
+    """Apply paper-line unified hyperparams for one model family."""
+    out = copy.deepcopy(cfg)
+    out.setdefault("trainer", {}).update(copy.deepcopy(UNIFIED_TRAINER_BASE))
+    out["dataloader"] = copy.deepcopy(UNIFIED_DATALOADER)
+    out = apply_unified_sequence_length(out, model)
+
+    params = out.setdefault("model", {}).setdefault("params", {})
+    params.update(copy.deepcopy(UNIFIED_WIDE_MLP_PARAMS))
+    params["latent_dim"] = UNIFIED_LATENT_DIM
+
+    if model == "cgmvae":
+        out["trainer"]["learning_rate"] = 3e-4
+        params["emb_dim"] = UNIFIED_EMB_DIM
+        params["prior"] = "gmm"
+        params.setdefault("num_gmm_states", 3)
+        for key in (
+            *CHMM_WARMUP_KEYS,
+            "hmm_sticky_kappa",
+            "hmm_estimate_transitions",
+        ):
+            params.pop(key, None)
+    elif model == "chmmgmvae":
+        out["trainer"]["learning_rate"] = 0.0013
+        params["emb_dim"] = UNIFIED_EMB_DIM
+        apply_chmm_prior_tier(params, "simple")
+    elif model == "hmmgmvae":
+        out["trainer"]["learning_rate"] = 0.0013
+        params["emb_dim"] = 0
+        apply_chmm_prior_tier(params, "simple")
+    else:
+        raise ValueError(f"Unknown paper model {model!r}")
+
+    out.setdefault("cvae", {})
+    out["cvae"].setdefault("normalize_global", False)
+    out["cvae"]["model_checkpoint_path"] = None
+    out["cvae"]["save_pretrained_checkpoint"] = False
+    out["cvae"]["traning_pipeline"] = "cvae"
+    out.setdefault("model", {}).setdefault("params", {})["decoder_only_conditioning"] = True
+    out["runs"] = 3
+    out["seed"] = 123
+    out.setdefault("visualizer", {})["save_results_npz"] = True
+    return ensure_cv4fold_diagnostics(out)
+
+
+def build_unified_holdout_skeleton(model: str) -> dict[str, Any]:
+    """Scratch config skeleton for paper-line holdout (no datasets). Base from lab_3 wide_mlp."""
+    base = load_locked_recipe("lab_3")
+    return apply_unified_recipe(base, model)

@@ -49,3 +49,5 @@ Logs: `hpc/output/cv4fold/ablation_chmm_seq64/lab_2/<variant>_%J.out`
 Results: `results/cv4fold/ablation_chmm_seq64/lab_2/`
 
 **Gate:** ≥2/3 healthy seeds and best-of-3 **> 0.546** before updating holdout lock.
+
+**Winner (2026-06-08):** `sweep_chmm_winner_seq64` — best **0.576**, 3/3 healthy. Incohort **ceiling** reference only; paper main line uses unified recipe in [unified_holdout_paper_line.md](../unified_holdout_paper_line.md).

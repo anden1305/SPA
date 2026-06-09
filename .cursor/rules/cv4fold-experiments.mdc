@@ -1,0 +1,50 @@
+---
+description: cv4fold paper line — locked recipes, fair comparison, postprocess, disk
+globs: hpc/submit/cv4fold/**,scripts/cv4fold/**,docs/cv4fold/**
+alwaysApply: false
+---
+
+# cv4fold experiment conventions (SPA)
+
+Canonical doc: [`docs/cv4fold/unified_holdout_paper_line.md`](/work3/s204070/SPA/docs/cv4fold/unified_holdout_paper_line.md)
+
+## Locked fair-comparison recipes (joint + within-lab)
+
+| | cGMVAE | cHMM-GMVAE |
+|--|--------|------------|
+| latent / emb | 6 / **8** | 6 / **8** |
+| lr | **1.3e-3** | **1.3e-3** |
+| T | 1 | 64 |
+| prior | gmm | warm_hmm_gmm, κ=0.92 |
+
+Shared: wide_mlp, `decoder_only_conditioning: true`, per-lab `cvae_overrides`, `runs: 3`, best-of-3 NMI.
+
+Generators: `generate_joint_locked_holdout.py`, `generate_within_lab_locked_holdout.py`  
+YAML: `joint_holdout/fold_{k}/{cgmvae,chmmgmvae}_locked.yaml`, `unified_holdout/{lab}/fold_{k}/...`
+
+**Do not** compare absolute NMI between **within-lab** vs **joint** scopes — different train/val pools. **Do** compare cGMVAE vs cHMM **within** each scope.
+
+## Postprocess (per-mouse / per-lab)
+
+Locked configs set `save_results_npz: true`. After jobs finish:
+
+```bash
+PYTHONPATH=. python3 scripts/cv4fold/postprocess_fold.py \
+  --result-root results/.../<run_ts>/ --per-mouse-metrics
+```
+
+- **Joint** per-lab NMI in `val_nmi_by_lab.csv` needs `--per-mouse-metrics` (default duplicates pooled NMI per lab).
+- **Within-lab** val is single-lab; per-mouse still useful.
+
+## Disk hygiene
+
+Bulk lives in `plots/*/results.npz` and `*.pth`. Documented incohort ablations (NMI in `docs/cv4fold/ablations/`) — safe to delete **npz** or whole trees when locks are in `locked_recipes.py`. **Keep** `ablation_joint_chmm/`, `joint_holdout/*_locked/`, `unified_holdout/*_locked/` until postprocessed.
+
+Quota: `getquota_work3.sh` (work3 ~200 GiB).
+
+## Ablation → lock workflow
+
+1. Fold-4 joint ablations on chmm (`generate_ablation_joint_chmm_fold4.py`).
+2. Lock winner (e.g. `warm_emb8_sticky92`), match cGMVAE emb8 + lr.
+3. Generalize: joint folds 1–4 + within-lab 3 labs × 4 folds.
+4. Submit via mixed-queue scripts; fold 4 last in **submission order** only (no LSF deps unless user asks).

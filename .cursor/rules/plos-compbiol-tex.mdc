@@ -1,0 +1,55 @@
+---
+description: PLOS Computational Biology LaTeX formatting when editing paper manuscripts
+globs: docs/paper/**/*.tex,paper/overleaf/**/*.tex
+alwaysApply: false
+---
+
+# PLOS Computational Biology — LaTeX rules
+
+Canonical manuscript: [`docs/paper/plos_my_paper.tex`](docs/paper/plos_my_paper.tex). Read-only template reference: [`docs/paper/plos_template.tex`](docs/paper/plos_template.tex).
+
+Official guides: [LaTeX](https://journals.plos.org/ploscompbiol/s/latex), [Submission guidelines](https://journals.plos.org/ploscompbiol/s/submission-guidelines), [Figures](https://journals.plos.org/ploscompbiol/s/figures).
+
+## Structure (single file)
+
+- One `.tex` file only — **no** `\input`, `\externaldocument`, or `\include` for manuscript body.
+- Do **not** delete packages listed in the PLOS template preamble.
+- Section order: Title page → Abstract → Author summary → Introduction → Results → Discussion → Materials and methods → Acknowledgments → References → Supporting information captions.
+- Use `\section*{}` for unnumbered main sections; **≤3** heading levels (`\section*`, `\subsection*`, `\subsubsection*`).
+- `\linenumbers` after `\newgeometry`; remove before final acceptance.
+
+## Figures and tables
+
+- **No `\includegraphics`** in the manuscript `.tex` — figures upload separately at submission.
+- Use caption-only `\begin{figure}...\end{figure}`; describe panels in the caption (**A:**, **B:**, …), not `\subfigure`.
+- Cite **Fig** (not Figure), **Table**, **Eq** (not Equation).
+- Place each figure/table environment **immediately after** the first paragraph that cites it (read order).
+- Submission file names: `Fig1.tif`, `Fig2.tif`, … (match `\label{fig1}` citations).
+- Combined multi-panel figures = one image file before upload.
+
+## Text and style
+
+- Title: sentence case, ≤200 characters. Short title ≤70 characters.
+- Abstract: ≤300 words, **no citations**.
+- Author summary: 150–200 words, **first person** (required for PLOS Comp Biol).
+- Species: italics, e.g. `\textit{Mus musculus}`.
+- No footnotes. No colored `\todo{}` in submission PDF — use `% TODO:` comments only.
+- No graphics or colored text in body (table cell shading via `xcolor` OK).
+
+## References and availability
+
+- `\bibliographystyle{plos2025}` + `\bibliography{references}`; bib file: [`docs/paper/references.bib`](docs/paper/references.bib).
+- Vancouver numbered citations via `\cite{}`.
+- Include **Data availability** and **Code availability** statements in Materials and methods.
+- Funding/competing interests go in Editorial Manager fields, not Acknowledgments body.
+
+## Supporting information
+
+- List SI captions at end of manuscript (`\paragraph*{S1 Fig.}` + `\label{S1_Fig}`).
+- Cite SI with `\nameref{S1_Fig}` when needed.
+
+## Agent workflow
+
+- Edit `plos_my_paper.tex`, not `plos_template.tex`.
+- Export figures via `scripts/paper/` → `docs/paper/figures/` and copy to Overleaf upload folder.
+- [`paper/overleaf/`](paper/overleaf/) is figure/table staging only.

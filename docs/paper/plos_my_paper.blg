@@ -1,0 +1,54 @@
+This is BibTeX, Version 0.99d (TeX Live 2024)
+Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
+The top-level auxiliary file: plos_my_paper.aux
+The style file: plos2025.bst
+Reallocated glb_str_ptr (elt_size=4) to 20 items from 10.
+Reallocated global_strs (elt_size=200001) to 20 items from 10.
+Reallocated glb_str_end (elt_size=4) to 20 items from 10.
+Reallocated wiz_functions (elt_size=4) to 6000 items from 3000.
+Database file #1: references.bib
+Warning--empty pages in dilokthanakul2016gmvae
+Warning--empty pages in sohn2015cvae
+Warning--empty pages in johnson2016svae
+You've used 17 entries,
+            3507 wiz_defined-function locations,
+            798 strings with 9164 characters,
+and the built_in function-call counts, 34634 in all, are:
+= -- 3931
+> -- 335
+< -- 152
++ -- 148
+- -- 67
+* -- 2803
+:= -- 3765
+add.period$ -- 79
+call.type$ -- 17
+change.case$ -- 15
+chr.to.int$ -- 356
+cite$ -- 20
+duplicate$ -- 2698
+empty$ -- 3377
+format.name$ -- 79
+if$ -- 8097
+int.to.chr$ -- 0
+int.to.str$ -- 17
+missing$ -- 183
+newline$ -- 103
+num.names$ -- 17
+pop$ -- 474
+preamble$ -- 1
+purify$ -- 0
+quote$ -- 0
+skip$ -- 380
+stack$ -- 0
+substring$ -- 6627
+swap$ -- 456
+text.length$ -- 37
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 0
+warning$ -- 3
+while$ -- 165
+width$ -- 19
+write$ -- 213
+(There were 3 warnings)
