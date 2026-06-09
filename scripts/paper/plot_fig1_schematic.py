@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fig 1 overview: MSSV cv4fold, train vs zero-shot eval, model ladder."""
+"""Fig 1: MSSV cv4fold, zero-shot inference, model ladder (publication layout)."""
 
 from __future__ import annotations
 
@@ -7,112 +7,107 @@ import argparse
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
+from matplotlib.patches import FancyArrowPatch, FancyBboxPatch, Rectangle
+
+from scripts.paper.plot_style import LADDER_COLORS, LADDER_LABELS, apply_paper_style, panel_label, save_figure
 
 REPO = Path(__file__).resolve().parents[2]
 
 
-def _panel_label(ax, letter: str) -> None:
-    ax.text(-0.08, 1.05, letter, transform=ax.transAxes, fontsize=14, fontweight="bold", va="top")
+def _rounded_box(ax, xy, w, h, text, *, fc="#F8FAFC", ec="#334155", fontsize=8, bold=False):
+    x, y = xy
+    ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.04,rounding_size=0.08", fc=fc, ec=ec, lw=0.9))
+    ax.text(x + w / 2, y + h / 2, text, ha="center", va="center", fontsize=fontsize, fontweight="bold" if bold else "normal")
 
 
 def draw_panel_a(ax) -> None:
-    ax.set_xlim(0, 10)
-    ax.set_ylim(0, 6)
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
     ax.axis("off")
-    _panel_label(ax, "A")
-    labs = [("Lab 2", 1.5), ("Lab 3", 5.0), ("Lab 5", 8.5)]
-    for name, x in labs:
-        ax.add_patch(FancyBboxPatch((x - 1, 3.5), 2, 1.8, boxstyle="round,pad=0.05", fc="#e8f4fc", ec="#333"))
-        ax.text(x, 4.4, name, ha="center", fontsize=9, fontweight="bold")
-        ax.text(x, 3.9, "mice", ha="center", fontsize=8)
-    ax.add_patch(FancyBboxPatch((0.5, 0.8), 9, 2.0, boxstyle="round,pad=0.08", fc="#f5f5f5", ec="#666", linestyle="--"))
-    ax.text(5, 2.3, "4-fold CV (leave mice out)", ha="center", fontsize=10, fontweight="bold")
-    ax.text(2.5, 1.5, "Train folds\n(3 labs)", ha="center", fontsize=8)
-    ax.text(7.5, 1.5, "Held-out fold\n(zero-shot eval)", ha="center", fontsize=8)
-    ax.annotate("", xy=(6.5, 1.8), xytext=(3.5, 1.8), arrowprops=dict(arrowstyle="->", lw=1.5))
-    ax.text(5, 0.3, "MSSV (OpenNeuro ds006366)", ha="center", fontsize=8, style="italic")
+    panel_label(ax, "A", x=-0.06, y=1.02)
+
+    for i, (lab, x) in enumerate([("Lab 2", 0.12), ("Lab 3", 0.42), ("Lab 5", 0.72)]):
+        _rounded_box(ax, (x, 0.62), 0.22, 0.22, f"{lab}\nEEG + EMG", fc="#EFF6FF", ec="#3B82F6", bold=True)
+
+    ax.add_patch(Rectangle((0.05, 0.12), 0.9, 0.38, fill=False, ec="#94A3B8", lw=1.0, linestyle=(0, (4, 3))))
+    ax.text(0.5, 0.44, "4-fold cross-validation (leave mice out)", ha="center", fontsize=9, fontweight="bold")
+    _rounded_box(ax, (0.1, 0.18), 0.32, 0.18, "Train: 3 folds\n(all labs)", fc="#F0FDF4", ec="#16A34A")
+    _rounded_box(ax, (0.58, 0.18), 0.32, 0.18, "Test: held-out mice\n(zero-shot)", fc="#FEF3C7", ec="#D97706")
+    ax.annotate("", xy=(0.58, 0.27), xytext=(0.42, 0.27), arrowprops=dict(arrowstyle="-|>", lw=1.2, color="#64748B"))
+    ax.text(0.5, 0.04, "MSSV · OpenNeuro ds006366", ha="center", fontsize=7.5, color="#64748B", style="italic")
 
 
 def draw_panel_b(ax) -> None:
-    ax.set_xlim(0, 10)
-    ax.set_ylim(0, 6)
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
     ax.axis("off")
-    _panel_label(ax, "B")
+    panel_label(ax, "B", x=-0.06, y=1.02)
 
-    def box(x, y, w, h, text, fc="#fff", ec="#333"):
-        ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.05", fc=fc, ec=ec))
-        ax.text(x + w / 2, y + h / 2, text, ha="center", va="center", fontsize=7)
+    ax.text(0.25, 0.92, "Training", ha="center", fontsize=9, fontweight="bold", color="#334155")
+    ax.text(0.75, 0.92, "Holdout inference", ha="center", fontsize=9, fontweight="bold", color="#1D4ED8")
 
-    ax.text(2.5, 5.5, "Training", ha="center", fontsize=10, fontweight="bold")
-    box(0.5, 3.8, 1.6, 0.9, "EEG/EMG")
-    box(2.3, 3.8, 1.6, 0.9, "Encoder\n(no subj. ID)")
-    box(4.1, 3.8, 1.4, 0.9, "Latent z")
-    box(0.5, 2.3, 1.6, 0.9, "Decoder\n+ subj. emb.")
-    ax.annotate("", xy=(2.2, 2.7), xytext=(4.8, 3.8), arrowprops=dict(arrowstyle="->", lw=1))
-    ax.annotate("", xy=(1.3, 3.8), xytext=(0.5, 3.2), arrowprops=dict(arrowstyle="->", lw=1))
-    ax.annotate("", xy=(2.3, 4.25), xytext=(1.3, 4.25), arrowprops=dict(arrowstyle="->", lw=1))
-    ax.annotate("", xy=(4.1, 4.25), xytext=(3.9, 4.25), arrowprops=dict(arrowstyle="->", lw=1))
+    # Train path
+    for label, x in [("Signal", 0.04), ("Encoder", 0.20), ("Latent", 0.36)]:
+        _rounded_box(ax, (x, 0.55), 0.12, 0.18, label)
+    _rounded_box(ax, (0.04, 0.28), 0.18, 0.16, "Decoder\n+ subject ID", fc="#FDF2F8", ec="#DB2777")
+    for x0, x1 in [(0.16, 0.20), (0.32, 0.36)]:
+        ax.annotate("", xy=(x1, 0.64), xytext=(x0, 0.64), arrowprops=dict(arrowstyle="-|>", lw=1.0))
+    ax.annotate("", xy=(0.10, 0.44), xytext=(0.42, 0.55), arrowprops=dict(arrowstyle="-|>", lw=0.9, color="#DB2777"))
 
-    ax.text(7.5, 5.5, "Holdout (zero-shot)", ha="center", fontsize=10, fontweight="bold", color="#1565c0")
-    box(6.0, 3.8, 1.6, 0.9, "EEG/EMG")
-    box(7.8, 3.8, 1.6, 0.9, "Encoder\n(no subj. ID)")
-    box(6.0, 2.3, 3.4, 0.9, "HMM--GMM prior → states", fc="#e3f2fd", ec="#1565c0")
-    ax.annotate("", xy=(7.8, 4.25), xytext=(6.8, 4.25), arrowprops=dict(arrowstyle="->", lw=1.5, color="#1565c0"))
-    ax.annotate("", xy=(7.7, 3.2), xytext=(8.6, 3.8), arrowprops=dict(arrowstyle="->", lw=1.5, color="#1565c0"))
-    ax.text(5, 0.5, "No subject ID · no AccuSleep calibration", ha="center", fontsize=8, color="#1565c0")
+    # Eval path
+    for x, t in [(0.58, "Signal"), (0.74, "Encoder")]:
+        _rounded_box(ax, (x, 0.55), 0.12, 0.18, t, fc="#EFF6FF", ec="#1D4ED8")
+    _rounded_box(ax, (0.58, 0.28), 0.28, 0.16, "HMM–GMM prior\n→ sleep states", fc="#DBEAFE", ec="#1D4ED8", bold=True)
+    ax.annotate("", xy=(0.74, 0.64), xytext=(0.70, 0.64), arrowprops=dict(arrowstyle="-|>", lw=1.2, color="#1D4ED8"))
+    ax.annotate("", xy=(0.72, 0.44), xytext=(0.80, 0.55), arrowprops=dict(arrowstyle="-|>", lw=1.2, color="#1D4ED8"))
+    ax.text(0.5, 0.06, "No subject ID at staging · no per-mouse calibration", ha="center", fontsize=7.5, color="#1D4ED8")
 
 
 def draw_panel_c(ax) -> None:
-    ax.set_xlim(0, 10)
-    ax.set_ylim(0, 6)
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
     ax.axis("off")
-    _panel_label(ax, "C")
-    rungs = [
-        ("HMM\n(features)", "#9e9e9e"),
-        ("HMMGMVAE", "#4daf4a"),
-        ("cGMVAE", "#377eb8"),
-        ("cHMM--GMVAE", "#984ea3"),
-    ]
-    y = 4.5
-    for i, (label, color) in enumerate(rungs):
-        x = 0.8 + i * 2.2
-        ax.add_patch(FancyBboxPatch((x, y), 1.8, 1.2, boxstyle="round,pad=0.05", fc=color, ec="#333", alpha=0.85))
-        ax.text(x + 0.9, y + 0.6, label, ha="center", va="center", fontsize=8, color="white", fontweight="bold")
-        if i < len(rungs) - 1:
-            ax.annotate("", xy=(x + 2.0, y + 0.6), xytext=(x + 1.85, y + 0.6),
-                        arrowprops=dict(arrowstyle="->", lw=1.5))
-    ax.text(5, 2.5, "Locked recipes · same features · prior NMI", ha="center", fontsize=9)
-    ax.text(5, 1.5, "+ temporal prior", ha="center", fontsize=8, style="italic")
-    ax.annotate("", xy=(8.5, 3.2), xytext=(8.5, 2.8), arrowprops=dict(arrowstyle="->", lw=1))
+    panel_label(ax, "C", x=-0.06, y=1.02)
+
+    keys = ["hmm_features", "hmmgmvae_locked", "cgmvae_locked", "chmmgmvae_locked"]
+    n = len(keys)
+    w = 0.19
+    gap = 0.025
+    x0 = 0.06
+    y = 0.45
+    for i, key in enumerate(keys):
+        x = x0 + i * (w + gap)
+        color = LADDER_COLORS[key]
+        label = LADDER_LABELS[key].replace("–", "-")  # matplotlib font
+        ax.add_patch(FancyBboxPatch((x, y), w, 0.28, boxstyle="round,pad=0.03", fc=color, ec="white", lw=0.5))
+        ax.text(x + w / 2, y + 0.14, label, ha="center", va="center", fontsize=7.5, color="white", fontweight="bold")
+        if i < n - 1:
+            ax.annotate("", xy=(x + w + gap * 0.2, y + 0.14), xytext=(x + w, y + 0.14),
+                        arrowprops=dict(arrowstyle="-|>", lw=1.5, color="#64748B"))
+    ax.text(0.5, 0.22, "Locked recipes · identical features · prior-prediction NMI", ha="center", fontsize=8, color="#475569")
+    ax.annotate("temporal prior", xy=(0.88, 0.78), xytext=(0.88, 0.62),
+                arrowprops=dict(arrowstyle="-|>", color="#7C3AED", lw=1.2), fontsize=7, color="#7C3AED", ha="center")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--out",
-        type=Path,
-        default=REPO / "docs/paper/figures/Fig1.tif",
-    )
+    parser.add_argument("--out", type=Path, default=REPO / "docs/paper/figures/Fig1.pdf")
     args = parser.parse_args()
 
-    fig, axes = plt.subplots(3, 1, figsize=(7, 9))
+    apply_paper_style()
+    fig, axes = plt.subplots(1, 3, figsize=(7.2, 2.6))
     draw_panel_a(axes[0])
     draw_panel_b(axes[1])
     draw_panel_c(axes[2])
-    fig.suptitle("Fig 1 — Study overview", fontsize=12, fontweight="bold", y=0.98)
-    fig.tight_layout(rect=[0, 0, 1, 0.96])
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(args.out, dpi=300, pil_kwargs={"compression": "tiff_lzw"})
-    fig.savefig(args.out.with_suffix(".pdf"), dpi=200)
+    fig.subplots_adjust(wspace=0.35, left=0.06, right=0.98, top=0.92, bottom=0.08)
+    save_figure(fig, args.out)
     plt.close(fig)
-    # Mirror to overleaf staging
+
+    import shutil
     staging = REPO / "paper/overleaf/figures/figure1_overview.pdf"
     staging.parent.mkdir(parents=True, exist_ok=True)
-    import shutil
-    shutil.copy(args.out.with_suffix(".pdf"), staging)
-    print(f"Wrote {args.out} and {args.out.with_suffix('.pdf')}")
+    shutil.copy(args.out, staging)
+    print(f"Wrote {args.out}")
     return 0
 
 

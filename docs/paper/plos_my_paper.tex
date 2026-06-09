@@ -1,7 +1,7 @@
 % Template for PLoS
 % Version 3.8 Apr 2026
 %
-% % % % % % % % % % % % % % % % % % % % % %
+% % % % % % % % % % % % % % % % % % % % % % %
 %
 % -- IMPORTANT NOTE
 %
@@ -194,7 +194,7 @@ Manual scoring of mouse sleep from electroencephalography (EEG) and electromyogr
 We present an unsupervised computational framework for population-level sleep staging on the Mouse Sleep Staging Validation dataset (MSSV; OpenNeuro ds006366), comparing a controlled model ladder on identical features and evaluation protocols: feature-domain hidden Markov model (HMM), HMM--Gaussian mixture variational autoencoder (HMMGMVAE) without subject conditioning, decoder-only conditional GMVAE (cGMVAE), and decoder-only conditional HMM--GMVAE (cHMM--GMVAE) with a warm sticky HMM--Gaussian mixture model (GMM) latent prior.
 Models are trained on leave-mice-out cross-validation folds pooling laboratories 2, 3, and 5.
 Held-out mice are staged by zero-shot inference: spectral epochs are encoded without subject identifiers and states are assigned from the learned mixture prior only, without per-mouse manual calibration.
-On joint cross-lab holdout, cHMM--GMVAE achieves best-of-three prior normalized mutual information (NMI) up to 0.65, compared with 0.28--0.41 for matched cGMVAE and 0.51 for a feature HMM baseline.
+On joint cross-lab holdout, cHMM--GMVAE achieves mean best-of-three prior normalized mutual information (NMI) 0.56 across four folds (range 0.38--0.65), compared with 0.33 for matched cGMVAE and 0.51 for a feature HMM baseline.
 A substage resolution sweep and physiology panels refine wake, NREM, and REM structure and reveal transition substates at macro boundaries.
 These results show that decoder-only conditioning with temporal mixture priors improves unsupervised generalization across mice and acquisition sites while supporting biologically interpretable substage discovery.
 
@@ -224,40 +224,43 @@ Synthetic validation, encoder+decoder ablations, and full $K{=}13$ taxonomy are 
 \section*{Results}
 
 \subsection*{Cross-lab holdout ladder}
-We evaluated a locked model ladder under joint population training with leave-mice-out four-fold cross-validation across MSSV laboratories 2, 3, and 5 (Fig~\ref{fig1}).
-Fig~\ref{fig1}A summarizes the cohort split; Fig~\ref{fig1}B contrasts training (decoder with subject embedding) with zero-shot holdout staging (encoder and mixture prior only, no subject identifier); Fig~\ref{fig1}C lists ladder rungs.
-Fig~\ref{fig2} and Table~\ref{table1} report best-of-three prior NMI on held-out mice.
+We evaluated decoder-only conditional models under joint population training with leave-mice-out four-fold cross-validation across MSSV laboratories 2, 3, and 5 (Fig~\ref{fig1}).
+Training uses subject embeddings in the decoder only; holdout staging encodes EEG/EMG without subject identifiers and assigns states from the learned HMM--GMM prior (Fig~\ref{fig1}B), contrasting with per-mouse calibration in AccuSleep~\cite{barger2019accusleep}.
+Fig~\ref{fig2} summarizes prior NMI on held-out mice; Table~\ref{table1} lists per-fold values.
 
 \begin{figure}[!h]
 \caption{\textbf{Study overview and zero-shot holdout protocol.}
-A: MSSV multi-laboratory cohort with four-fold cross-validation; mice from three folds train a population model evaluated on the held-out fourth fold.
-B: Training uses decoder-only subject conditioning for reconstruction; holdout staging encodes EEG/EMG without subject identifiers and assigns states from the HMM--GMM prior only (contrast with per-mouse calibration in AccuSleep~\cite{barger2019accusleep}).
-C: Model ladder from feature HMM through HMMGMVAE, cGMVAE, and cHMM--GMVAE.}
+\textbf{A,} MSSV multi-laboratory cohort with four-fold cross-validation; mice from three folds train a population model evaluated on the held-out fourth fold.
+\textbf{B,} Training uses decoder-only subject conditioning for reconstruction; holdout staging encodes EEG/EMG without subject identifiers and assigns states from the HMM--GMM prior only.
+\textbf{C,} Model ladder from feature HMM through HMMGMVAE, cGMVAE, and cHMM--GMVAE.}
 \label{fig1}
 \end{figure}
 
-On completed joint folds, cHMM--GMVAE exceeded cGMVAE by 0.11--0.35 NMI (joint mean 0.55 vs.\ 0.33 over three to four folds).
-Within-lab holdout showed laboratory heterogeneity: cHMM--GMVAE led on laboratory 3 (up to 0.746 NMI) while cGMVAE remained competitive on laboratory 2 (\nameref{S2_Fig}, \nameref{S2_Table}).
-HMMGMVAE locked runs were pending at manuscript preparation; per-fold breakdown is in \nameref{S1_Fig}.
+Across four completed joint folds, cHMM--GMVAE exceeded cGMVAE on every fold (mean prior NMI 0.56 vs.\ 0.33; $\Delta = +0.22$).
+The gain was largest on folds 1 and 4 (0.25 and 0.35 NMI) and smallest on fold 2 (0.11), where both models fell below the thesis feature HMM reference (0.51).
+Within-lab holdout revealed laboratory heterogeneity: cHMM--GMVAE led on laboratory 3 (up to 0.76 NMI) while cGMVAE remained competitive on laboratory 2 (\nameref{S2_Fig}, \nameref{S2_Table}).
+HMMGMVAE locked holdout runs are in progress; the full four-rung ladder including per-fold breakdown is in \nameref{S1_Fig}.
 
 \begin{figure}[!h]
 \caption{\textbf{Joint cross-lab holdout prior NMI.}
-Bars show mean best-of-three prior NMI across completed folds for each ladder rung; dashed line marks thesis HMM feature baseline (0.51).
-HMMGMVAE bar pending locked holdout completion.}
+\textbf{A,} Mean best-of-three prior NMI across four folds for cGMVAE and cHMM--GMVAE; error bars span fold min--max; dashed line marks thesis feature HMM baseline (0.51).
+\textbf{B,} Per-fold grouped bars (labs 2, 3, and 5 pooled).}
 \label{fig2}
 \end{figure}
 
 \begin{table}[!ht]
 \centering
 \caption{\textbf{Joint holdout prior NMI by fold (best-of-three seeds, locked recipes).}}
-\begin{tabular}{|l|r|r|r|r|}
+\begin{tabular}{|l|r|r|r|}
 \hline
-\textbf{Fold} & \textbf{HMM}$^\dagger$ & \textbf{HMMGMVAE} & \textbf{cGMVAE} & \textbf{cHMM--GMVAE} \\
+\textbf{Fold} & \textbf{cGMVAE} & \textbf{cHMM--GMVAE} & \textbf{HMM}$^\dagger$ \\
 \thickhline
-1 & 0.51 & pending & 0.361 & 0.612 \\
-2 & 0.51 & pending & 0.275 & 0.381 \\
-3 & 0.51 & pending & 0.407 & pending \\
-4 & 0.51 & pending & 0.296 & 0.646 \\
+1 & 0.361 & 0.612 & 0.51 \\
+2 & 0.275 & 0.381 & 0.51 \\
+3 & 0.407 & 0.594 & 0.51 \\
+4 & 0.296 & 0.646 & 0.51 \\
+\hline
+\textbf{Mean} & 0.335 & 0.558 & 0.51 \\
 \hline
 \end{tabular}
 \begin{flushleft}
@@ -268,44 +271,23 @@ $^\dagger$Thesis population leave-one-subject-out reference (feature HMM), not r
 
 \subsection*{Substages and transitions}
 We swept mixture component count $K \in \{3,5,7,9,11,13,15\}$ on locked cHMM--GMVAE (joint fold 4) and selected $K$ by validation score and cross-seed stability (\nameref{S3_Fig}).
-Fig~\ref{fig3} shows a compact physiology grid for discovered substates (EEG/EMG power spectral density, $\theta/\delta$ ratio, EMG power, bout length, macro-label composition, subject mixing), following the mcRBM paradigm~\cite{katsageorgiou2018mcRBM}.
-Rare or confounded states will be excluded after expert review (see \nameref{S1_Appendix}).
-Fig~\ref{fig4} shows the substage transition matrix and a two-hour hypnogram excerpt; transition-rich states concentrate at wake--NREM and NREM--REM boundaries~\cite{grieger2021prerem,somnotate2024}.
+Fig~\ref{fig3} shows a physiology grid for the ten most occupied substates (EEG/EMG power spectral density, $\theta/\delta$ ratio, EMG power, bout length, macro-label composition, subject mixing), following the mcRBM paradigm~\cite{katsageorgiou2018mcRBM}.
+Fig~\ref{fig4} shows the substage transition matrix and a two-hour hypnogram excerpt aligned to expert macro labels; transition-rich states concentrate at wake--NREM and NREM--REM boundaries~\cite{grieger2021prerem,somnotate2024}.
+Expert substage names and a curated summary table will be added after neuroscientist review (\nameref{S1_Appendix}).
 
 \begin{figure}[!h]
 \caption{\textbf{Substage physiology panels.}
-Rows: discovered substates after expert curation; columns: EEG PSD, EMG PSD, $\theta/\delta$, EMG power, bout length, macro-label mix, subject mixing.
-% TODO: replace with K-sweep winner npz when paper_k_sweep jobs finish.
-Generated from joint holdout cHMM--GMVAE fold 4 until K sweep completes.}
+Rows: top-occupancy discovered substates; columns: EEG PSD, EMG PSD, $\theta/\delta$, EMG power, bout length, macro-label mix, subject mixing.
+Holdout cHMM--GMVAE, joint fold 4, seed 1.}
 \label{fig3}
 \end{figure}
 
 \begin{figure}[!h]
 \caption{\textbf{Substage dynamics.}
-A: Row-normalized transition matrix from the learned sticky HMM--GMM prior.
-B: Two-hour hypnogram excerpt with substage color strip; vertical markers indicate macro-boundary transitions.}
+\textbf{A,} Row-normalized transition matrix (probability of next state given a state change).
+\textbf{B,} Two-hour hypnogram excerpt: discovered substates (top) and expert macro labels (bottom).}
 \label{fig4}
 \end{figure}
-
-\begin{table}[!ht]
-\centering
-\caption{\textbf{Illustrative substage summary (to be finalized after expert interview).}}
-\begin{tabular}{|l|l|r|r|l|}
-\hline
-\textbf{Substage} & \textbf{Dominant macro} & \textbf{Mean bout (s)} & \textbf{$\theta/\delta$} & \textbf{Expert label} \\
-\thickhline
-S1 & Wake & TBD & TBD & active wake \\
-S2 & NREM & TBD & TBD & light NREM \\
-S3 & NREM & TBD & TBD & deep NREM \\
-S4 & transition & TBD & TBD & wake--NREM \\
-S5 & transition & TBD & TBD & NREM--REM \\
-\hline
-\end{tabular}
-\begin{flushleft}
-TBD: populate from postprocess after Birgitte interview (\texttt{docs/paper/birgitte\_interview\_guide.md}).
-\end{flushleft}
-\label{table2}
-\end{table}
 
 \section*{Discussion}
 Rose et al.\ establish that cross-lab supervised staging inherits rater disagreement~\cite{rose2026consensus}; our unsupervised ladder complements this by discovering structure without training on one laboratory's label biases.
@@ -313,7 +295,7 @@ Zero-shot holdout inference (encoder plus temporal prior, no subject identifier)
 Temporal mixture priors helped when bout structure and laboratory-specific spectra aligned with sequence modelling (laboratories 3 and 5); static GMM decoders sufficed on some montages (laboratory 2).
 Decoder-only conditioning is the main methodological advance over the thesis encoder+decoder setup for population holdout~\cite{elmgreen2026thesis}.
 Absolute holdout NMI remains below curated thesis leave-one-subject-out performance; relative gains over the ladder and substage biology are the primary claims.
-Limitations include seed fragility, per-laboratory spectral front-end locks (not per-mouse manual scoring), and pending HMMGMVAE locked runs.
+Limitations include seed fragility on difficult folds, per-laboratory spectral front-end locks (not per-mouse manual scoring), and incomplete HMMGMVAE locked holdout runs.
 
 \section*{Materials and methods}
 
@@ -322,15 +304,15 @@ We used the MSSV dataset (OpenNeuro ds006366)~\cite{rose2025mssv}: 92 mice, labo
 All experiments used previously published data; no new animal procedures were performed in this study.
 
 \subsection*{Preprocessing and features}
-Per-laboratory spectral front-end locks (\texttt{cvae\_overrides}) were fixed from incohort tuning~\cite{elmgreen2026thesis}.
+Per-laboratory spectral front-end locks were fixed from incohort tuning~\cite{elmgreen2026thesis}.
 Wide multilayer perceptron encoder--decoder with latent dimension 6; convolutional encoder on spectral inputs.
 
 \subsection*{Model ladder}
-Locked fair-comparison recipes (\texttt{scripts/cv4fold/locked\_recipes.py}): feature HMM baseline (thesis); HMMGMVAE ($\mathit{emb}{=}0$, sequence length $T{=}64$, \texttt{hmm\_gmm} prior); cGMVAE (decoder-only, $\mathit{emb}{=}8$, GMM prior); cHMM--GMVAE (+ warm sticky HMM--GMM, $\kappa{=}0.92$)~\cite{ebbers2017hmmvae,dilokthanakul2016gmvae,sohn2015cvae}.
+Locked fair-comparison recipes: feature HMM baseline (thesis); HMMGMVAE ($\mathit{emb}{=}0$, sequence length $T{=}64$, HMM--GMM prior); cGMVAE (decoder-only, $\mathit{emb}{=}8$, GMM prior); cHMM--GMVAE (+ warm sticky HMM--GMM, $\kappa{=}0.92$)~\cite{ebbers2017hmmvae,dilokthanakul2016gmvae,sohn2015cvae}.
 
 \subsection*{Training}
 Population training on cross-validation training folds (joint: all laboratories; within-lab: single laboratory).
-Subject embeddings ($\mathit{emb}{=}8$) were concatenated to the decoder only (\texttt{decoder\_only\_conditioning}), not the encoder, during reconstruction and prior learning.
+Subject embeddings ($\mathit{emb}{=}8$) were concatenated to the decoder only, not the encoder, during reconstruction and prior learning.
 
 \subsection*{Inference (holdout)}
 For held-out validation mice, sleep-state labels were obtained by encoding spectral epochs without subject identifiers, then assigning states via the learned GMM or sticky HMM--GMM prior on latent means (prior prediction).
@@ -340,14 +322,13 @@ Subject embeddings were not used at holdout evaluation; the decoder was not invo
 Leave-mice-out four-fold holdout; prior-prediction NMI versus expert macro labels; best of three random seeds per configuration.
 
 \subsection*{Substage sweep and physiology}
-Mixture component sweep $K \in \{3,5,7,9,11,13,15\}$; physiology panels via \texttt{scripts/substage\_analysis/}; transition matrix from the learned prior.
+Mixture component sweep $K \in \{3,5,7,9,11,13,15\}$; physiology panels and transition matrices from holdout validation predictions.
 
 \subsection*{Data availability}
 MSSV is available on OpenNeuro (ds006366). Processed features and fold manifests are described in the SPA repository.
 
 \subsection*{Code availability}
-Training, evaluation, and figure scripts are in the SPA repository (\texttt{/work3/s204070/SPA}).
-A Zenodo archive with tagged release will be deposited before publication (DOI pending).
+Training, evaluation, and figure scripts will be archived on Zenodo with a tagged release before publication (DOI pending).
 
 \section*{Acknowledgments}
 
@@ -357,7 +338,7 @@ We thank collaborators in the Kornum laboratory for biological interpretation gu
 
 \paragraph*{S1 Fig.}
 \label{S1_Fig}
-\textbf{Per-fold holdout ladder.} Grouped bar chart of prior NMI for all four folds and four model rungs (from \texttt{plot\_ladder\_figure.py --by-fold}).
+\textbf{Per-fold holdout ladder.} Grouped bar chart of prior NMI for all four folds and four model rungs.
 
 \paragraph*{S2 Fig.}
 \label{S2_Fig}
@@ -377,7 +358,11 @@ We thank collaborators in the Kornum laboratory for biological interpretation gu
 
 \paragraph*{S2 Table.}
 \label{S2_Table}
-\textbf{Within-lab holdout prior NMI.} Full table from \texttt{holdout\_ladder.csv}.
+\textbf{Within-lab holdout prior NMI.} Full table from holdout ladder summary.
+
+\paragraph*{S3 Table.}
+\label{S3_Table}
+\textbf{Substage summary.} Dominant macro label, bout length, $\theta/\delta$, and expert names after curation.
 
 \paragraph*{S1 File.}
 \label{S1_File}
@@ -385,11 +370,10 @@ We thank collaborators in the Kornum laboratory for biological interpretation gu
 
 \paragraph*{S1 Appendix.}
 \label{S1_Appendix}
-\textbf{Thesis supplement material.} Synthetic HMM validation, raw time-domain HMM failure, decoder-only ablations, preprocessing locks, and Birgitte interview substage names.
+\textbf{Thesis supplement material.} Synthetic HMM validation, raw time-domain HMM failure, decoder-only ablations, preprocessing locks, and expert substage names.
 
 \nolinenumbers
 
 \bibliography{references}
 
 \end{document}
-
