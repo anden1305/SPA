@@ -1,45 +1,34 @@
-# Special-course / PLOS Computational Biology paper
-
-**Added 2026-06-09.** Manuscript and experiment runbooks for *Decoder-only conditional latent models with temporal mixture priors for unsupervised cross-lab mouse sleep staging and substage discovery*.
-
-## Canonical manuscript (Overleaf)
+# Paper manuscript (`docs/paper/`)
 
 | File | Role |
 |------|------|
-| **[plos_my_paper.tex](plos_my_paper.tex)** | **PLOS Comp Biol draft** (single-file, caption-only figures) |
-| [plos_template.tex](plos_template.tex) | Official template reference (do not edit) |
-| [plos2025.bst](plos2025.bst) | Vancouver BibTeX style |
-| [references.bib](references.bib) | Bibliography |
-| [figures/](figures/) | Exported `Fig1.tif` … `Fig4.*` for upload |
+| **[plos_my_paper.tex](plos_my_paper.tex)** | Manuscript source |
+| **[plos_my_paper.pdf](plos_my_paper.pdf)** | PLOS submission build (caption-only figures) |
+| **[plos_my_paper_report.pdf](plos_my_paper_report.pdf)** | Local report with embedded figures |
 
-Cursor rule when editing `.tex`: [`.cursor/rules/plos-compbiol-tex.mdc`](../../.cursor/rules/plos-compbiol-tex.mdc).
+## Subfolders
+
+| Folder | Contents |
+|--------|----------|
+| [`assets/`](assets/) | `references.bib`, `plos2025.bst`, `plos_template.tex`, generated `tables/` |
+| [`figures/`](figures/) | `main/`, `supplementary/`, `k_sweep/`, `curated/`, `archive/`, `professor_meeting/` |
+| [`notes/`](notes/) | Planning docs, experiment runbooks, outline, word budget |
+| [`build/`](build/) | `compile_report.sh`, LaTeX cache (`cache/`) |
+
+## Build
+
+**Report** (figures embedded):
 
 ```bash
-cd docs/paper
+bash docs/paper/build/compile_report.sh
+```
+
+**PLOS submission** (from `docs/paper/`):
+
+```bash
 pdflatex plos_my_paper && bibtex plos_my_paper && pdflatex plos_my_paper && pdflatex plos_my_paper
 ```
 
-Initial submission: compile PDF **without** embedded figures; upload `figures/Fig*.tif` separately.
+Start here for workflows: [`notes/report_outline.md`](notes/report_outline.md), [`notes/holdout_experiments.md`](notes/holdout_experiments.md).
 
-## Docs and runbooks
-
-| Doc | Purpose |
-|-----|---------|
-| [related_work_novelty.md](related_work_novelty.md) | Literature tiers, comparison table, reviewer stress test |
-| [deep_research_synthesis.md](deep_research_synthesis.md) | ChatGPT + Gemini merge for supervisors |
-| [holdout_experiments.md](holdout_experiments.md) | P0 ladder + zero-shot inference protocol |
-| [k_sweep_experiments.md](k_sweep_experiments.md) | P1: K substage sweep on cHMM |
-| [birgitte_interview_guide.md](birgitte_interview_guide.md) | Biological interpretation script |
-
-## Figure scripts
-
-```bash
-PYTHONPATH=. python3 scripts/paper/plot_fig1_schematic.py
-PYTHONPATH=. python3 scripts/paper/plot_ladder_figure.py
-PYTHONPATH=. python3 scripts/paper/plot_ladder_figure.py --by-fold
-PYTHONPATH=. python3 scripts/paper/plot_within_lab_heatmap.py
-PYTHONPATH=. python3 scripts/paper/plot_k_sweep_curve.py
-PYTHONPATH=. python3 scripts/paper/plot_figure27_compact.py --npz <path/to/results.npz>
-```
-
-Figure staging copies: [`../../paper/overleaf/figures/`](../../paper/overleaf/figures/).
+**Friday hand-in:** [`notes/FRIDAY_CHECKLIST.md`](notes/FRIDAY_CHECKLIST.md) — pending HPC jobs + what to regenerate when they finish.

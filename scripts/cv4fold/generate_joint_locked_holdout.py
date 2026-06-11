@@ -6,7 +6,7 @@ Paper ladder (3 models):
   HMMGMVAE:  emb0, latent 6, T=64, hmm_gmm, lr=1.3e-3
   cHMMGMVAE: warm_emb8_sticky92, latent 6, T=64, lr=1.3e-3
 
-See docs/cv4fold/unified_holdout_paper_line.md and docs/paper/holdout_experiments.md
+See docs/cv4fold/unified_holdout_paper_line.md and docs/paper/notes/holdout_experiments.md
 """
 
 from __future__ import annotations

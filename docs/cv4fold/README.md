@@ -18,10 +18,11 @@ Scrape helper (shows best + all seeds): `python3 scripts/cv4fold/scrape_experime
 
 **After cv4fold / holdout jobs finish:** run postprocess — [postprocess.md](postprocess.md) and [per_lab_holdout_pilot.md § When jobs finish](per_lab_holdout_pilot.md#when-jobs-finish-postprocess).
 
-**Status (2026-06-08):** Incohort locks — **lab_2 cGMVAE** 0.593; **lab_3 cHMM warm** 0.734 T=64; **lab_5 cHMM** seq32 0.640 (1/3 seeds — reliability before thesis lock). Enc+dec worse on lab_2. **Next:** [per_lab_holdout_pilot.md](per_lab_holdout_pilot.md) fold 4. Full write-up: [ablation_findings_20260608.md](ablations/ablation_findings_20260608.md).
+**Status (2026-06-11):** Locked VAE holdout ladder **complete** (48/48 cells, best-of-3). **HMM (raw)** baseline **7/16** cells — see [holdout_results_status.md](holdout_results_status.md). Paper Table 2 uses per-lab fair comparison with fold min--max ranges.
 
 | Doc | Contents |
 |-----|----------|
+| [holdout_results_status.md](holdout_results_status.md) | **Holdout completion grid**, reporting rules, HMM raw status |
 | [cross_lab_cv4fold.md](cross_lab_cv4fold.md) | Story, folds, conditioning ablations, fold-4 results, next steps |
 | [incohort_to_cross_lab_strategy.md](incohort_to_cross_lab_strategy.md) | **How incohort locks → holdout → joint cv4fold** (strategies & pitfalls) |
 | [lab_2_locked_montage.md](lab_2_locked_montage.md) | **Locked EEG1+EEG4+EMG** + `rem_emg_wide_eeg4` recipe (0.593) |

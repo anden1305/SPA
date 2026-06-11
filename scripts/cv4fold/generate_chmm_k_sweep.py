@@ -25,7 +25,7 @@ from scripts.cv4fold.generate_joint_locked_holdout import LOCKED_LR
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_ROOT = REPO_ROOT / "src/config/run/cvaemarhmm/cv4fold"
-DEFAULT_K = (3, 5, 7, 9, 11, 13, 15)
+DEFAULT_K = tuple(range(3, 16))  # 3 … 15 inclusive
 DEFAULT_FOLD = 4
 
 

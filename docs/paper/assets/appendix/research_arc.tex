@@ -1,0 +1,45 @@
+% Research arc — condensed from results/Story Map.pdf
+\subsection*{Research arc: from thesis to this report}
+\label{S7_Appendix_arc}
+
+This report focuses on decoder-only cHMM--GMVAE cross-laboratory holdout, but it sits in a longer line of work.
+Figure~\ref{fig_story_map} summarises the arc; the steps below group extensions by theme so readers can see what was tried before the locked paper protocol.
+
+\paragraph*{Phase A — Synthetic validation (MSc thesis).}
+\textbf{HMM} and \textbf{MAR-HMM} priors were validated on synthetic sleep sequences before any MSSV training.
+This established that sticky transitions and autoregressive emissions recover latent structure under controlled noise (\nameref{S1_Appendix_synth}).
+
+\paragraph*{Phase B — Classical HMM baselines on MSSV (thesis).}
+The same HMM family was benchmarked on empirical MSSV data in two input regimes:
+\textbf{feature-domain} (expert spectral features; thesis peak NMI $\approx 0.51$ on single-lab leave-one-subject-out) and
+\textbf{time-domain} raw EEG/EMG (population NMI near zero on cross-lab data; \nameref{S2_Appendix}).
+This motivated deep spectral encoders rather than hand-crafted features alone.
+
+\paragraph*{Phase C — Deep generative staging (thesis core).}
+\textbf{GMVAE--MAR-HMM} replaced hand features with a CNN--VAE latent space and a mixture prior for staging.
+\textbf{cGMVAE--MAR-HMM} added subject conditioning (encoder+decoder) for population training on a curated single-lab cohort.
+\textbf{cGMVAE with GMM prior} simplified the static mixture path and supported substage discovery at higher $K$ (thesis $K{=}13$ taxonomy; \nameref{S6_Fig}).
+
+\paragraph*{Phase D — Special course extensions (this repository).}
+Four changes define the present report relative to the thesis default:
+\begin{enumerate}
+\item \textbf{Decoder-only conditioning} — subject embeddings enter the decoder only, not the encoder, so encoder means stay identity-free at holdout (\nameref{S3_Appendix}).
+\item \textbf{Cross-laboratory scope} — quality-screened 20 mice from MSSV laboratories 2, 3, and 5 with harmonised montages and per-lab preprocessing locks (\nameref{S4_Appendix}).
+\item \textbf{cHMM--GMVAE ladder} — warm sticky HMM--GMM prior on CNN--VAE latents; compared fairly against cGMVAE, HMMGMVAE, and time-domain HMM(raw) under identical folds (Table~\ref{table1}; \nameref{S6_Table} for raw-HMM completion status).
+\item \textbf{Substage sweep at holdout} — $K \in \{3,\ldots,15\}$ on joint fold~4 with NMI and predictive log-likelihood (Fig~\ref{fig2}); $K{=}4$ selected for physiology and transitions (Figs~\ref{fig3}, \nameref{S5_Fig}).
+\end{enumerate}
+
+\paragraph*{Explored but not in the locked paper protocol.}
+The story map also lists ablations retained for future work:
+\textbf{lab-only} or \textbf{lab+subject} decoder conditioning (versus mouse ID only),
+\textbf{end-to-end CNN} front-ends replacing fixed FFT features,
+and population-level substage biology on all 20 mice (incohort) versus strict fold-4 holdout.
+These are documented in repository configs under \texttt{results/cv4fold/} but are not headline results here.
+
+\begin{paperfigure}
+\paperfig{figures/supplementary/Story_Map.pdf}
+\caption{\textbf{Research arc (story map).}
+Columns: synthetic validation, empirical MSSV benchmarks, and special-course extensions.
+The locked paper protocol (bold path) is decoder-only cGMVAE/cHMM--GMVAE on quality-screened labs~2/3/5 with zero-shot holdout.}
+\label{fig_story_map}
+\end{paperfigure}

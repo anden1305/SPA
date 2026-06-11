@@ -1,0 +1,224 @@
+{
+  "expected_joint_folds": 4,
+  "expected_within_lab_cells": 12,
+  "joint_pooled_ok": 1,
+  "within_lab_ok": 6,
+  "joint_per_lab_ok": 3,
+  "incomplete": true,
+  "cells": [
+    {
+      "scope": "joint",
+      "fold": "1",
+      "lab": "all",
+      "status": "no_npz",
+      "nmi": null,
+      "macro_accuracy": null
+    },
+    {
+      "scope": "joint",
+      "fold": "2",
+      "lab": "all",
+      "status": "no_npz",
+      "nmi": null,
+      "macro_accuracy": null
+    },
+    {
+      "scope": "joint",
+      "fold": "3",
+      "lab": "all",
+      "status": "no_npz",
+      "nmi": null,
+      "macro_accuracy": null
+    },
+    {
+      "scope": "joint",
+      "fold": "4",
+      "lab": "all",
+      "status": "ok",
+      "nmi": 0.2082,
+      "macro_accuracy": 0.699
+    },
+    {
+      "scope": "within_lab",
+      "fold": "1",
+      "lab": "lab_2",
+      "status": "ok",
+      "nmi": 0.0,
+      "macro_accuracy": 0.5197
+    },
+    {
+      "scope": "within_lab",
+      "fold": "2",
+      "lab": "lab_2",
+      "status": "ok",
+      "nmi": 0.0,
+      "macro_accuracy": 0.4681
+    },
+    {
+      "scope": "within_lab",
+      "fold": "3",
+      "lab": "lab_2",
+      "status": "ok",
+      "nmi": 0.0,
+      "macro_accuracy": 0.4979
+    },
+    {
+      "scope": "within_lab",
+      "fold": "4",
+      "lab": "lab_2",
+      "status": "no_npz",
+      "nmi": null,
+      "macro_accuracy": null
+    },
+    {
+      "scope": "within_lab",
+      "fold": "1",
+      "lab": "lab_3",
+      "status": "no_npz",
+      "nmi": null,
+      "macro_accuracy": null
+    },
+    {
+      "scope": "within_lab",
+      "fold": "2",
+      "lab": "lab_3",
+      "status": "ok",
+      "nmi": 0.004,
+      "macro_accuracy": 0.4748
+    },
+    {
+      "scope": "within_lab",
+      "fold": "3",
+      "lab": "lab_3",
+      "status": "no_npz",
+      "nmi": null,
+      "macro_accuracy": null
+    },
+    {
+      "scope": "within_lab",
+      "fold": "4",
+      "lab": "lab_3",
+      "status": "no_npz",
+      "nmi": null,
+      "macro_accuracy": null
+    },
+    {
+      "scope": "within_lab",
+      "fold": "1",
+      "lab": "lab_5",
+      "status": "ok",
+      "nmi": 0.0001,
+      "macro_accuracy": 0.5047
+    },
+    {
+      "scope": "within_lab",
+      "fold": "2",
+      "lab": "lab_5",
+      "status": "ok",
+      "nmi": 0.0037,
+      "macro_accuracy": 0.5445
+    },
+    {
+      "scope": "within_lab",
+      "fold": "3",
+      "lab": "lab_5",
+      "status": "no_npz",
+      "nmi": null,
+      "macro_accuracy": null
+    },
+    {
+      "scope": "within_lab",
+      "fold": "4",
+      "lab": "lab_5",
+      "status": "no_npz",
+      "nmi": null,
+      "macro_accuracy": null
+    }
+  ],
+  "joint_per_lab": [
+    {
+      "fold": "1",
+      "lab": "lab_2",
+      "status": "no_npz",
+      "nmi": null,
+      "macro_accuracy": null
+    },
+    {
+      "fold": "1",
+      "lab": "lab_3",
+      "status": "no_npz",
+      "nmi": null,
+      "macro_accuracy": null
+    },
+    {
+      "fold": "1",
+      "lab": "lab_5",
+      "status": "no_npz",
+      "nmi": null,
+      "macro_accuracy": null
+    },
+    {
+      "fold": "2",
+      "lab": "lab_2",
+      "status": "no_npz",
+      "nmi": null,
+      "macro_accuracy": null
+    },
+    {
+      "fold": "2",
+      "lab": "lab_3",
+      "status": "no_npz",
+      "nmi": null,
+      "macro_accuracy": null
+    },
+    {
+      "fold": "2",
+      "lab": "lab_5",
+      "status": "no_npz",
+      "nmi": null,
+      "macro_accuracy": null
+    },
+    {
+      "fold": "3",
+      "lab": "lab_2",
+      "status": "no_npz",
+      "nmi": null,
+      "macro_accuracy": null
+    },
+    {
+      "fold": "3",
+      "lab": "lab_3",
+      "status": "no_npz",
+      "nmi": null,
+      "macro_accuracy": null
+    },
+    {
+      "fold": "3",
+      "lab": "lab_5",
+      "status": "no_npz",
+      "nmi": null,
+      "macro_accuracy": null
+    },
+    {
+      "fold": "4",
+      "lab": "lab_2",
+      "status": "ok",
+      "nmi": 0.1786,
+      "macro_accuracy": 0.6647
+    },
+    {
+      "fold": "4",
+      "lab": "lab_3",
+      "status": "ok",
+      "nmi": 0.2368,
+      "macro_accuracy": 0.7308
+    },
+    {
+      "fold": "4",
+      "lab": "lab_5",
+      "status": "ok",
+      "nmi": 0.2405,
+      "macro_accuracy": 0.7235
+    }
+  ]
+}

@@ -91,7 +91,7 @@ def draw_panel_c(ax) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--out", type=Path, default=REPO / "docs/paper/figures/Fig1.pdf")
+    parser.add_argument("--out", type=Path, default=REPO / "docs/paper/figures/main/Fig1.pdf")
     args = parser.parse_args()
 
     apply_paper_style()

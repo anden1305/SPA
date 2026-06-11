@@ -6,7 +6,7 @@ alwaysApply: false
 
 # PLOS Computational Biology — LaTeX rules
 
-Canonical manuscript: [`docs/paper/plos_my_paper.tex`](docs/paper/plos_my_paper.tex). Read-only template reference: [`docs/paper/plos_template.tex`](docs/paper/plos_template.tex).
+Canonical manuscript: [`docs/paper/plos_my_paper.tex`](docs/paper/plos_my_paper.tex). Read-only template reference: [`docs/paper/assets/plos_template.tex`](docs/paper/assets/plos_template.tex).
 
 Official guides: [LaTeX](https://journals.plos.org/ploscompbiol/s/latex), [Submission guidelines](https://journals.plos.org/ploscompbiol/s/submission-guidelines), [Figures](https://journals.plos.org/ploscompbiol/s/figures).
 
@@ -14,13 +14,15 @@ Official guides: [LaTeX](https://journals.plos.org/ploscompbiol/s/latex), [Submi
 
 - One `.tex` file only — **no** `\input`, `\externaldocument`, or `\include` for manuscript body.
 - Do **not** delete packages listed in the PLOS template preamble.
-- Section order: Title page → Abstract → Author summary → Introduction → Results → Discussion → Materials and methods → Acknowledgments → References → Supporting information captions.
+- Section order: Title page → Abstract → Author summary (PLOS only) → Introduction → **Data** → **Methods** → **Results and discussion** → **Conclusion** → Acknowledgments → References → **Appendix**.
+- Canonical outline: [`report_outline.md`](report_outline.md). Use `\methodpara{Label.}` for QSLP-style bold paragraph starters in Data/Methods.
+- Do **not** add separate `\section*{Discussion}`, `\section*{Materials and methods}`, or `\section*{Supporting information}`.
 - Use `\section*{}` for unnumbered main sections; **≤3** heading levels (`\section*`, `\subsection*`, `\subsubsection*`).
 - `\linenumbers` after `\newgeometry`; remove before final acceptance.
 
 ## Figures and tables
 
-- **No `\includegraphics`** in the manuscript `.tex` — figures upload separately at submission.
+- **No `\includegraphics` in submission builds** — figures upload separately at submission. Use `\paperfig`/`\suppfig` (gated by `\ifdraftfigures`); compile report via `docs/paper/build/compile_report.sh` → `plos_my_paper_report.pdf`.
 - Use caption-only `\begin{figure}...\end{figure}`; describe panels in the caption (**A:**, **B:**, …), not `\subfigure`.
 - Cite **Fig** (not Figure), **Table**, **Eq** (not Equation).
 - Place each figure/table environment **immediately after** the first paragraph that cites it (read order).
@@ -38,7 +40,7 @@ Official guides: [LaTeX](https://journals.plos.org/ploscompbiol/s/latex), [Submi
 
 ## References and availability
 
-- `\bibliographystyle{plos2025}` + `\bibliography{references}`; bib file: [`docs/paper/references.bib`](docs/paper/references.bib).
+- `\bibliographystyle{assets/plos2025}` + `\bibliography{assets/references}`; bib file: [`docs/paper/assets/references.bib`](docs/paper/assets/references.bib).
 - Vancouver numbered citations via `\cite{}`.
 - Include **Data availability** and **Code availability** statements in Materials and methods.
 - Funding/competing interests go in Editorial Manager fields, not Acknowledgments body.

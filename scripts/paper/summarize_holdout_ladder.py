@@ -26,10 +26,8 @@ MODEL_LABEL = {
     "chmmgmvae_locked": "cHMMGMVAE",
 }
 
-# Thesis population LOSO reference (supplement baseline rung).
-THESIS_BASELINE = {
-    "hmm_features": {"nmi": 0.51, "source": "thesis Table 10 population"},
-}
+# Thesis expert-feature HMM (~0.51) — different protocol; not a holdout ladder rung.
+THESIS_BASELINE: dict[str, dict] = {}
 
 
 @dataclass
@@ -176,7 +174,8 @@ def main() -> int:
         print("\nJoint holdout mean NMI (available folds):")
         for model in MODEL_ORDER:
             if model == "hmm_features":
-                print(f"  {MODEL_LABEL[model]:12s}  {THESIS_BASELINE['hmm_features']['nmi']:.3f}  (thesis)")
+                if "hmm_features" in THESIS_BASELINE:
+                    print(f"  {MODEL_LABEL[model]:12s}  {THESIS_BASELINE['hmm_features']['nmi']:.3f}  (thesis)")
                 continue
             if model in summary["joint_by_model"]:
                 m = summary["joint_by_model"][model]

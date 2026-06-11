@@ -17,7 +17,7 @@ FOLD=4
 MEM="6GB"
 CPUS="4"
 WALLTIME="2:00"
-K_VALUES=(3 5 7 9 11 13 15)
+K_VALUES=($(seq 3 15))
 
 mkdir -p hpc/output/cv4fold/paper_k_sweep
 

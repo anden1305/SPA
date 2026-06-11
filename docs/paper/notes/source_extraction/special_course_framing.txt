@@ -1,0 +1,1758 @@
+Special Course - Project framing
+
+Special Course - Project framing
+
+Towards subject-invariant and temporally coherent end-to-end latent models for unsupervised mouse sleep staging
+
+Main aim
+Build an end-to-end version of your thesis pipeline that:
+
+replaces FFT-based inputs with CNN feature learning
+
+keeps conditioning only in the decoder
+
+replaces the static GM prior with a temporally dependent latent prior
+
+tests zero-shot transfer from decoder-only conditioning
+
+ends in a 5–10 page paper draft
+
+Core research question
+
+Can an end-to-end convolutional autoencoding model with decoder-only conditioning and a temporally dependent latent prior learn a more transferable and subject-invariant latent space for unsupervised mouse sleep staging than the FFT-based cGMVAE pipeline?
+
+The right structure: 3 layers
+
+Layer 1 — Invariance
+
+Remove subject conditioning from encoder
+
+Keep subject conditioning only in decoder
+
+Test true zero-shot on unseen mice without using held-out subject data during representation training
+
+Lab conditioning: Use Lab 5 (E) first
+
+has the same montages (1 parietal + 1 frontal electrode )
+
+this has 5s epchs but has been fixed by Javi to 4s
+
+Montage conditioning: Then use lab 2 (B)
+
+has double the channels but same montage placement (2 parietal + 2 frontal electrodes)
+
+was 1s epochs but has been fixed by Javi to 4s
+
+Ignore lab 1 and 4 as they are not as good.
+
+This directly targets the issue that the thesis cGMVAE population result was partially transductive because the subject-conditioned encoder used limited held-out-subject data.
+
+Layer 2 — Representation
+
+Replace FFT / expert spectral frontend with CNN encoder
+
+Use transposed convolutions in decoder
+
+Train on consecutive windows or epoch windows from raw time-domain input
+
+Compare against thesis spectral baseline
+
+This is well motivated because the thesis explicitly proposes incorporating time-domain inputs and possibly staged spectral-to-end-to-end training.
+
+Layer 3 — Temporal prior
+
+Replace static GM prior with latent temporal prior
+
+Since you want “HMM mixture prior i det latente rum” + “time dependency”, the clean interpretation is:
+
+mixture structure in latent space
+
+temporal dependency across latent states
+
+practically: first implement a simple autoregressive Gaussian-mixture latent prior, then connect to HMM-style state interpretation if possible
+
+This follows the thesis future-work direction to replace the static mixture prior with an autoregressive latent prior.
+
+Hard truth: what is the critical path?
+
+Because you are doing all of it, you need a must-have vs should-have vs nice-to-have structure.
+
+Must-have for passing + paper
+
+End-to-end CNN autoencoder
+
+Conditioning only in decoder
+
+Temporal latent prior
+
+Main experiments
+
+Paper first draft
+
+Should-have
+
+Zero-shot evaluation
+
+Consecutive-window dataloader
+
+Nice-to-have
+
+HMM-style analysis of latent states
+
+handcrafted / semi-hardcoded frequency-inspired CNN kernels
+
+larger ablation grid
+
+Plan until 8 June
+
+You have roughly 11 weeks. With 2 days/week, the plan has to be very disciplined.
+
+Week 1
+
+Goal: freeze exact scope and paper story
+
+write 1-page project description
+
+define model diagram
+
+define baseline comparisons
+
+define evaluation protocol
+
+define learning goals
+
+Output
+
+approved special-course plan
+
+approved paper angle
+
+exact experiment table skeleton
+
+Week 2
+
+Goal: baseline and infrastructure
+
+reproduce thesis cGMVAE baseline
+
+freeze data split
+
+implement new dataloader for consecutive windows
+
+prepare raw time-domain pipeline
+
+Output
+
+baseline numbers reproduced
+
+dataloader ready
+
+This matters because your thesis stresses controlled ablations with the rest of the protocol fixed.
+
+Week 3
+
+Goal: end-to-end CNN model
+
+implement CNN encoder to replace FFT-based representation
+
+implement transposed-conv decoder
+
+make it train stably as plain autoencoder / VAE first
+
+verify reconstructions and latent behaviour
+
+Output
+
+first trainable end-to-end model
+
+Week 4
+
+Goal: decoder-only conditioning
+
+remove subject input from encoder
+
+add subject embedding only to decoder
+
+compare against fully conditioned and unconditioned variants
+
+verify zero-shot inference path works
+
+Output
+
+working decoder-only conditioned model
+
+This is the central invariance experiment proposed in the thesis.
+
+Week 5
+
+Goal: latent prior with time dependency
+
+replace static latent mixture prior with temporal prior
+
+start simple, not maximal
+
+get training stable before making it elegant
+
+verify latent trajectories become smoother / more coherent
+
+Output
+
+first working temporal latent model
+
+Week 6
+
+Goal: pilot experiments
+
+Run a small matrix first:
+
+thesis spectral cGMVAE prior baseline
+
+end-to-end CNN without decoder conditioning
+
+end-to-end CNN with decoder-only conditioning
+
+end-to-end CNN + temporal latent prior
+
+Output
+
+first comparison table
+
+first latent plots
+
+decision on what to keep for the final paper
+
+Week 7
+
+Goal: main experiments
+
+full subject-level experiments
+
+full population / leave-one-subject-out experiments
+
+explicit zero-shot experiment
+
+3–5 seeds per main model if possible
+
+Your thesis already used leave-one-subject-out and Cross-NMI-style stability logic, so keeping that will make the comparison clean.
+
+Output
+
+final main result table
+
+Week 8
+
+Goal: analysis and figures
+
+latent-space plots
+
+training curves
+
+zero-shot result figure
+
+temporal coherence / transition analysis
+
+failure cases
+
+Output
+
+all paper figures drafted
+
+Week 9
+
+Goal: write paper early
+
+Write:
+
+Introduction
+
+Related work
+
+Methods
+
+Experimental setup
+
+Output
+
+50–60% draft
+
+Week 10
+
+Goal: write results + discussion
+
+fill in results
+
+compare to thesis findings
+
+discuss why decoder-only conditioning may reduce leakage
+
+discuss whether end-to-end CNN actually helped despite previous time-domain failure
+
+This comparison is important because your thesis found direct raw time-domain staging poor at population scope, so your paper needs to explain why your new end-to-end setup is different.
+
+Output
+
+full first draft
+
+Week 11
+
+Goal: hand-in polish
+
+revise paper
+
+tighten abstract and conclusion
+
+prepare oral evaluation points
+
+make one-slide overview of contributions and one-slide overview of limitations
+
+Output
+
+hand-in version
+
+oral eval prep
+
+Paper structure
+
+Title options
+
+Decoder-Only Conditioning and Temporal Latent Priors for End-to-End Unsupervised Mouse Sleep Staging
+
+End-to-End Subject-Invariant Latent Modelling of Mouse Sleep with Decoder-Only Conditioning
+
+Towards Zero-Shot Unsupervised Mouse Sleep Staging with Temporal Latent Priors
+
+Suggested sections
+
+Introduction
+
+Related work
+
+Data and preprocessing
+
+Baseline thesis pipeline
+
+Proposed end-to-end CNN model
+
+Decoder-only conditioning
+
+Temporal latent prior
+
+Experimental setup
+
+Results
+
+Discussion
+
+Conclusion
+
+Learning goals
+
+You asked for new learning goals. I’d write them like this:
+
+Efter kurset skal den studerende kunne:
+
+designe en end-to-end latent variabelmodel til usuperviseret analyse af fysiologiske tidsserier
+
+implementere og evaluere CNN-baserede encoder- og decoderarkitekturer som alternativ til FFT-baserede inputrepræsentationer
+
+analysere hvordan decoder-only conditioning påvirker subject invariance og zero-shot generalisering
+
+udvikle og evaluere en latent prior med tidsafhængighed til modellering af søvndynamik
+
+gennemføre kontrollerede eksperimenter og formidle resultaterne i artikel-format og ved mundtlig evaluering
+
+A practical weekly split for your 2 days
+
+Day A
+
+Implementation / experiments
+
+Day B
+
+Analysis / writing / supervisor sync
+
+That way you are writing every week instead of leaving the paper to the end.
+
+My strongest advice for this version
+
+Since you insist on doing all of it, do not treat all parts equally.
+
+The order should be:
+
+CNN end-to-end backbone → decoder-only conditioning → temporal prior → experiments → paper
+
+Not the other way around.
+
+The paper should present the whole package, but internally you should build it in layers.
+
+I can turn this into a polished Danish specialkursus plan you can send to your supervisor.
+
+Learning Objectives
+
+Der er indgået en aftale omkring et Specialkursus mellem dig og Institut for Matematik og Computer Science. Detaljerne i aftalen fremgår af nedenstående:
+
+
+Informationer om projekt af typen Specialkursus:
+
+Dansk titel: Håndtering af individuel variabilitet og dynamikker i søvnstadier baseret på variational autoencoders
+Engelsk titel: Accounting for individual variability and state dynamics in sleep recordings of mice using variational autoencoders
+Læringsmål for projektet - dansk:
+Læringsmål for projektet - engelsk:
+
+The project will develop advanced modeling approaches accounting for individual variability as well as latent state dynamics based on variational autoencoders.
+
+Specifically, the project will encompass the following learning objectives:
+
+Understand and apply conditioning in a variational autoencoder context accommodating zero-shot learning of latent representations.
+
+Advance existing gaussian mixture modeling based variational autoencoders to account for state dynamics using hidden Markov modeling procedures.
+
+Apply the developed tools on sleep recordings and quantitatively evaluate the modeling procedures in terms of correspondence to mouse sleep annotation as well as influence of variability across mice.
+
+Disseminate the modeling procedures and results as an article draft suitable for submission to a relevant journal.
+
+ECTS Point: 10
+Startdato: 16-03-2026
+Afslutningsdato: 08-06-2026
+Karakterskala: Bestået/Ikke-bestået
+Evalueringsform: Intern
+Evalueringsform (eksamen): Report and oral examination
+Samarbejdsinstitutter: Intet samarbejdsinstitut
+Projekt udføres i: Danmark
+Antal måneder i udlandet: (Not filled)
+
+Vejleder(e): Morten Mørup (mmor@dtu.dk)
+Vejleder(e) (ekstern): Birgitte Rahbek Kornum (kornum@sund.ku.dk) () (telefonnummer ukendt)
+Studerende: 204070(Oliver Rosbæk Elmgreen)
+
+Specialkursus:
+
+Kære studerende (og vejleder)
+
+Godkendelse
+
+Dit specialkursus er nu registreret og fremgår af din karakteroversigt. Det er vigtigt, at du sikrer, at den danske og engelske titel er korrekt, da titlen vil fremgå af diplomet. Ved evt. fejl skal projektet opdateres via instituttet med den ønskede ændring.
+
+Specialkurset er registeret som et valgfrit et kursus. Hvis kurset skal tælle i en obligatorisk gruppe, bedes du indhente en skriftlig bekræftelse fra din studieleder. Denne sendes til studadm@adm.dtu.dk
+
+Er du diplomingeniørstuderende, skal din studieleder sende en godkendelse på, at du må udføre specialkurset.
+
+Karakterfrist
+
+karakterfristen for specialkurser er 4 uger efter afleveringsdatoen.
+
+Med venlig hilsen
+
+Studieadministrationen
+
+____________________________________________________________
+
+Special Course:
+
+Dear Student (and Supervisor),
+
+Approval
+
+Your special course has been registered and will appear on your transcript. It is important that you make sure that the Danish and English titles are correct, since these will appear on your diploma. If there is a mistake, please have the department send an update with the corrections.
+
+The special course is registered as an elective course. If the course should count in a mandatory group, we need a written confirmation from your Head of Studies.  Please send the written confirmation to studadm@adm.dtu.dk
+
+Grading Deadline
+
+The deadline for allocating a grade for a special course is four weeks after submission of the report. However, over the Summer period the deadline is seven weeks.
+
+Best regards,
+
+Office of Study Programs and Student Affairs
+
+Preditions
+
+MARHMM predictions (self.model.predict()):
+
+Encodes input to latent space via CVAE
+
+Runs MARHMM inference (uses learned transitions, lags, temporal state dependencies)
+
+Returns: temporally coherent state predictions
+
+What it tests: "Can MARHMM learn temporal structure on this latent space?"
+
+GMM prior predictions (self.model.predict_gmm()):
+
+Encodes input to latent space via CVAE
+
+Runs GMM inference (static clustering, no temporal structure)
+
+Returns: cluster assignments directly from the learned Gaussian mixture
+
+What it tests: "Can the GMM prior alone (without MARHMM) cluster the latent space?"
+
+Zero -shot
+
+Zero - shot
+
+But wait — how do you handle unseen subject s∗s^*s∗?
+
+You have 3 options (important for your project):
+
+Option A (cleanest): no subject at test
+
+Just don’t use decoder at all for prediction
+
+👉 Use:
+
+mixture prior p(u)=∑kπkN(μk,Σk)p(u) = \sum_k \pi_k \mathcal{N}(\mu_k, \Sigma_k)p(u)=∑k​πk​N(μk​,Σk​)
+
+This is what already worked best for you:
+
+cGMVAE prior outperformed downstream HMM
+
+✅ Fully zero-shot
+ ✅ No leakage
+ ✅ Cleanest story
+
+Option B: learned default subject embedding
+
+Use a shared/global embedding:
+
+cglobalc_{global}cglobal​
+
+or sample average of training subjects.
+
+👉 Works, but weaker theoretically.
+
+Option C (more advanced): infer subject embedding online
+
+At test time:
+
+optimize csc_scs​ for a few samples
+
+⚠️ This becomes few-shot / transductive, not pure zero-shot
+
+Agent Writing
+
+You are a world-class Machine Learning professor reviewing a Master’s thesis written in British academic English. You are also an academic writing model for a Master’s thesis. Your task is to turn the supplied research materials, methods, results, and draft text into a precise, clear, and scientific thesis section that matches the existing thesis style and maintains continuity with earlier chapters.
+
+You operate in two modes and you must infer the correct mode from the user request.
+
+Mode A. Writing
+
+- Draft new Overleaf-ready thesis text from the supplied materials, methods, and results.
+
+- Do not invent claims, data, or citations. If a justified statement is not possible, state the limitation and specify what information is missing.
+
+- Apply the same discipline as in Mode B before finalising the draft. This includes notation consistency, cross-references, controlled claims, and removal of generic background.
+
+Mode B. Reviewing and refining
+
+- Critically revise the supplied text to improve structure, correctness, clarity, and consistency with earlier chapters.
+
+- Preserve intended meaning unless it is technically incorrect or unsupported.
+
+- Remove repetition of definitions already introduced earlier and replace with explicit cross-references.
+
+- After revision, provide a concise change log grouped by theme. Provide refs.bib entries only for any new citations you introduce.
+
+Core objectives
+
+- Produce an Overleaf-ready revision or draft of the supplied section.
+
+- Remove generic background unless it directly supports modelling choices or later analyses.
+
+- Ensure the section clearly builds on earlier sections and uses precise cross-references instead of repeating definitions.
+
+- Preserve logical flow and narrative continuity.
+
+Structure and hierarchy
+
+- Remove repetition of definitions already introduced earlier.
+
+- Replace repeated explanations with precise cross-references to earlier sections, figures, tables, and equations.
+
+- Ensure the section clearly builds on earlier sections.
+
+- Preserve logical flow and narrative continuity.
+
+- Do not add new subsections unless required for clarity and the existing structure is inadequate.
+
+Notation discipline
+
+- Enforce strict consistency with earlier notation.
+
+- Do not introduce alternative symbols unless absolutely necessary.
+
+- Avoid redundant redefinitions of variables and parameters, including X, Z, and \boldsymbol{\theta}.
+
+- Ensure equations are minimal, precise, and necessary.
+
+- Reference equations with \eqref{}.
+
+Terminology discipline
+
+- Use Machine Learning terminology rather than classical time-series jargon.
+
+- Avoid terms such as innovation, companion matrix, and unit-root stability unless formally cited and necessary for this thesis.
+
+- Prefer terms such as Gaussian noise term, state-conditional emission, marginal log-likelihood, and dynamic-programming recursion.
+
+- Use ML framing where appropriate, including distribution shift, label noise, class imbalance, train-test leakage, and nuisance factors.
+
+- Remove vague or rhetorical phrasing, including powerful framework, rich representation, and explicitly captures.
+
+- Avoid repeated “This enables …” constructions.
+
+Claims, evidence, and citations
+
+- Every theoretical claim must be either derived, cited, or clearly marked as an implementation choice.
+
+- Be strictly factual. Rely only on the supplied evidence. Do not invent claims, data, or citations.
+
+- Support assertions with data, analysis, and \cite{} references when the claim is not directly evidenced by the thesis results.
+
+- Prefer referencing thesis figures and tables when a statement is directly supported by presented results, rather than adding citations.
+
+- Avoid overcitation. Distribute citations logically. Use a canonical source for foundational claims and a specific source for extensions.
+
+- Do not stack multiple citations unnecessarily.
+
+- Ensure all citations correspond exactly to statements made.
+
+- If a citation is changed or a new citation is introduced, ensure it is correct and exists. Provide the required refs.bib entry after the revision.
+
+Tone and style
+
+- Write in British English.
+
+- Maintain an objective, impersonal voice. Avoid first person. Prefer forms such as “this report analyses” and “the results indicate”.
+
+- Keep sentences compact and controlled.
+
+- Avoid marketing language and overly enthusiastic phrasing. Maintain engagement through crisp motivation rather than hype.
+
+- Eliminate ChatGPT signals. Do not use long em dashes. Do not use filler, stacked synonyms, or overpromising.
+
+- Avoid vague high-level filler sentences and empty sophistication.
+
+- Avoid repeated constructions, including repeated “This enables …”.
+
+- Do not connect clauses with hyphens.
+
+- Do not use parentheses for subsentences. Restructure sentences instead.
+
+- Do not use colons or semicolons. Use full sentences.
+
+Technical discipline
+
+- Make explicit what changes from the base model and what remains identical.
+
+- Ensure complexity claims are purely asymptotic.
+
+- Do not overpromise interpretability or conclusions that are not demonstrated later in the thesis.
+
+- Make limitations explicit but controlled. State what the limitation is, why it matters for this thesis, and where it is handled later.
+
+Domain specificity
+
+- Use EEG when the data is EEG. Use EMG only when relevant.
+
+- Do not generalise to broader “electrophysiology” unless justified by the thesis content.
+
+- Align modelling claims with actual analyses performed.
+
+Thesis conventions and formalia
+
+- Use LaTeX cite commands and follow the referencing style defined in the thesis preamble.
+
+- Refer explicitly to figures, tables, and equations when discussing their content.
+
+- Maintain consistent terminology and strict acronym discipline. Define terms and abbreviations once, then reuse them. Use standard abbreviations such as EEG, EMG, HMM, MAR-HMM, NMI, RMS.
+
+- Use signposting only at the start of each section, not within subsections or subsubsections. Begin each section with one context sentence and end with one linking sentence.
+
+- Provide short intuitive explanations before equations when needed, and follow each equation with one sentence clarifying its meaning.
+
+- Provide only the content of sections and subsections. The preamble and formatting are already set.
+
+Required output format
+
+1) Provide the full revised or drafted Overleaf-ready section only.
+
+2) Then provide a concise explanation of the corrections made, grouped by theme such as structure, notation, terminology, claims and citations, and style.
+
+3) If any new citations were introduced, provide the corresponding refs.bib entries after the explanations.
+
+Experiments setup Decoder
+
+Prompt for Experiments on Decoder Only
+
+I need to make the experiements for cGMVAE Decoder only as new model that i run the experiements on, similarly to how i did all the other models, as seen by this table from my report.
+
+Model Dataset Domain Scope Train NMI Pred. NMI Train Log-Likelihood Pred. Log-Likelihood
+HMM MSSV Features Subject 0.640 ± 0.027 0.619 ± 0.075 ↓0.1377 ± 0.0301 ↓0.1732 ± 0.0381
+MAR-HMM MSSV Features Subject 0.653 ± 0.207 0.633 ± 0.108 ↓0.1568 ± 0.0417 ↓0.1972 ± 0.0456
+GMVAE-MAR-HMM MSSV Frequency Subject 0.672 ± 0.036 0.580 ± 0.032 ↓0.1316 ± 0.0501 ↓0.1639 ± 0.0547
+cGMVAE-MAR-HMM MSSV Frequency Subject 0.691 ± 0.018 0.656 ± 0.033 ↓0.1269 ± 0.0012 ↓0.1381 ± 0.0021
+cGMVAE Prior MSSV Frequency Subject 0.749 ± 0.018 0.738 ± 0.019 – –
+HMM MSSV Features Population 0.587 ± 0.009 0.505 ± 0.159 ↓0.1543 ± 0.0291 ↓0.2083 ± 0.0306
+MAR-HMM MSSV Features Population 0.594 ± 0.039 0.508 ± 0.183 ↓0.1708 ± 0.0609 ↓0.2157 ± 0.0804
+GMVAE-MAR-HMM MSSV Frequency Population 0.455 ± 0.021 0.067 ± 0.048 ↓0.1824 ± 0.0726 ↓0.4474 ± 0.1278
+cGMVAE-MAR-HMM MSSV Frequency Population 0.674 ± 0.033 0.642 ± 0.036 ↓0.1495 ± 0.0048 ↓0.1717 ± 0.0066
+cGMVAE Prior MSSV Frequency Population 0.729 ± 0.021 0.701 ± 0.030 – –
+
+This means that i in need to run the decoder only on first the subject wise scope. This entails running the model on a single subject and predicting on the same. Look at how i did this for the HMM src/config/run/hmm/subjectwise
+This will give me the subject scope Train NMI (subjectwise)
+
+Then i need to do getthe subject scope PredicTIve NMI (generalization subject) which is done by imitatiing src/config/run/hmm/generalization_subject
+
+Next for the population scope i need to do the src/config/run/hmm/reliability
+But remember to add the sub-69 as well as i had forgotten that in the HMM experiements. But dont change any of the HMM yamls. This will give the population scope Train NMI (reliability)
+
+Next i need the population scope Predictive NMI (generalization) which is from the are trained on many mice and tested on a held out mouse to quantify transfer
+Like done here:
+src/config/run/hmm/generalization
+
+Remember only for MSSV since i will not be running cGMVAE decoder only on synthetic data at all.
+
+Lab subject selection
+
+LAB 5
+
+Accepted
+
+Sub-87: 6 runs
+
+Sub-88: 2 runs
+
+Sub-89: 2 runs:
+
+Slightly bad EEG 2 (0.24 relative power where threshold is a 0.2)
+
+Sub-92: 2 runs
+
+Removed
+
+Sub-90: Bad EEG1, Bad EEG2, bad EMG
+
+Sub-91: Very Bad EMG
+
+LAB 2
+
+Accepted
+
+71, 72, 76, 77, 80, 81
+
+All have 2 runs
+
+Removed:
+
+73, 74, 75, 83, 84
+
+Bad EEG 1 (parietal)
+
+70, 72, 74, 75, 79, 83, 84, 85, 86
+
+Bad EEG 2 (parietal)
+
+70, 73, 75, 79, 83, 84, 85, 86
+
+Bad EEG 3 (frontal)
+
+73, 75, 79, 83, 84, 85, 86
+
+Bad EEG 4 (frontal)
+
+70, 73, 74, 75, 78, 79, 82, 83, 84, 85
+
+Bad EMG
+
+I just need to use one parietal (eeg1 or eeg 2), and one frontal (eeg 3 or eeg 4)
+
+LAB 3:
+
+Accepted:
+
+sub-38
+
+sub-39
+
+sub-41
+
+sub-43
+
+sub-48
+
+sub-54
+
+sub-56
+
+sub-59
+
+sub-60
+
+sub-69
+
+First step:
+
+Reproduce decoder-only results on Lab5 first with subject conditioning
+
+Subjectwise (Subject Train NMI):
+
+Train and val on all runs of a single subject. Do this for all subjects in the lab. Run it 3 times for each subject. Take the best of the runs, then compute mean and SEM after.
+
+Generalisation Subject (Subject Pred NMI):
+
+Train on ⅔ (lab 3) or ½ (lab 5) of the runs and Val on the last ⅓ (lab 3) or ½ (lab 5) run. Do it for 3 different subjects and run it 3 times for each subject.  Take the best of the runs, then compute mean and SEM after.
+
+Reliability (Population Train NMI):
+
+Train and Val on all subjects and all of their runs. Run it 10 times. Compute the mean and SEM after.
+
+Generalisation (Population  Pred NMI)
+
+LOSO
+
+(subjectwise + LOLO) to confirm baseline.
+
+subject conditioning VS lab conditioning VS subject+lab conditioning
+
+For your current setup, the best test is:
+
+within-lab subjectwise runs for labs 5 subjects
+
+leave-one-subject-out within lab 5
+
+leave-one-lab-out across labs 2/3/5 - bare bruge de første e.g EEG 1, EEG 3 (one frontal one parietal)
+
+a decoder-only lab-conditioning ablation against no conditioning
+
+Træne en stor model med alle labs og så predicte på forskellige cases - lab level, subject
+
+Conditional HMM VAE
+
+Subject cond Decoder
+
+Decoder Only Subject Conditioning
+
+Lab 2 (weakest / most variable)
+
+Reliability: Pred 0.35 ± 0.00.
+Subjectwise: peak Train up to 0.54 (077); Pred 0.29–0.48 on best seeds (076 0.48 best Pred).
+Generalization: 071 0.51 ± 0.01; 072 0.08 ± 0.02; 081 0.20 ± 0.07; others 0.28–0.42.
+Gen-subject: 081 0.49 ± 0.01 vs 077 0.06 ± 0.02 — gen-subject can beat full LOSO when LOSO fails (e.g. 081: gen ~0.20 vs gen-sub ~0.49).
+
+Lab 3 (still strongest)
+
+Reliability: Pred 0.73; peak Train ≈ 0.73 across seeds.
+Subjectwise (best run/mouse): Pred 0.65–0.84 (mean 0.75); peaks sub-056 0.83, sub-060 0.83; lowest sub-059 0.65.
+Generalization (039 / 041 / 048): Pred 0.78 / 0.69 / 0.70 (mean 0.72) — still strong in-lab LOSO.
+Gen-subject: Pred ~0.80 / ~0.83 / ~0.39 (039 / 041 / 048); 048 run-3 hold-out remains hard.
+
+Lab 5
+
+Reliability: Pred 0.41 ± 0.01.
+Subjectwise: peak Train 0.39–0.63; Pred 0.26–0.62 (087 0.60, 089 0.62, 092 0.46, 088 0.26 on best peak-train seed).
+Generalization: 088 Pred 0.15 ± 0.01 (clear failure); 089 / 092 ≈ 0.58 / 0.57.
+Gen-subject: stable ~0.37–0.42 across 088/089/092.
+
+Updated takeaways
+
+Lab 3 stays far ahead on decoder-only subject conditioning (~0.73 reliability Pred, ~0.72 gen), consistent with a larger, more homogeneous cohort and more runs per mouse.
+
+Labs 2 & 5 sit at ~0.35–0.41 reliability; in-lab subjectwise is modest (~0.36–0.48 Pred on best runs).
+
+Cross-mouse generalization is the main gap for labs 2 & 5 (many hold-outs < 0.30 Pred); lab 3 stays ~0.69–0.78.
+
+Failures: lab 5 gen sub-088 (0.15); lab 2 gen sub-072 (0.08), sub-081 (0.20); lab 3 gen-sub sub-048 (~0.39, with one logged run near 0.01).
+
+Gen-subject is often more stable but lower when gen works (lab 3); it can exceed LOSO when LOSO collapses (lab 2 sub-081).
+
+“We fixed the pipeline after initial development on lab 3 and evaluated the same decoder-only subject-conditioning setup on labs 2 and 5 without re-tuning.”
+
+Meeting Agenda
+
+Meeting Agenda
+
+Status:
+
+Decoder only done
+
+Works better
+
+Less SEM
+
+Still had a problem with one subject 48 in the Population Pred NMI, maybe running more times than once would be better
+
+Lab 2, 3, 5 analysed for channel quality
+
+Lab 5 chosen sub 87, 88, 89, 92
+
+Setup experiments to run decoder only subject conditioning on Lab 5 now
+
+Setup experiments to run cross lab.
+
+Next steps:
+
+Lab 2 test with more channels, 4 EEG total, but same montages
+
+Increase Hz to include all. Dont cap at 30Hz.
+
+Publish in a biological setting
+
+Condition on lab and subject - em
+
+Målet er at få invariante representation af søvn i en unsupervised setting. Latent rum. Finder de rigtige clusters, og overgangsstadier.
+
+Bedre sleep staging
+
+Refind the substages found across labs and subjects
+
+Forskningsspørgsmål
+
+Invariance
+
+I hvilken grad afspejler denne representation kendte søvnstadier - og er der relevante indiktioner af substadier
+
+Next steps
+
+Bedre med transition dynamics (HMM prior) cHMMGMVAE
+
+Transitions between epochs
+
+Bedre end to end (CNN lag i starten)
+
+Erstatte FFT med en CNN lag som kan ersttate det og har learned params. 4s segment ind, lærer en represnetation. En data drevet FFT. 512. Til hver kanal.
+
+Kortere filtrer, max pooling måske fremtiden.
+
+Husk transposed convolution on the decoder end.
+
+Meeting Agenda 2
+
+Status:
+
+Ran: Decoder Only Subject Conditioning on labs 2,3,5
+
+Lab 2 uses EEG 1 and EEG 3 (frontal & parietal)
+
+Lab 2 (6 subjects) & Lab 5 (4 subjects) have much lower NMI but also less, and more variable (noisy) data
+
+Hyperparameter sweeps for Labs 2 & 5
+
+Learning Rate [0.0002, 0.0003, 0.0005], max_beta [0.5, 1] and num_batches [32,64]
+
+Embedding dim: 4 , each epoch gets a categorical ID (usually subject, sometimes lab, sometimes both)
+
+Subject_lab uses conditioning size of 2*embed_dim so 8 concat features
+
+Latent dim: 8 standard choice, so z has shape 8.
+
+Ran: Lab Conditioning:
+
+Reliability
+
+Lab 3: 0.47 NMI
+
+Lab 5 0.37 NMI
+
+Morten anbefaling
+
+(3 runs) Træne på frequency input ska virke med conditioning på mus
+
+Kører analyserne hver lab for sig - labs 2, 3, 5
+
+4 fold cross validation - e.g.
+
+Fold 1, lab 3: mouse 38, 39
+
+Fold 2, lab 3: mouse 40, 41
+
+Fold
+
+Whole population all labs - joint over labs - vigtigere
+
+4 fold cross validation
+
+Use the same folds as lab
+
+Fold 1: lab 3 mouse 38, 39 AND lab 2 mouse 71
+
+Dele predictions op for hver lab - so i get predictions for each mouse (or lab)
+
+Each fold has some mouse of each lab held out.
+
+E.g. 2 from lab 3, 2 from lab 5 and 1 from lab 2
+
+Ablations with 3 stages
+
+Ikke har conditioning HMMGMM på vs med conditioning cHMMGMM
+
+cGMM vs cHMMGMM prior
+
+Tune hyperparameters - måske global
+
+Substages - run with variable number of substages only for the cHMMGMM. Run with 3-15 stages, each ran 5 times
+
+Error bars, etc
+
+Suplementary CNN delen med hvad jeg har gjort og hvilke udfordringer der er
+
+DROP the lab conditioing - just subject
+
+HMM på raw skal køres på de samme fold (baseline)
+
+For at sammenligne - Skal grounde performance imod HMMGMM (no conditioning) på raw data.  I de samme fold
+
+Rykke 14 juni aflevering i stedet for d 8.
+
+Warmup ladder is fine as long as we end on beta = 1
+
+Bigom møde Noter:
+
+Plot data that goes into the model. The preprocessing steps might work for lab 3 but not for the other labs.
+
+Preprocessing is on a run level, but check whether normalisation is on lab level or not
+
+Tuner hyperparameters med Priors prediction - GMM eller HMMGMM prior AFTER TRAINING - since we will be predicting with this
+
+Use less params to reduce confounders
+
+Køre uden waremup for cGMVAE og måske også cHMMGMVAE
+
+Lab - future work maybe? If it works
+
+Data preprocessing exploration ->model Smoke tests -> hyperparam sweep -> experimnts
+
+Skære ned og bare køre med den config der virker.
+
+BIGOM MEETING 2
+
+Try with more hidden neurons in the VAE network - so more neurons! Since its more lab data and more complex
+
+Try with more hidden dimensions of the latent space
+
+Try to get within lab to work well for each lab - labs 2 and 5 need to work - look at how they were scored and the artifact class or other preprocessing changes
+
+What does no_postnorm do for lab 2? Why is it much better
+
+Should i bandpass differently for the other labs? E.g. lab 2 works better with a wider band pass
+
+Lab 5 works better with more epochs
+
+Need to compare within each lab VS cross lab (cv4fold) -
+
+With and without conditioning (different types: subject, lab, subject&lab)
+
+Need to show the cHMMGMVAE works on lab 3 better than cGMVAE!
+
+Show the latent space and some other plot to show the sequence length impact and the transition matricer, etc. The flow of states? Maybe hypnogram?
+
+Ran: Conditioning Ablation on LOLO:
+
+Train on two labs and test on all mice from holdout lab.
+
+Subject conditioning
+
+Held out Lab 2: 0.39 NMI
+
+Held out Lab 3: 0.51 NMI
+
+Held out Lab 5: 0.37 NMI
+
+Lab conditioning:
+
+Work in progress
+
+Subject & Lab conditioning
+
+Work in progress
+
+Proposed: CNN instead of FFT
+
+Using differentiable Short-Time Fourier Transforms
+
+Remove bandpass of 30Hz, and take all take data with!
+
+CNN can learn its own frequency emphasis
+
+Target in decoder is frequency based, not the raw original signal
+
+It has to be original signal
+
+Idea: Replace FFT band-pass features with a learned front-end:
+
+short temporal segments per channel → small Conv1D stack → representation fed to the same subject-conditioned VAE encoder; ConvTranspose1D on the decoder to map back (transposed conv on decode path).
+
+A standard FFT takes a signal and tells you what frequencies are present (e.g., "this signal contains a massive 4 Hz Delta wave and a 10 Hz Theta wave"). However, the FFT looks at the entire signal all at once. By doing this, it completely destroys the time axis. It tells you what frequencies exist, but it cannot tell you when they happened.
+
+Short-Time Fourier Transform (STFT) analyzes how a signal's frequency content changes over time by dividing the long time-series signal into short, overlapping segments and applying a standard Fourier Transform to each isolated chunk
+
+2D spectrogram with time and frequencies and intensity in colour
+
+Gabor limit - long or short windows. Cant have perfect time resolution and have perfect frequencies
+
+Framing: “Data-driven spectrogram” — differentiable STFT / raw CNN path (raw_cnn in config) so filtering is learned, not fixed 30 Hz / manual bands.
+
+Status: Architecture wired in ConditionalVAE; smoke/POC on one subject; not yet the main lab 2/3/5 decoder-only results (those still use FFT pipeline).
+
+Proposed: HMMGMM prior
+
+It works in theory, but might not actually be capturing temporal dynamics due to CNN not working properly yet
+
+https://wandb.ai/dtu_projects/SPA/runs/bk5g7cfk?nw=nwuserfenriswulven
+
+Idea: Keep the same cGMVAE encoder/decoder and conditioning; only change the latent prior in the ELBO:
+
+GMM prior: latent state at each epoch is independent across time (mixture at each step).
+
+HMM-GMM prior: same mixture, plus a transition matrix so latent class at t depends on t-1.
+
+Explicit transition dynamics in the prior, not only in a downstream MAR-HMM.
+
+Training: train
+
+the model processes raw time-domain inputs through its internal trainable STFT filterbank layer and tasks the decoder with reconstructing the resulting log-magnitude frequency spectrum.
+
+We train the model fully end-to-end by flowing raw time-domain signals into a differentiable STFT filterbank layer, optimization-stabilized by forcing the decoder to reconstruct the resulting log-magnitude frequency spectrum rather than raw waveforms. To prevent latent collapse, we employ a phased warmup schedule—starting with a reconstruction-only phase (\beta=0), followed by a standard normal VAE warmup, a K-means cluster initialization, and a final linear ramp up to the full sequence-level HMM-GMM prior, which is optimized jointly using the differentiable forward algorithm via backpropagation through time.
+
+Warmup ladder - fine as long as we end on beta 1
+
+Stage 1 (Reconstruction Only): The model trains with \beta=0 for the first 10 epochs, focusing purely on learning a crisp spectral reconstruction from the raw data before any latent regularisation pulls the space together.
+
+WE DID THIS! KEEP at 10 epochs
+
+Stage 2 (Standard VAE Warmup): The model begins regularising the latent space against a simple isotropic Gaussian prior (\mathcal{N}(0, I)) to smoothly distribute the embedding coordinates.
+
+Try to remove
+
+Stage 3 (K-Means Initialization): The training loop pauses briefly to encode the dataset into continuous encoder means (\mu_\phi), running an offline K-Means cluster matching algorithm to cleanly initialize the GMM prior's means, variances, and state logits.
+
+Idk if we even used this or a Random Initialisation
+
+Stage 4 (HMM-GMM Sequence Ramp): The sequence length is fully enabled alongside the HMM transition framework, linearly ramping \beta up to its capped value (e.g., 0.25) to smoothly lock the continuous spatial clusters into temporally coherent physiological sleep trajectories
+
+Status: Implemented (hmm_gmm / warm_hmm_gmm);
+
+POC runs exist;
+
+temporal benefit unclear until front-end and lab-scale eval match the FFT baseline fairly.
+
+Questions:
+
+Metrics: Currently tracking latent K-Means NMI during training and the GMM Pred NMI after.
+
+Next steps:
+
+Finish / summarize LOLO conditioning tables (peak NMI, mean ± SEM).
+
+Run or analyze lab 2 sweep v2; only then update gen YAMLs if a clear winner.
+
+CNN: one cross-lab smoke → then match lab 3 protocol (reliability + LOSO).
+
+HMM-GMM: paired comparison vs GMM on same front-end (FFT first, then CNN).
+
+Lab 2 data: 4 EEG channels, uncapped Hz — new preprocessing + rerun decoder-only.
+
+Substages: re-find stable substages across labs/subjects once latents stabilize.
+
+Meeting Agenda 3 (Bigom)
+
+What this extension is about
+
+Goal: Rigorous 4-fold cross-validation on a quality cohort (20 mice, labs 2, 3, 5) to compare your thesis HMM-raw baseline against three VAE extensions on the same folds, so you can quantify “thesis vs special course” uplift.
+
+Scopes: per-lab (3 labs × 4 folds) + joint cross-lab (4 folds). VAE: best-of-3 runs; HMM raw: 1 run (30k epochs).
+
+What you have done
+
+1. Earlier foundation (thesis → course)
+
+Working CVAE stack (cGMVAE, cHMM-GMVAE), orchestrator, checkpoints, validation plots.
+
+Conditioning work: subject, lab, decoder-only, combined — documented in docs/conditioning_story_map.md.
+
+Reliability / lab-conditioning experiments and HPC scripts (decoder-only, lab conditioning).
+
+Supporting docs: cHMM_GMVAE.md, cgmvae_training.md, architecture notes.
+
+2. cv4fold experiment system (main extension deliverable)
+
+Built end-to-end (mostly uncommitted on chmmgmm_fold):
+
+Cohort + folds: data/manifests/cv_quality_cohort_v1.yaml (20 mice, 4 folds, per-lab + joint holdouts).
+
+Config generator: scripts/cv4fold/generate_configs.py → full YAML grid under src/config/run/.../cv4fold/.
+
+HPC pipeline: smoke → W&B tune → full grid (hpc/submit/cv4fold/, queue routing, heredoc bsub).
+
+Postprocessing: per-mouse splits, tripanel plots, select_best_vae_run.py.
+
+Workflow doc: docs/cv4fold/README.md.
+
+3. Experiments actually run
+
+Smoke80 NMI (joint fold 4) — useful talking point:
+
+Manifest currently locks learning_rate: 0.0003, epochs: 80 (manual tune favored 120 epochs at same LR).
+
+What you still need to do (execution)
+
+Finish Phase 1: W&B sweep (50 trials × cgmvae + chmmgmvae, all-mice in-sample) → lock winners in manifest.
+
+Regenerate full configs and submit Phase 2 (submit_all_cv4fold.sh) — large GPU spend.
+
+Run HMM raw on full grid (24h jobs, may need resume).
+
+Aggregate results: fold-wise tables, per-mouse metrics, best_runs.json, thesis uplift tables (hmm_raw vs cHMMGMVAE vs ablations).
+
+Commit the cv4fold branch work when stable.
+
+Where you likely need your partner’s help
+
+Scientific / design
+
+HMMGMVAE is failing badly (NMI ~0.09–0.12 vs ~0.36–0.38 for conditioned models). Is that expected for this setup, or a bug/config issue? Should it stay in the ablation grid?
+
+Thesis uplift narrative: HMM raw uses ~1 s windows; VAE uses 4 s FFT features — partner input on how to phrase “fair” comparison in the report.
+
+Fold balance: plan noted reviewing fold 1 (heavy holdouts like sub-087); manifest already rebalanced lab_3 (sub-069). Confirm splits are acceptable for publication/thesis.
+
+Hyperparameter lock: epochs 80 (manifest) vs 120 (manual tune winner) — which to use for the full grid?
+
+Methodology / writing
+
+How to report 4-fold CV: mean ± std across folds, per-lab vs joint, per-mouse holdout metrics — align with Morten’s expectations.
+
+Framing the special course: one clear paragraph on contribution beyond thesis (rigorous CV + three ablations + reproducible pipeline vs single-subject POC runs).
+
+Compute / prioritization
+
+Grid is huge (3 VAE × 4 scopes × 4 folds × 3 seeds + 16 HMM jobs). What to run first if GPU time is limited (e.g. joint only, or lab 3 only)?
+
+HMM raw 30k epochs — resume strategy and whether smoke-scale HMM is enough for debugging only.
+
+Technical (if partner knows the codebase)
+
+Review fair-comparison locks (seq64, β schedule, no CNN, no lab conditioning) in cv4fold templates.
+
+Tripanel / W&B sweep expansion (second plan: beta cyclical, broader Bayes search) — priority vs getting full CV numbers first.
+
+Suggested agenda (15–20 min)
+
+2 min — Recap goal: same-fold comparison, thesis baseline vs extensions.
+
+5 min — Show smoke80: cHMMGMVAE ≈ cGMVAE; HMMGMVAE broken?
+
+5 min — Pipeline done; blocked on full grid + HMM baseline + tune lock.
+
+5 min — Decisions: hmmgmvae, epochs 80 vs 120, run priority, reporting format.
+
+3 min — Timeline to thesis/special-course deadline.
+
+One-liner for the meeting
+
+“I built a reproducible 4-fold CV framework on 20 quality mice comparing thesis HMM-raw to cGMVAE / cHMMGMVAE / HMMGMVAE; smoke tests look good for conditioned models but HMMGMVAE collapses and the full grid plus thesis-scale HMM baseline are not run yet — I need help interpreting the ablation failure, locking hyperparameters, and how to report uplift fairly.”
+
+If you want, I can turn this into a one-page slide outline or a short email draft to send before the meeting.
+
+Morten anbefaling
+
+Morten anbefaling
+
+(3 runs) Træne på frequency input ska virke med conditioning på mus. Should be run 3 times for each, and the best run should be taken.
+
+Kører analyserne hver lab for sig - labs 2, 3, 5
+
+5 fold cross validation - e.g.
+
+Fold 1, lab 3: mouse 38, 39
+
+Fold 2, lab 3: mouse 40, 41
+
+Fol
+
+Whole population all labs - joint over labs - vigtigere
+
+5 fold cross validation
+
+Use the same folds as lab
+
+Fold 1: lab 3 mouse 38, 39 AND lab 2 mouse 71
+
+Dele predictions op for hver lab - so i get predictions for each mouse (or lab)
+
+Each fold has some mouse of each lab held out.
+
+E.g. 2 from lab 3, 2 from lab 5 and 1 from lab 2
+
+Ablations with 3 models total: cHMMGMVAE, HMMGMVAE, cGMVAE
+
+Ikke har conditioning HMMGM på vs med conditioning cHMMGM
+
+cGMM vs cHMMGM prior
+
+HMM raw!
+
+Tune hyperparameters - måske global
+
+Substages - run with variable number of substages only for the cHMMGMM. Run with 3-15 stages, each ran 5 times
+
+Error bars, etc
+
+This should be on all of the data???
+
+Suplementary - CNN delen med hvad jeg har gjort og hvilke udfordringer der er
+
+DROP the lab conditioing - just subject
+
+HMM på raw skal køres på de samme fold (baseline)
+
+For at sammenligne - Skal grounde performance imod HMMGMM (no conditioning) på raw data.  I de samme fold
+
+Rykke 14 juni aflevering i stedet for d 8.
+
+Warmup ladder is fine as long as we end on beta = 1
+
+Folds
+
+4 - folds since lab 5 only has 4 mice.
+
+Recommended next steps
+
+Lock hyperparams to lr=0.0003, epochs=120 (tune winner).
+
+Fix hmm_raw yaml (add valid cvae: stub to hmm_raw_thesis_base.yaml or make cvae optional in GlobalConfig), regenerate smoke config, resubmit HMM smoke only.
+
+Revisit hmmgmvae smoke — inspect plots; consider longer smoke or accept that 20 epochs is only a pipeline check for that family.
+
+Then generate_configs --phase full + submit_all_cv4fold.sh when you are ready for Phase 2.
+
+I can patch the HMM config / cvae validation issue so hmm_raw smoke runs on the next submit if you want that fixed now.
+
+cd /work3/s204070/SPA
+
+source .venv/bin/activate
+
+# Base config for joint fold 4 (from manifest)
+
+PYTHONPATH=. python3 scripts/cv4fold/generate_configs.py --phase tune_sweep_base
+
+# 25 gpuv100 jobs × 1 trial each (needs WANDB_API_KEY in .env)
+
+bash hpc/submit/cv4fold/submit_tune_sweep.sh
+
+PYTHONPATH=. python3 scripts/cv4fold/generate_configs.py --phase full
+
+bash hpc/submit/cv4fold/submit_all_cv4fold.sh
+
+submit_tune.sh now points to submit_tune_sweep.sh (old 6-job LR×epoch grid removed from the generator).
+
+Does subject encoding capture lab
+
+Does subject encoding capture lab?
+
+Partially, but not for the metric you're optimizing.
+
+Your cv4fold configs use decoder_only_conditioning: true and conditioning_source: subject. That means:
+
+# cHMM-GMVAE, all mice
+
+ALL_MICE=1 bash hpc/submit/cv4fold/submit_tune_sweep.sh
+
+# cGMVAE, all mice
+
+ALL_MICE=1 MODEL=cgmvae bash hpc/submit/cv4fold/submit_tune_sweep.sh
+
+# Optional: more agents / longer wall
+
+ALL_MICE=1 MODEL=chmmgmvae NUM_AGENTS=50 WALLTIME=10:00 bash hpc/submit/cv4fold/submit_tune_sweep.sh
+
+Two parts: what we changed in code, and what to tune.
+
+Code changes (runs survive HMM blow-ups)
+
+Trainer — non-finite loss or grad → skip that batch, keep training (no crash). Logs first few warnings per epoch.
+
+HMM KL fallback — if HMM-GMM KL is NaN/Inf, use GMM-seq KL for that step instead (_safe_hmm_gmm_prior).
+
+Transition init — estimated A is now 50/50 blend with sticky κ matrix (reduces collapse to switch rate 0).
+
+Template defaults — hmm_warmup_epochs: 35, hmm_transition_ramp_epochs: 16 (was 25/8).
+
+Sweep bounds — longer GMM-only phase (hmm_warmup min 25) and longer ramp (8–32 epochs).
+
+What helps stability (beyond not crashing)
+
+init_strategy (kmeans, random_uniform, …) still does not apply to this latent HMM — only to HMM/MARHMM modules.
+
+2. Warm schedule during training (warm_hmm_gmm_prior)
+
+Training goes through four phases controlled by epoch counters:
+
+Why joint all-labs NMI stalls around ~0.48
+
+I pulled your local sweep results under results/cv4fold/tune_sweep/chmmgmvae/joint/fold_4/.
+
+What the number actually is
+
+The Bayes sweep optimizes val/cvae_latent_kmeans_nmi: KMeans on CVAE latents vs sleep-stage labels, pooled across all holdout mice and runs from labs 2, 3, and 5. That is a harder target than per-lab or per-mouse NMI.
+
+Your completed trials so far:
+
+So 0.48 is not the ceiling — your best valid 3-state trial is already ~0.57. But many trials collapse to 1–2 states, and the top W&B score can be misleading if collapse happens.
+
+Why joint is harder than “all labs should help”
+
+Cross-lab input mismatch — lab 2 uses EEG1+EEG3, labs 3/5 use EEG1+EEG2. Same 3-channel tensor, different physiology/montage. One shared encoder must represent all of them.
+
+Holdout mice are uneven — fold 4 holdout: sub-080/081 (lab 2), sub-056/059/060 (lab 3), sub-092 (lab 5). From your 20-epoch smoke (per-mouse):
+
+Pooled NMI is dragged down by lab 3 holdout mice — especially 059/060 — even when lab 2 mice score ~0.6.
+
+Subject conditioning ≠ lab normalization — you condition on subject ID, not lab. That helps decoding per mouse but does not remove cross-lab feature shift in the shared latent space.
+
+Metric vs final metrics.txt — W&B tracks latent KMeans NMI during training. End-of-run metrics.txt reports HMM-Viterbi NMI after the temporal prior — related but not identical.
+
+Practical takeaways
+
+Treat ~0.48 pooled joint NMI as plausible, not necessarily a bug.
+
+When picking a sweep winner, require Predicted unique states: 3 — favor np6uo8ut-style runs over collapsed 2-state winners.
+
+CV4fold sweep audit (condensed)
+
+CV4fold sweep audit (condensed)
+
+Pulled from HPC logs (hpc/output/sweep_*), checkpoints under results/cv4fold/tune_sweep/, and W&B (dtu_projects/SPA, 199 cv4fold runs). Metric = best train-time latent KMeans NMI (what the sweep optimizes).
+
+What ran vs not
+
+Never submitted (YAML exists, no HPC logs):
+
+cgmvae_joint_fold{1,2,3,4}_bayes50.yaml
+
+chmmgmvae_joint_fold{1,2,3,4}_bayes50.yaml
+
+cgmvae_joint_fold4_bayes25.yaml (superseded)
+
+Also ran (not cv4fold): decoder-only lab2/lab5 reliability grids.
+
+Failures and causes
+
+cGMVAE sweeps had zero hard failures.
+
+Main findings
+
+Best result overall: cGMVAE per_lab lab_3 → NMI 0.630 (many trials >0.55). Lab-3-only data is much easier than pooled cross-lab.
+
+Joint pooled ceiling ~0.48–0.56:
+
+cGMVAE all-mice: max 0.479, tight cluster around 0.35–0.45
+
+cHMM all-mice: max 0.556 (trial 5bkceef8) but median only 0.334 — high variance
+
+cGMVAE >> cHMM-GMVAE for stability on the same data. cHMM wins on peak NMI sometimes but most trials are worse.
+
+Per_lab vs joint: lab_3 alone (+15pp NMI) vs joint all-mice points to cross-lab heterogeneity (EEG placement, bandpower) as the main limiter — not missing hyperparams alone.
+
+Hyperparam signal (informal): best cHMM trial used moderate LR, long training (~105 ep), HMM warmup ~50+. Many fast-HMM configs collapse.
+
+State collapse?
+
+Yes, mainly on cHMM-GMVAE — model/training, not raw data.
+
+KMeans always uses k=3 (sleep-state labels). Collapse = latents fail to separate 3 classes (NMI → 0.01–0.05), not “2-cluster KMeans.”
+
+HMM switch rate → 0 after HMM activation in ~25/40 fold_4 bayes25 trials and ~18/62 all-mice cHMM runs → sticky HMM stuck in one path.
+
+Classic pattern: good NMI pre-HMM (0.35–0.42) → crash post-HMM (0.005–0.05). That’s HMM phase / warmup scheduling, not bad EEG.
+
+cGMVAE (GMM prior only): minimal collapse (1 trial in all-mice, 9 noisy dips in lab_3 but still strong peaks).
+
+What I fixed
+
+Updated generate_configs.py so cHMM all-mice sweeps exclude VRAM-heavy combos and regenerated:
+
+src/config/sweep/cv4fold/chmmgmvae_joint_all_mice_bayes50.yaml
+
+Recommended reruns
+
+# cHMM all-mice (OOM-safe; fresh 50 trials)
+
+ALL_MICE=1 MODEL=chmmgmvae bash hpc/submit/cv4fold/submit_tune_sweep.sh
+
+# Joint fold CV sweeps (never submitted; use bayes50 not bayes25)
+
+MODEL=cgmvae FOLD=4 bash hpc/submit/cv4fold/submit_tune_sweep.sh
+
+MODEL=chmmgmvae FOLD=4 bash hpc/submit/cv4fold/submit_tune_sweep.sh
+
+# or all folds:
+
+bash hpc/submit/cv4fold/submit_tune_sweep_all_folds.sh
+
+Bottom line: Sweeps worked for cGMVAE (especially lab_3). cHMM needs a clean resubmit with stability fixes + OOM-safe bounds. Joint pooled NMI ~0.48 is plausible; lab_3 alone shows the model can reach ~0.63 when lab heterogeneity is removed. I can submit the fixed cHMM all-mice sweep or extract top-3 hyperparam configs per scope if you want that next.
+
+What changed since April (and why all-mice looks “bad”)
+
+Intentional thesis/cv4fold changes — not accidental regressions:
+
+sequence_length: 1 → 64
+Needed for HMM/cHMM path. Static cGMVAE worked well at seq=1; seq=64 is a harder representation problem (~0.1 NMI on lab_3 alone).
+
+Single lab → three labs pooled
+Lab_2 uses different EEG pairing (EEG1/EEG3 vs EEG1/EEG2). Cross-lab alignment is the main ceiling (~0.48 joint vs ~0.63 lab_3-only).
+
+Pretrained decoder removed
+Reliability warm-started from cvae_final_decoder_only_model.pth. cv4fold trains end-to-end from scratch.
+
+Sweep vs tuned single config
+Reliability: 10 runs, fixed good hyperparams. Sweep: one shot per trial, explores cyclical β, batch sizes, etc.; median all-mice KMeans ~0.40.
+
+Sweep metric ≠ metrics.txt metric
+Sweep optimizes KMeans-on-latents during training; your tripanel/metrics.txt uses GMM marginal at the end. Same ballpark on all-mice, but not identical.
+
+Not the cause: bandpass (still 20 Hz), subject conditioning, GMM prior, or in-sample train=val (both setups do that for these runs).
+
+A. Fair comparison to reliability (lab_3, GMM metric)
+Run lab_3 with sequence_length: 1, batch 128, fixed hyperparams, optional pretrained decoder, validate_cvae_gmm.
+
+B. Keep cv4fold protocol (seq=64) but improve joint pooled
+
+Tune on per-lab sweeps (lab_3 already ~0.63) and accept joint ~0.48–0.55 as cross-lab ceiling
+
+Or add lab conditioning / harmonize channels
+
+Lock sweep winners instead of reporting sweep median
+
+C. Align metrics
+Add GMM marginal NMI to sweep objective or report both KMeans and GMM for the same checkpoint.
+
+Lab diff performances
+
+1. Many models are effectively “lab 3 models”
+
+Your main decoder-only reliability config trains only on lab_3 subjects (sub-038, sub-039, sub-041, …) in reliability_cgmvae_decoder_only_subject_conditioning.yaml. So strong lab_3 numbers are largely in-distribution performance, not cross-lab generalization.
+
+Reported NMI (examples from your runs):
+
+So if you compare “my lab_3 model on lab_2/5,” a big drop is expected even before counting hours.
+
+2. Lab 3 has much more data (but that’s not the whole story)
+
+For labs 2, 3, 5:
+
+Lab 3 has roughly 4–5× more labeled time and longer continuous recordings. That helps both training and validation stability.
+
+But note: even when each model is trained only on its own lab, lab_3 still reaches ~0.73 while lab_2/lab_5 stay ~0.34–0.35. So lab 3 isn’t winning only because other labs have “less test data” — something about lab 3 recordings / labels / protocol also differs.
+
+3. Recording setup differs between labs (domain shift)
+
+From metadata.csv:
+
+lab_2: EEG1–4 + EMG (4 EEG channels); placements like P, P, F, F; 6 h runs.
+
+lab_3 & lab_5: EEG1 + EEG2 + EMG only; placements P + F; longer runs (lab_3 especially).
+
+Your mixed training config (reliability_cgmvae_decoder_only_labs235.yaml) even uses different channel sets per lab (e.g. lab_2 uses EEG1+EEG3+EMG, lab_3/5 use EEG1+EEG2+EMG). That forces the model to bridge different montages and spectra, not just “more vs fewer subjects.”
+
+scripts/data_exploration/lab_differences.py was built exactly because amplitude, PSD, and variability differ across labs — that’s classic domain shift for unsupervised / weakly supervised sleep models.
+
+4. Labels are not fully comparable across labs
+
+From your stage-count analysis:
+
+lab_2 & lab_5: 0% artifact in processed labels (3-class effective setup).
+
+lab_3: small artifact fraction (~0.4%).
+
+Stage mix is similar for 2/3/5, but label semantics and scoring rigor can still differ by site.
+
+The dataset code also treats labs differently:
+
+mssv_dataset.pyLines 63-64
+
+config['n_stages'] = 4 if not config['lab'] in ('lab_2', 'lab_4') else 3
+
+config['stage_names'] = ['Awake', 'NREM', 'REM', 'Artifact'] if not config['lab'] in ('lab_2', 'lab_4') else ['Awake', 'NREM', 'REM']
+
+So “Wake/NREM/REM” are not guaranteed to be identically defined/scored across labs.
+
+5. Subject count and subject conditioning
+
+Lab 3: 32 subjects → subject conditioning has many examples.
+
+Lab 5: 6 subjects → harder to learn subject-specific decoders.
+
+Cross-lab generalization with subject conditioning is especially hard: subject IDs at test time were never seen at train time.
+
+Practical takeaway
+
+So: partly data quantity, but definitely not purely that. The bigger story is domain shift + training/eval mismatch (lab-3-centric training, different hardware, channels, run length, and labeling).
+
+What would isolate the cause?
+
+Per-lab train & test (you already started): compare NMI within each lab only.
+
+Harmonize inputs: same channels everywhere (e.g. only EEG1+EEG2+EMG for all labs).
+
+Match run length: train on 6 h windows if evaluating lab_2.
+
+Lab conditioning / LOLO (your lab_conditioning configs): see if explicit lab ID recovers cross-lab performance.
+
+Match hours, not subjects: subsample lab_3 to ~205 h and see how much of the gap remains — that tests “is it just more data?”
+
+If you tell me which exact run you’re comparing (e.g. decoder-only reliability vs labs235 vs LOLO holdout), I can map the numbers to that setup more precisely.
+
+sweep
+
+chmmgmvae (sweep 1gbsbad1)
+
+Top trials on disk (trial id):
+
+W&B-ranked best (0z8ird8h) highlights: cyclical β, latent_dim=4, emb_dim=8, lr ≈ 1.3e-3, 185 epochs, low HMM switch (~0.73/100).
+
+Many trials collapsed (NMI < 0.01); median ~0.33 is reasonable but spread is wide.
+
+cgmvae (sweep 8e8jftet)
+
+Top on disk: 8duimqhc (0.513 disk / 0.459 W&B) — anneal β, latent_dim=16, lr ≈ 1.2e-5, 240 epochs, num_batches=256.
+
+cgmvae median on disk is dragged down by many failed/low-NMI trials (~0.09 median).
+
+Head-to-head on this sweep: chmmgmvae wins on both W&B and disk bests (~0.49 vs ~0.46 W&B; ~0.56 vs ~0.51 disk).
+
+Next step per your docs: lock hyperparams in data/manifests/cv_quality_cohort_v1.yaml (e.g. from 5bkceef8 or 0z8ird8h for chmmgmvae, 8duimqhc for cgmvae), run generate_configs.py --phase full, then submit_all_cv4fold.sh for Phase 2.
+
+broken branches
+
+Short answer: cross-lab is hard because the data are not the same random process across sites, not because your VAE is “broken.” subject_lab is not a bad idea, but decoder-only + subject-tuned hyperparams + embedding at decode time is a fragile combo for joint 3-lab training—and your fold-4 numbers match that story.
+
+Why training across labs is hard
+
+1. Different recordings, not just different mice
+Labs differ in montage (lab_2: two parietal EEGs; lab_3/5: parietal + frontal), scoring, and amplitude. The audit showed lab clusters in feature space stronger than stage clusters even after the same FFT pipeline. The model must learn “sleep stage” on top of that shift.
+
+2. Decoder-only pushes identity into the decoder, not the latent
+With decoder_only_conditioning: true, the encoder builds one latent space from mixed labs without being told which lab/mouse. The decoder is supposed to fix lab-specific reconstruction. That works well when train and test look similar (your thesis: mostly lab_3, subject scope). On joint 3-lab holdout, the encoder sees lab_2/5 mice it never saw at train time and must still produce latents the GMM can score as Wake/NREM/REM—that is a much harder generalization problem.
+
+3. Holdout is harder than your thesis table
+Thesis rows: subject or population, often same lab / similar setup, GMVAE trained on “all except the predictive split.”
+cv4fold fold 4: train on 17 mice from 3 labs, test on 6 held-out mice from all 3 labs. That is real cross-site generalization, not “same lab, new night.”
+
+4. Hyperparams were tuned for subject, not subject_lab
+Bayes tune winners were picked with conditioning_source: subject and in-sample all-mice setup. Plugging in subject_lab without re-tuning gave NMI ≈ 0 (collapse). That is a mismatch, not proof that “lab + subject” is wrong in principle.
+
+5. seq length matters
+Fold 4: seq64 + subject → 0.31 pooled NMI; seq1 + subject → 0.07. Temporal context helps the prior; thesis-style seq1 does not transfer to this joint holdout.
+
+6. Metrics hide uneven success
+Even “good” B: lab_2 ~0.47, lab_5 ~0.42, lab_3 ~0.08 on holdout. Pooled NMI can look OK while one lab fails (fold-4 lab_3 mice are hard).
+
+So difficulty is expected: you moved from “stable decoder-only on familiar lab_3” to “one encoder, three labs, six unseen mice.”
+
+Is subject_lab conditioning flawed?
+
+Not as a concept. Telling the model which site and which animal when reconstructing is reasonable when labs differ systematically.
+
+What is weak in the current setup:
+
+Practical theory (one line)
+
+Decoder-only subject conditioning = “one latent sleep space, decoder handles idiosyncrasy” → OK for within-lab stability (thesis).
+
+Joint 3-lab holdout = need either shared latents that are truly lab-invariant (hard) or explicit lab in the encoder/prior (subject_lab done properly), not just subject-tuned decoder-only with lab tacked on at decode time.
+
+Your conditioning story is not nonsense; the gap is where conditioning acts (decode-only vs encode), how you tuned it (subject-only winners), and how hard the eval is (3-lab holdout vs lab_3 reliability table).
+
+CONDITIONING
+
+Your reported GMM/HMM NMI goes through encode → prior on z. The subject_ids argument is passed but ignored by the encoder in decoder-only mode. So at LODO test you do not get “random embedding poisons the latent” the way encoder-conditioned cGMVAE does.
+
+That is why decoder-only is a better fit for population generalization than encoder+subject, and why your thesis’s 1/3 held-out leakage protocol is mainly an encoder-conditioning issue.
+
+So for “new mouse, same lab” and your current metrics:
+
+Decoder-only + subject_emb: latent staging can generalize without a trained row for the held-out mouse (encoder doesn’t look it up). Remaining gap is true distribution shift (spectra the encoder never saw), not bad embedding lookup.
+
+Encoder + subject_emb: latent does use the embedding → held-out mouse needs leakage/few-shot or you get bad conditioning.
+
+What is still true
+
+Subject embedding is not a generalization mechanism for unseen mice.
+It’s a per-mouse decoder knob for seen mice during training. It doesn’t give you a meaningful “identity vector” for a new mouse at test.
+
+Training still uses subject_emb in the decoder for every training mouse (forward → decode(z, subject_ids)). The encoder is pushed to produce z that decodes well with mouse-specific decoder inputs — nuisance is meant to live in the decoder, not in z.
+
+LODO is still hard — the held-out mouse’s EEG was never in training. Decoder-only removes the embedding artifact; it doesn’t remove spectral / cohort shift.
+
+Lab conditioning still matters for decoder-only if you care about reconstruction or later add lab to the encoder. For labs 2/3/5 (different montages, 3 vs 4 stages), lab is the metadata you know at test time for a new mouse; subject ID is not.
+
+Also
+
+What to do differently (concrete)
+
+Checkpoint on val/prior_pred_nmi (and require n_unique_pred_states == 3, entropy_norm > 0), not KMeans alone.
+
+Report 3 seeds + SEM — B’s 0.31 is one lucky/collapsed seed, not a population result.
+
+Prefer seq64 over seq1 for cv4fold (A already showed seq1 prior failure).
+
+Push cHMM on fold 4 before more cGMVAE subject_lab sweeps.
+
+In W&B, filter runs by name fold4 and plot together:
+
+val/prior_pred_nmi vs epoch
+
+val/n_unique_pred_states
+
+val/entropy_norm
+
+overlay val/cvae_latent_kmeans_nmi to see the disconnect.
+
+W&B filter tip: project dtu_projects/SPA, search run name contains fold4 or joint_fold4.
+
+Now:     Finish lab_3 matrix on THIS branch (0→baselines, A–E, [92,4]).
+
+Next:    Tag commit / note SHA in W&B when baselines succeed.
+
+Then:    cv4fold — cherry-pick FROM chmmgmm_fold:
+
+- manifest + fold YAML generator
+
+- postprocess / val_nmi_by_lab
+
+- seq64 templates
+
+NOT: blind subject_lab + tune winners without fold-4 re-tune
+
+Later:   Decoder lab_emb (small) on this branch if multi-lab needs it.
+
+Impact
+
+Preprocessing
+
+Preprocessing
+
+LAB 5
+
+Later stuff
+
+Later stuff
+
+Cv4 shared model
+
+Cv4 shared model
+
+cHMM-GMVAE
+
+HMM-GMM-VAE
+
+Training schedule
+
+CNN
+
+CNN replacement of FFT
+
+After epoch 10: no_beta_epochs ends and warm_gmm + KL turn on. The model stops optimizing “separate sleep clusters” and starts matching a single GMM mode + very low recon loss. Latents shrink to almost the same z for every window → KMeans NMI ≈ 0.
+
+PCA plot: Same thing — all points sit in one tight blob because z barely varies (and GMM often predicts one state). True wake/NREM/REM colors overlap because the encoder did not keep stage-specific structure in latent space after that phase change.

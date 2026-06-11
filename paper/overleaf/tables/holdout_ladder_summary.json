@@ -1,23 +1,24 @@
 {
   "joint_by_model": {
-    "cgmvae_locked": {
-      "mean_nmi": 0.334725,
+    "hmmgmvae_locked": {
+      "mean_nmi": 0.386525,
       "n_folds": 4,
-      "min_nmi": 0.275,
-      "max_nmi": 0.4074
+      "min_nmi": 0.2358,
+      "max_nmi": 0.4974
+    },
+    "cgmvae_locked": {
+      "mean_nmi": 0.24289999999999998,
+      "n_folds": 4,
+      "min_nmi": 0.1414,
+      "max_nmi": 0.3067
     },
     "chmmgmvae_locked": {
-      "mean_nmi": 0.558175,
+      "mean_nmi": 0.574775,
       "n_folds": 4,
-      "min_nmi": 0.3808,
-      "max_nmi": 0.6461
+      "min_nmi": 0.3956,
+      "max_nmi": 0.6754
     }
   },
-  "thesis_baseline": {
-    "hmm_features": {
-      "nmi": 0.51,
-      "source": "thesis Table 10 population"
-    }
-  },
-  "n_rows": 31
+  "thesis_baseline": {},
+  "n_rows": 48
 }

@@ -1,0 +1,198 @@
+{
+  "generated_at": "2026-06-09T15:02:15.066330+00:00",
+  "thesis_pdf": "Master Thesis.pdf",
+  "pdf_results": [
+    {
+      "engine": "pymupdf",
+      "ok": true,
+      "page_count": 117,
+      "char_count": 303901,
+      "word_count": 45190,
+      "text_path": "docs/paper/source_extraction/thesis_pymupdf.txt",
+      "error": null,
+      "anchors_found": [
+        "Characterizing Sleep Patterns",
+        "Oliver Rosb\u00e6k Elmgreen",
+        "Andreas Holmer Bigom",
+        "population NMI of about 0.51",
+        "population NMI of about 0.70",
+        "conditional Gaussian mixture variational autoencoder",
+        "leave one subject out",
+        "Mouse Sleep Staging Validation",
+        "Table 10",
+        "subject conditioned"
+      ]
+    },
+    {
+      "engine": "pdfplumber",
+      "ok": true,
+      "page_count": 117,
+      "char_count": 308515,
+      "word_count": 49005,
+      "text_path": "docs/paper/source_extraction/thesis_pdfplumber.txt",
+      "error": null,
+      "anchors_found": [
+        "Characterizing Sleep Patterns",
+        "Oliver Rosb\u00e6k Elmgreen",
+        "Andreas Holmer Bigom",
+        "population NMI of about 0.51",
+        "leave one subject out",
+        "Mouse Sleep Staging Validation",
+        "Table 10",
+        "subject conditioned"
+      ]
+    },
+    {
+      "engine": "pypdf",
+      "ok": true,
+      "page_count": 117,
+      "char_count": 304162,
+      "word_count": 45434,
+      "text_path": "docs/paper/source_extraction/thesis_pypdf.txt",
+      "error": null,
+      "anchors_found": [
+        "Characterizing Sleep Patterns",
+        "Oliver Rosb\u00e6k Elmgreen",
+        "Andreas Holmer Bigom",
+        "population NMI of about 0.51",
+        "population NMI of about 0.70",
+        "conditional Gaussian mixture variational autoencoder",
+        "leave one subject out",
+        "Mouse Sleep Staging Validation",
+        "Table 10",
+        "subject conditioned"
+      ]
+    }
+  ],
+  "pdf_cross_check": {
+    "engines_ok": 3,
+    "engines_total": 3,
+    "page_counts": {
+      "pymupdf": 117,
+      "pdfplumber": 117,
+      "pypdf": 117
+    },
+    "char_counts": {
+      "pymupdf": 303901,
+      "pdfplumber": 308515,
+      "pypdf": 304162
+    },
+    "page_count_agree": true,
+    "char_count_spread": 4614,
+    "char_count_spread_pct": 1.5,
+    "anchor_votes": {
+      "Characterizing Sleep Patterns": 3,
+      "Oliver Rosb\u00e6k Elmgreen": 3,
+      "Andreas Holmer Bigom": 3,
+      "population NMI of about 0.51": 3,
+      "population NMI of about 0.70": 2,
+      "conditional Gaussian mixture variational autoencoder": 2,
+      "leave one subject out": 3,
+      "Mouse Sleep Staging Validation": 3,
+      "Table 10": 3,
+      "subject conditioned": 3
+    },
+    "anchors_missing": [
+      "decoder-only"
+    ],
+    "anchors_weak": [
+      "population NMI of about 0.70",
+      "conditional Gaussian mixture variational autoencoder"
+    ],
+    "text_similarity_to_canonical": {
+      "pdfplumber": 0.8935,
+      "pypdf": 0.8348
+    },
+    "legacy_txt_similarity": 0.7548,
+    "status": "PASS"
+  },
+  "thesis_sections_chars": {
+    "abstract": "8000",
+    "introduction": "8000",
+    "discussion": "8000",
+    "conclusion": "8000"
+  },
+  "paper_claim_checks": [
+    {
+      "claim": "thesis_hmm_nmi",
+      "pattern": "0\\.51",
+      "in_thesis": true
+    },
+    {
+      "claim": "thesis_cgmvae_nmi",
+      "pattern": "0\\.70",
+      "in_thesis": true
+    },
+    {
+      "claim": "decoder_only",
+      "pattern": "decoder.?only|decoder only",
+      "in_thesis": false
+    },
+    {
+      "claim": "zero_shot",
+      "pattern": "zero.?shot|leave.?one.?subject|leave one subject out",
+      "in_thesis": true
+    },
+    {
+      "claim": "mssv",
+      "pattern": "Mouse Sleep Staging Validation|ds006366|MSSV",
+      "in_thesis": true
+    }
+  ],
+  "docx": {
+    "ok": true,
+    "path": "docs/google_sheets/Special Course - Project framing.docx",
+    "paragraphs": 849,
+    "char_count": 61067,
+    "word_count": 9813,
+    "text_path": "docs/paper/source_extraction/special_course_framing.txt",
+    "stale_warning": "Take with a grain of salt \u2014 early special-course framing; superseded by holdout ladder results and docs/paper/*.md.",
+    "preview": "Special Course - Project framing\n\nSpecial Course - Project framing\n\nTowards subject-invariant and temporally coherent end-to-end latent models for unsupervised mouse sleep staging\n\nMain aim\nBuild an end-to-end version of your thesis pipeline that:\n\nreplaces FFT-based inputs with CNN feature learning\n\nkeeps conditioning only in the decoder\n\nreplaces the static GM prior with a temporally dependent latent prior\n\ntests zero-shot transfer from decoder-only conditioning\n\nends in a 5\u201310 page paper draft\n\nCore research question\n\nCan an end-to-end convolutional autoencoding model with decoder-only conditioning and a temporally dependent latent prior learn a more transferable and subject-invariant latent space for unsupervised mouse sleep staging than the FFT-based cGMVAE pipeline?\n\nThe right structure: 3 layers\n\nLayer 1 \u2014 Invariance\n\nRemove subject conditioning from encoder\n\nKeep subject conditioning only in decoder\n\nTest true zero-shot on unseen mice without using held-out subject data during representation training\n\nLab conditioning: Use Lab 5 (E) first\n\nhas the same montages (1 parietal + 1 frontal electrode )\n\nthis has 5s epchs but has been fixed by Javi to 4s\n\nMontage conditioning: Then use lab 2 (B)\n\nhas double the channels but same montage placement (2 parietal + 2 frontal electrodes)\n\nwas 1s epochs but has been fixed by Javi to 4s\n\nIgnore lab 1 and 4 as they are not as good.\n\nThis directly targets the issue that the thesis cGMVAE population result was partially transductive because the subject-conditioned encoder used limited held-out-subject data.\n\nLayer 2 \u2014 Representation\n\nReplace FFT / expert spectral frontend with CNN encoder\n\nUse transposed convolutions in decoder\n\nTrain on consecutive windows or epoch windows from raw time-domain input\n\nCompare against thesis spectral baseline\n\nThis is well motivated because the thesis explicitly proposes incorporating time-domain inputs and possibly staged spectral-to-end-to-end training.\n\nLayer 3 \u2014 Temporal prior\n\nReplace sta"
+  },
+  "text_sources": {
+    "plans": {
+      ".cursor/plans/5_page_paper_plan.md": {
+        "words": 1719,
+        "exists": true
+      },
+      ".cursor/plans/plos_manuscript_draft_f5977e3b.plan.md": {
+        "words": 2129,
+        "exists": true
+      }
+    },
+    "docs": {
+      "docs/paper/deep_research_synthesis.md": {
+        "words": 400,
+        "exists": true
+      },
+      "docs/paper/holdout_experiments.md": {
+        "words": 458,
+        "exists": true
+      },
+      "docs/paper/related_work_novelty.md": {
+        "words": 789,
+        "exists": true
+      },
+      "docs/paper/k_sweep_experiments.md": {
+        "words": 152,
+        "exists": true
+      },
+      "docs/cv4fold/unified_holdout_paper_line.md": {
+        "words": 604,
+        "exists": true
+      },
+      "paper/overleaf/tables/holdout_ladder.csv": {
+        "words": 589,
+        "exists": true
+      },
+      "paper/overleaf/tables/holdout_ladder_summary.json": {
+        "words": 37,
+        "exists": true
+      }
+    },
+    "manuscript": {
+      "words": 3129,
+      "has_author_summary": true
+    }
+  }
+}

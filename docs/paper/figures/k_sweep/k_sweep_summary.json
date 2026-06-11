@@ -1,0 +1,97 @@
+{
+  "root": "results/cv4fold/paper_k_sweep/fold_4",
+  "chosen_k": 4,
+  "by_k": {
+    "3": {
+      "best": 0.635,
+      "min": 0.5886,
+      "max": 0.635,
+      "run": "joint_k_sweep_f4_K3_20260609-183702",
+      "n_seeds": 3
+    },
+    "4": {
+      "best": 0.6428,
+      "min": 0.5866,
+      "max": 0.6428,
+      "run": "joint_k_sweep_f4_K4_20260609-183717",
+      "n_seeds": 3
+    },
+    "5": {
+      "best": 0.6285,
+      "min": 0.5297,
+      "max": 0.6285,
+      "run": "joint_k_sweep_f4_K5_20260609-184152",
+      "n_seeds": 3
+    },
+    "6": {
+      "best": 0.5136,
+      "min": 0.4959,
+      "max": 0.5136,
+      "run": "joint_k_sweep_f4_K6_20260609-194422",
+      "n_seeds": 3
+    },
+    "7": {
+      "best": 0.5874,
+      "min": 0.4564,
+      "max": 0.5874,
+      "run": "joint_k_sweep_f4_K7_20260609-195433",
+      "n_seeds": 3
+    },
+    "8": {
+      "best": 0.529,
+      "min": 0.4815,
+      "max": 0.529,
+      "run": "joint_k_sweep_f4_K8_20260609-232933",
+      "n_seeds": 2
+    },
+    "9": {
+      "best": 0.4902,
+      "min": 0.4521,
+      "max": 0.4902,
+      "run": "joint_k_sweep_f4_K9_20260609-233939",
+      "n_seeds": 2
+    },
+    "10": {
+      "best": 0.5346,
+      "min": 0.4398,
+      "max": 0.5346,
+      "run": "joint_k_sweep_f4_K10_20260609-190121",
+      "n_seeds": 3
+    },
+    "11": {
+      "best": 0.458,
+      "min": 0.4389,
+      "max": 0.458,
+      "run": "joint_k_sweep_f4_K11_20260609-181522",
+      "n_seeds": 3
+    },
+    "12": {
+      "best": 0.5819,
+      "min": 0.4221,
+      "max": 0.5819,
+      "run": "joint_k_sweep_f4_K12_20260609-225033",
+      "n_seeds": 3
+    },
+    "13": {
+      "best": 0.5252,
+      "min": 0.4172,
+      "max": 0.5252,
+      "run": "joint_k_sweep_f4_K13_20260609-195753",
+      "n_seeds": 3
+    },
+    "14": {
+      "best": 0.5653,
+      "min": 0.4198,
+      "max": 0.5653,
+      "run": "joint_k_sweep_f4_K14_20260609-200417",
+      "n_seeds": 3
+    },
+    "15": {
+      "best": 0.4907,
+      "min": 0.3985,
+      "max": 0.4907,
+      "run": "joint_k_sweep_f4_K15_20260609-210023",
+      "n_seeds": 3
+    }
+  }
+}

@@ -1,6 +1,6 @@
 # Unified holdout paper line (3 models × 2 scopes)
 
-**Added 2026-06-08.** Primary thesis experiments: **cgmvae** vs **hmmgmvae** vs **chmmgmvae**, each with **one unified recipe**, tested in **within-lab** and **joint** train scopes. Per-lab **preprocessing** from incohort locks via `cvae_overrides`; model/training hyperparams identical across scopes per model family.
+**Added 2026-06-08; results status 2026-06-11.** Primary thesis experiments: **cgmvae** vs **hmmgmvae** vs **chmmgmvae**, each with **one unified recipe**, tested in **within-lab** and **joint** train scopes. Per-lab **preprocessing** from incohort locks via `cvae_overrides`; model/training hyperparams identical across scopes per model family. Completion grid + HMM (raw) baseline: [holdout_results_status.md](holdout_results_status.md).
 
 Incohort ablation NMI = **ceiling reference** (supplementary), not the train config for this line.
 
@@ -18,7 +18,7 @@ Incohort ablation NMI = **ceiling reference** (supplementary), not the train con
 
 ### Zero-shot inference (paper Methods)
 
-Holdout **prior NMI** uses encoder latents + mixture prior only — **no subject embeddings** at evaluation for decoder-only models (`cgmvae_locked`, `chmmgmvae_locked`). Subject `emb` is training-only (decoder reconstruction). See [`docs/paper/holdout_experiments.md`](../paper/holdout_experiments.md) and `src/models/vae.py` (`predict_gmm_labels`).
+Holdout **prior NMI** uses encoder latents + mixture prior only — **no subject embeddings** at evaluation for decoder-only models (`cgmvae_locked`, `chmmgmvae_locked`). Subject `emb` is training-only (decoder reconstruction). See [`docs/paper/notes/holdout_experiments.md`](../paper/notes/holdout_experiments.md) and `src/models/vae.py` (`predict_gmm_labels`).
 
 ---
 

@@ -1,0 +1,8 @@
+{
+  "K": 9,
+  "best_seed": 3,
+  "nmi": 0.5283,
+  "npz": "/work3/s204070/SPA/results/cv4fold/paper_k_sweep/fold_4/K9/joint_k_sweep_f4_K9_20260609-233939/plots/3/results.npz",
+  "run": "joint_k_sweep_f4_K9_20260609-233939",
+  "n_active_substages": 9
+}

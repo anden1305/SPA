@@ -1,0 +1,13 @@
+{
+  "npz": "/work3/s204070/SPA/results/cv4fold/joint_holdout/fold_4/chmmgmvae_locked/joint_ho_f4_chmmgmvae_locked_20260609-042207/plots/1/results.npz",
+  "n_states": 2,
+  "macro_recall": {
+    "Wake": 0.9644321734540582,
+    "NREM": 0.9484886039118487,
+    "REM": 0.0
+  },
+  "dominant_macro_per_state": {
+    "S1": "Wake",
+    "S2": "NREM"
+  }
+}

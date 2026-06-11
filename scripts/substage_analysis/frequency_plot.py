@@ -70,6 +70,14 @@ def plot_label_channel_frequency_grid(
     subject_max_legend_items: int = 30,
     subject_sort_legend: bool = True,
 
+    # lab distribution column (optional, right of subject mix)
+    lab_ids: Optional[np.ndarray] = None,
+    lab_dist_col_title: str = "Lab mix",
+    lab_dist_alpha: float = 0.85,
+    lab_dist_edgecolor: str = "none",
+    show_lab_dist_legend: bool = True,
+    lab_colors: Optional[dict[str, ColorLike]] = None,
+
     # NEW: how to compute subject distribution
     # - "count": standard fraction by sample counts within each label
     # - "inv_total": each sample is weighted by 1 / (total samples of that subject across ALL data)
@@ -93,6 +101,7 @@ def plot_label_channel_frequency_grid(
     # Optional: prevent bouts from crossing concatenated sequence boundaries.
     # True at indices that are the FIRST element of a new sequence.
     sequence_start_mask: Optional[np.ndarray] = None,
+    bout_length_epoch_sec: float = 1.0,
 
     figsize_per_row: float = 2.6,
     save_path: Optional[str] = None,
@@ -108,7 +117,8 @@ def plot_label_channel_frequency_grid(
             3) EMG Power (channel emg_channel_index)
             4) Bout length (timesteps): run lengths of consecutive identical y_pred values
       - Next column: stacked % distribution of true labels within each predicted label.
-      - Last column: stacked % distribution of subjects within each predicted label.
+      - Second-to-last column: stacked % distribution of subjects within each predicted label.
+      - Last column (optional): stacked % lab composition when lab_ids is provided.
 
     Subject distribution modes:
       - subject_dist_mode="count":
@@ -138,6 +148,9 @@ def plot_label_channel_frequency_grid(
         raise ValueError(f"labels_true length must equal N={N}. Got {labels_true.shape[0]}.")
     if sub_ids.shape[0] != N:
         raise ValueError(f"sub_ids length must equal N={N}. Got {sub_ids.shape[0]}.")
+    if lab_ids is not None:
+        if not isinstance(lab_ids, np.ndarray) or lab_ids.ndim != 1 or lab_ids.shape[0] != N:
+            raise ValueError(f"lab_ids must be shape (N,). Got {getattr(lab_ids, 'shape', None)}.")
     if len(channel_names) != C:
         raise ValueError(f"channel_names length must equal C={C}. Got {len(channel_names)}.")
     if len(label_names) == 0:
@@ -312,6 +325,10 @@ def plot_label_channel_frequency_grid(
         return out
 
     bout_lengths_per_label = _bout_lengths_by_label(y_pred, L, sequence_start_mask)
+    if bout_length_epoch_sec != 1.0:
+        bout_lengths_per_label = [
+            arr * bout_length_epoch_sec for arr in bout_lengths_per_label
+        ]
 
     # -----------------
     # Feature masks + per-sample features
@@ -459,6 +476,40 @@ def plot_label_channel_frequency_grid(
     cmap = plt.get_cmap("tab20" if S <= 20 else "hsv")
     subject_colors: List[Tuple[float, float, float, float]] = [cmap(i / max(S - 1, 1)) for i in range(S)]
 
+    # Lab distribution (optional)
+    has_lab_col = lab_ids is not None
+    lab_legend_handles = None
+    lab_legend_labels = None
+    if has_lab_col:
+        lab_ids_obj = np.asarray(lab_ids, dtype=object)
+        unique_labs, lab_inv = np.unique(lab_ids_obj, return_inverse=True)
+        n_labs = int(unique_labs.size)
+        lab_totals = np.bincount(lab_inv, minlength=n_labs).astype(np.float64)
+        lab_totals = np.maximum(lab_totals, 1.0)
+        counts_rl = np.zeros((L, n_labs), dtype=np.float64)
+        for lbl in range(L):
+            idx = np.where(y_pred == lbl)[0]
+            if idx.size:
+                counts_rl[lbl] = np.bincount(lab_inv[idx], minlength=n_labs).astype(np.float64)
+        if subject_dist_mode == "count":
+            lab_dist = np.zeros((L, n_labs), dtype=np.float64)
+            row_sums = counts_rl.sum(axis=1, keepdims=True)
+            nz = row_sums[:, 0] > 0
+            lab_dist[nz] = counts_rl[nz] / row_sums[nz]
+        else:
+            weighted = counts_rl / lab_totals[None, :]
+            lab_dist = np.zeros((L, n_labs), dtype=np.float64)
+            row_sums = weighted.sum(axis=1, keepdims=True)
+            nz = row_sums[:, 0] > 0
+            lab_dist[nz] = weighted[nz] / row_sums[nz]
+        default_lab_colors = {
+            "lab_1": "#4E79A7", "lab_2": "#F28E2B", "lab_3": "#59A14F",
+            "lab_4": "#E15759", "lab_5": "#B07AA1", "unknown": "#BAB0AC",
+        }
+        palette = {**default_lab_colors, **(lab_colors or {})}
+        lab_color_list = [palette.get(str(lab), "#999999") for lab in unique_labs]
+        lab_order = np.argsort(-lab_totals)
+
     # -----------------
     # Compute shared y-limits per spectrum column (channel)
     # -----------------
@@ -578,7 +629,8 @@ def plot_label_channel_frequency_grid(
     n_feature_cols = 4
     true_dist_col_idx = C + n_feature_cols
     subj_dist_col_idx = C + n_feature_cols + 1
-    C_plot = C + n_feature_cols + 2
+    lab_dist_col_idx = C + n_feature_cols + 2 if has_lab_col else None
+    C_plot = C + n_feature_cols + 2 + (1 if has_lab_col else 0)
 
     fig_w = 5.2 * C_plot
     fig_h = max(2.8, figsize_per_row * L)
@@ -753,10 +805,47 @@ def plot_label_channel_frequency_grid(
             subj_legend_handles = ordered_handles
             subj_legend_labels = ordered_labels
 
+        # ---- Lab distribution ----
+        if has_lab_col and lab_dist_col_idx is not None:
+            axl = axes[r, lab_dist_col_idx]
+            ldist = lab_dist[r]
+            left = 0.0
+            for li in lab_order:
+                w = float(ldist[li])
+                if w <= 0:
+                    continue
+                axl.barh(
+                    y=0,
+                    width=w,
+                    left=left,
+                    height=0.72,
+                    color=lab_color_list[li],
+                    alpha=lab_dist_alpha,
+                    edgecolor=lab_dist_edgecolor,
+                    label=str(unique_labs[li]),
+                )
+                left += w
+            axl.set_xlim(0.0, 1.0)
+            axl.set_ylim(-1.0, 1.0)
+            axl.grid(True, axis="x", linewidth=0.4, alpha=0.35)
+            if r == 0:
+                axl.set_title(lab_dist_col_title)
+            axl.set_yticks([])
+            axl.set_xticks([0.0, 0.25, 0.5, 0.75, 1.0])
+            axl.set_xticklabels(["0%", "25%", "50%", "75%", "100%"] if r == L - 1 else [])
+            if r == L - 1:
+                axl.set_xlabel("Percent")
+            if r == 0:
+                lab_legend_handles = [
+                    plt.Rectangle((0, 0), 1, 1, color=lab_color_list[i], alpha=lab_dist_alpha)
+                    for i in lab_order
+                ]
+                lab_legend_labels = [str(unique_labs[i]) for i in lab_order]
+
     fig.suptitle(plot_title, y=1.02, fontsize=14)
 
-    # Reserve margin for (potentially) two legends
-    fig.tight_layout(rect=[0.0, 0.0, 0.965, 0.98])
+    right_margin = 0.965 if not has_lab_col else 0.94
+    fig.tight_layout(rect=[0.0, 0.0, right_margin, 0.98])
 
     if show_true_dist_legend and true_legend_handles is not None:
         fig.legend(
@@ -773,9 +862,21 @@ def plot_label_channel_frequency_grid(
             subj_legend_handles,
             subj_legend_labels,
             loc="lower left",
-            bbox_to_anchor=(0.968, 0.02),
+            bbox_to_anchor=(0.968 if not has_lab_col else 0.945, 0.02),
             frameon=False,
             title="Subjects",
+            fontsize=7,
+        )
+
+    if show_lab_dist_legend and lab_legend_handles is not None:
+        fig.legend(
+            lab_legend_handles,
+            lab_legend_labels,
+            loc="center left",
+            bbox_to_anchor=(0.968, 0.50),
+            frameon=False,
+            title="Labs",
+            fontsize=8,
         )
 
     if save_path is not None:

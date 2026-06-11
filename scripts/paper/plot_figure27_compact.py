@@ -105,11 +105,9 @@ def plot_fig4_combined(
         csv_path.parent.mkdir(parents=True, exist_ok=True)
         pd.DataFrame(m, index=label_names, columns=label_names).to_csv(csv_path)
 
-    fig = plt.figure(figsize=(7.0, 4.2))
-    gs = GridSpec(2, 2, height_ratios=[1.2, 0.55], width_ratios=[1, 1], hspace=0.45, wspace=0.35)
-    ax_tm = fig.add_subplot(gs[0, 0])
-    ax_cb = fig.add_subplot(gs[0, 1])
-    ax_cb.axis("off")
+    fig = plt.figure(figsize=(7.0, 4.5))
+    gs = GridSpec(2, 1, height_ratios=[1.15, 0.65], hspace=0.42)
+    ax_tm = fig.add_subplot(gs[0])
 
     cmap = LinearSegmentedColormap.from_list("w_blue", ["#ffffff", "#2563EB"]).copy()
     cmap.set_bad(alpha=0.0)
@@ -131,8 +129,7 @@ def plot_fig4_combined(
     cbar.set_label("P(next | change)", fontsize=7)
     cbar.ax.tick_params(labelsize=6)
 
-    # Panel B: hypnogram spans bottom row
-    ax_sub = fig.add_subplot(gs[1, :])
+    ax_sub = fig.add_subplot(gs[1])
     n_epochs = min(1800, labels_pred.size)
     sub = labels_pred[:n_epochs]
     true = np.clip(labels_true[:n_epochs], 0, 2)
@@ -141,7 +138,7 @@ def plot_fig4_combined(
     ax_sub.imshow(sub.reshape(1, -1), aspect="auto", cmap=ListedColormap(label_colors[:k_pred]), vmin=0, vmax=k_pred - 1)
     ax_sub.set_yticks([])
     ax_sub.set_ylabel("Sub", fontsize=7)
-    ax_macro = ax_sub.inset_axes([0, -0.95, 1, 0.75])
+    ax_macro = ax_sub.inset_axes([0, -0.88, 1, 0.72])
     ax_macro.imshow(true.reshape(1, -1), aspect="auto", cmap=ListedColormap(LABEL_COLORS_TRUE), vmin=0, vmax=2)
     ax_macro.set_yticks([])
     ax_macro.set_ylabel("Exp", fontsize=7)
@@ -212,6 +209,9 @@ def run(
         label_colors_true=LABEL_COLORS_TRUE[:n_macro],
         sub_ids=sub_ids,
         channel_freq_ranges=[(0.0, 30), (0.0, 30), (5, 60)],
+        input_scale="linear",
+        y_scale="linear",
+        y_lim_mode="minmax",
         save_path=str(out_panel),
     )
 
@@ -236,10 +236,10 @@ def main() -> int:
     repo = Path(__file__).resolve().parents[2]
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--npz", type=Path, required=True)
-    parser.add_argument("--out-panel", type=Path, default=repo / "docs/paper/figures/Fig3_substage_panels.pdf")
-    parser.add_argument("--out-transition", type=Path, default=repo / "docs/paper/figures/Fig4_transition_matrix.pdf")
-    parser.add_argument("--out-hypno", type=Path, default=repo / "docs/paper/figures/Fig4_hypnogram.pdf")
-    parser.add_argument("--out-fig4", type=Path, default=repo / "docs/paper/figures/Fig4_combined.pdf")
+    parser.add_argument("--out-panel", type=Path, default=repo / "docs/paper/figures/archive/Fig3_substage_panels.pdf")
+    parser.add_argument("--out-transition", type=Path, default=repo / "docs/paper/figures/archive/Fig4_transition_matrix.pdf")
+    parser.add_argument("--out-hypno", type=Path, default=repo / "docs/paper/figures/archive/Fig4_hypnogram.pdf")
+    parser.add_argument("--out-fig4", type=Path, default=repo / "docs/paper/figures/main/Fig5.pdf")
     args = parser.parse_args()
 
     if not args.npz.exists():

@@ -1,0 +1,151 @@
+---
+description: Report writing style — clarity and structure inspired by QSLP-AE (Ciudad et al., MSSV VAE colleague paper)
+globs: docs/paper/**/*.tex,docs/paper/**/*.md,paper/overleaf/**/*.tex
+alwaysApply: false
+---
+
+# Report writing style (QSLP-AE reference)
+
+**Reference paper:** Ciudad et al., *Aligning human and mouse EEG representations of sleep stages with a quadruplet split latent permutation auto-encoder* ([OpenReview K3Z4jVHUnf](https://openreview.net/pdf?id=K3Z4jVHUnf), ICLR 2026 Re-Align workshop). Same MSSV cohort, shared supervisors (Mørup, Kornum). Full text extract: [`docs/paper/source_extraction/qslp_ae_reference.txt`](docs/paper/source_extraction/qslp_ae_reference.txt).
+
+**Our manuscript:** [`docs/paper/plos_my_paper.tex`](docs/paper/plos_my_paper.tex) — structure in [`report_outline.md`](report_outline.md).
+
+**PLOS LaTeX formatting** remains governed by [`plos-compbiol-tex.mdc`](plos-compbiol-tex.mdc). This rule governs **prose quality and explanatory structure**, not template mechanics.
+
+## Word budget
+
+| | Words |
+|---|------:|
+| **Target** | 3,000–3,500 |
+| **Hard cap** | 4,000 main text |
+| **Count** | `cd docs/paper && texcount -inc -1 plos_my_paper.tex` |
+
+Full breakdown: [`word_budget.md`](word_budget.md). **Methods ~1,100 w is enough.** Add words in **Results and Discussion** only until the adequacy checklist passes. Move detail to SI rather than exceed 4,000.
+
+**Concision rules:** one idea per paragraph (3–5 sentences); no duplicate definitions; cite Fig/Table/SI instead of re-explaining; cut any sentence that does not add a number, protocol step, or interpretation.
+
+---
+
+## What makes the reference paper readable
+
+| Pattern | Example from QSLP-AE | Apply to our report |
+|---------|----------------------|---------------------|
+| **Problem → need → approach** | Rodent–human gap → “need for modeling procedures…” → QSLP-AE | Rose cross-lab gap → need for zero-shot holdout → decoder-only cHMM–GMVAE ladder |
+| **Concrete DATA before METHODS** | 92 mice, 5 labs, 4 s epochs, label merge rules, PSD $\in \mathbb{R}^{128}$, EMG RMS | MSSV labs 2/3/5, Artifact removal, spectral tensor shape, per-lab locks — **numbers first** |
+| **Build on prior work, state delta** | “Our model builds on… We modify… to use PSDs instead of raw signals” | “Extends thesis cGMVAE… decoder-only conditioning replaces encoder+decoder… sticky HMM–GMM replaces two-step MAR-HMM” |
+| **Conceptual rename map** | style = individual/species, task = sleep stage | nuisance = subject/lab/montage, macro = Wake/NREM/REM, substage = mixture component |
+| **Figure-first Methods** | Fig 1 panels (a)(b)(c) walk through training before equations | Fig 1: cohort split, train vs holdout path, ladder rungs — cite panel in prose |
+| **One key equation when needed** | Loss $\mathcal{L}_{\mathrm{QSLP}}$ after verbal setup | NMI \eqref{eq:nmi} after defining partitions $Y$, $\hat{Y}$ |
+| **Metrics defined before Results** | Four probes S-on-S, T-on-T, T-on-S, S-on-T with direction arrows | Prior NMI, best-of-3 seeds, joint vs within-lab scopes — define before Table 1 |
+| **Results interpret immediately** | “In Table 1, the baseline shows… Remarkably,… Regarding disentanglement,…” | “In Table 1, cHMM–GMVAE exceeds cGMVAE on every fold… Fold 2 is an exception because…” |
+| **Honest limitations inline** | “task information leaks… probably due to…” | Seed fragility, K=3 macro ladder vs K-sweep, front-end locks not per-mouse |
+| **Quantitative anchors** | Random 33%, $d_s=16$, $d_t=2$, mean ± SEM | NMI 0.56 vs 0.33, $\Delta=+0.22$, fold ranges, $K \in \{3,\ldots,15\}$ |
+| **Appendix for overflow** | Dataset overview A.1, architecture A.5, probes A.6 | SI: thesis K=13, ablations, full within-lab table, locked YAML |
+
+---
+
+## Section templates (our report)
+
+Canonical order: **Abstract → Introduction → Data → Methods → Results and discussion → Conclusion → Acknowledgments → References → Appendix.** See [`report_outline.md`](report_outline.md).
+
+### Introduction (350–450 words)
+
+1. **Clinical / methodological problem** — Rose 2026 cross-lab scoring disagreement; supervised models fail across MSSV sites without retraining.
+2. **Why unsupervised + temporal structure** — bout dynamics, substages, label noise as feature not bug.
+3. **Gap vs prior work** — one sentence each on AccuSleep (transductive), SegWay (per-mouse), mcRBM (no holdout protocol); **our combination** in one sentence.
+4. **Contributions as numbered list** — (i) decoder-only zero-shot holdout, (ii) fair ladder, (iii) substage biology after K-sweep. Point to Methods for protocol detail.
+
+### Data (~300–400 words)
+
+Use `\methodpara{Dataset.}`, `\methodpara{Epoch construction.}`, `\methodpara{Input representation.}` — numbers first, no model detail.
+
+### Methods (3 subsections, ~900–1,100 words)
+
+| Subsection | Bold starters |
+|------------|---------------|
+| Cross-validation and holdout protocol | Evaluation scopes. Holdout inference. Agreement metrics. |
+| Model ladder and architecture | Model ladder. Encoder–decoder. Latent priors. |
+| Training, substages, and reproducibility | Decoder-only conditioning. Training and checkpoints. Substage sweep. Data and code. |
+
+**Fig 1** in Methods (protocol + ladder). Each block: `\methodpara{Label.}` then prose.
+
+### Results and discussion (~900–1,100 words, 4 subsections)
+
+For every figure/table:
+
+```
+In [Table/Fig X], [main observation with number].
+[Expected or baseline comparison — e.g. vs random, vs thesis, vs other rung].
+[Mechanistic reading — why this pattern is plausible given lab/montage/prior].
+[Limitation or caveat in one clause if needed].
+```
+
+Subsections: **Cross-lab holdout performance** → **Laboratory heterogeneity** → **Substage structure and physiology** → **Methodological implications**.
+
+### Conclusion (~120–180 words)
+
+Three to five sentences; no new results. Methodological implications (vs thesis, QSLP-AE, limitations) belong in the last **Results and discussion** subsection, not here.
+
+---
+
+## Contrast with QSLP-AE (do not conflate)
+
+| QSLP-AE (Ciudad et al.) | Our report |
+|------------------------|------------|
+| Human + mouse alignment | Mouse-only, cross-**laboratory** holdout |
+| Style / task disentanglement via permutation | Subject nuisance via **decoder-only** embedding |
+| 2-d task latent for visualization | Mixture prior + optional $K$-sweep substates |
+| Contrastive vs reconstruction ablation | Model **ladder** (HMM → HMMGMVAE → cGMVAE → cHMM) |
+| Accuracy probes on latents | Prior-prediction **NMI** vs expert macro labels |
+
+Cite colleague work when discussing shared MSSV preprocessing or representation-learning framing; do not claim their results as ours.
+
+---
+
+## Prose rules (adapted from thesis prompt + reference style)
+
+- **British English**, impersonal voice in Methods/Results (`this study`, `the model`).
+- **Lead with the claim**, then evidence — not the reverse.
+- **Define acronyms once** (EEG, EMG, NMI, NREM, REM, MSSV, cGMVAE, cHMM–GMVAE).
+- **No hype** — avoid “powerful framework”, “rich representation”, “explicitly captures”.
+- **No invented numbers** — use `holdout_ladder.csv`, thesis extraction report, or mark pending.
+- **Cross-reference** Fig/Table/Eq/SI instead of repeating definitions.
+- **Short paragraphs** — 3–6 sentences; one idea per paragraph.
+- Prefer **ML framing**: distribution shift, label noise, nuisance factors, holdout leakage.
+- When a design choice is not derived, label it **implementation choice** and point to YAML/code.
+
+---
+
+## Figure caption standard (match reference clarity)
+
+```
+\textbf{[Title].}
+\textbf{A,} [what is plotted, population, n].
+\textbf{B,} [what is plotted].
+[One sentence interpretation — what the reader should notice.]
+[Data source: joint fold X, seed Y, or K=Z if relevant.]
+```
+
+---
+
+## Agent workflow
+
+When editing `plos_my_paper.tex` for report quality:
+
+1. Read [`methods_writing_guide.md`](methods_writing_guide.md) for thesis vs paper deltas.
+2. For Methods/Results expansion, skim [`qslp_ae_reference.txt`](source_extraction/qslp_ae_reference.txt) §DATA and §METHODS for pacing.
+3. After tex edits, rebuild: `bash docs/paper/build/compile_report.sh`.
+4. Do **not** copy QSLP structure wholesale (no human data, no quadruplet loss) — borrow **explanation discipline** only.
+5. Flag `\ifreportmode` blocks for WIP honesty; keep submission build free of “pending” language.
+
+---
+
+## Quality checklist before hand-in
+
+- [ ] Every figure cited in text before it appears; caption panels match narrative.
+- [ ] Methods standalone — readable without Results.
+- [ ] Every numeric claim in Results traceable to table, figure, or cited thesis value.
+- [ ] Holdout protocol stated in **both** Methods and Fig 1B.
+- [ ] K-sweep/substage section states $K$ selection rule even if winner TBD.
+- [ ] Limitations paragraph names at least: label noise, lab heterogeneity, seed fragility, incomplete ladder rungs.
+- [ ] `texcount` main text **≤ 4,000**; ideally **3,000–3,500** ([`word_budget.md`](word_budget.md))

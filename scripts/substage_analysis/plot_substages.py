@@ -3,9 +3,10 @@ from __future__ import annotations
 from typing import Sequence, Tuple, Union
 import os
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 import seaborn as sns
+from sklearn.manifold import TSNE
 
 sns.set_theme(style="whitegrid", context="paper")
 
@@ -187,3 +188,145 @@ def pca_scatter_random_samples(
     if return_details:
         return idx, scores_sel, explained_variance_ratio
     return None
+
+
+def _scatter_tsne_panel(
+    ax: plt.Axes,
+    emb: np.ndarray,
+    labels: np.ndarray,
+    label_names: Sequence[str],
+    label_colors: Sequence[ColorLike],
+    *,
+    title: str,
+    point_size: float = 14.0,
+    alpha: float = 0.75,
+) -> None:
+    c_count = len(label_names)
+    for c in range(c_count):
+        mask = labels == c
+        if not np.any(mask):
+            continue
+        ax.scatter(
+            emb[mask, 0],
+            emb[mask, 1],
+            s=point_size,
+            alpha=alpha,
+            label=label_names[c],
+            color=label_colors[c],
+            edgecolors="none",
+        )
+    ax.set_xlabel("t-SNE 1")
+    ax.set_ylabel("t-SNE 2")
+    ax.set_title(title)
+    ax.legend(loc="best", frameon=True, fontsize=8)
+    ax.grid(True, linewidth=0.4, alpha=0.35)
+
+
+def tsne_scatter_pair(
+    datapoints: np.ndarray,
+    labels_true: np.ndarray,
+    labels_pred: np.ndarray,
+    label_names_true: Sequence[str],
+    label_names_pred: Sequence[str],
+    label_colors_true: Sequence[ColorLike],
+    label_colors_pred: Sequence[ColorLike],
+    analysis_name: str,
+    save_path_true: str,
+    save_path_pred: str,
+    *,
+    seed: int,
+    n_samples: int,
+    perplexity: float = 30.0,
+    point_size: float = 14.0,
+    alpha: float = 0.75,
+) -> None:
+    """Fit t-SNE on a latent subsample; save expert-label and prediction-label scatters."""
+    if datapoints.ndim != 2 or labels_true.ndim != 1 or labels_pred.ndim != 1:
+        raise ValueError("datapoints (N,F), labels_true (N,), labels_pred (N,) required.")
+    n = datapoints.shape[0]
+    if labels_true.shape[0] != n or labels_pred.shape[0] != n:
+        raise ValueError("label arrays must match datapoints row count.")
+    if n_samples <= 0:
+        raise ValueError("n_samples must be > 0.")
+    if n_samples > n:
+        raise ValueError(f"n_samples={n_samples} cannot exceed N={n}.")
+
+    rng = np.random.default_rng(seed)
+    idx = rng.choice(n, size=n_samples, replace=False)
+    x = datapoints[idx].astype(np.float64, copy=False)
+    y_true = labels_true[idx].astype(int, copy=False)
+    y_pred = labels_pred[idx].astype(int, copy=False)
+
+    perp = float(min(perplexity, max(5.0, (n_samples - 1) / 3.0)))
+    tsne = TSNE(
+        n_components=2,
+        perplexity=perp,
+        init="pca",
+        learning_rate="auto",
+        random_state=seed,
+    )
+    emb = tsne.fit_transform(x)
+
+    for path, labels, names, colors, subtitle in [
+        (save_path_true, y_true, label_names_true, label_colors_true, "Expert labels"),
+        (save_path_pred, y_pred, label_names_pred, label_colors_pred, "GM substages"),
+    ]:
+        fig, ax = plt.subplots(figsize=(9, 7))
+        _scatter_tsne_panel(
+            ax,
+            emb,
+            labels,
+            names,
+            colors,
+            title=f"{analysis_name} — {subtitle}",
+            point_size=point_size,
+            alpha=alpha,
+        )
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        fig.tight_layout()
+        fig.savefig(path, dpi=300, bbox_inches="tight")
+        plt.close(fig)
+
+
+def tsne_true_vs_predicted(
+    datapoints: np.ndarray,
+    labels_true: np.ndarray,
+    labels_pred: np.ndarray,
+    label_names_true: Sequence[str],
+    label_names_pred: Sequence[str],
+    label_colors_true: Sequence[ColorLike],
+    label_colors_pred: Sequence[ColorLike],
+    save_path: str,
+    *,
+    seed: int,
+    n_samples: int,
+    title: str = "Latent t-SNE: expert labels vs substages",
+    perplexity: float = 30.0,
+) -> None:
+    """Side-by-side t-SNE with one shared embedding (same subsample as PCA)."""
+    n = datapoints.shape[0]
+    rng = np.random.default_rng(seed)
+    idx = rng.choice(n, size=min(n_samples, n), replace=False)
+    x = datapoints[idx].astype(np.float64, copy=False)
+    y_true = labels_true[idx].astype(int, copy=False)
+    y_pred = labels_pred[idx].astype(int, copy=False)
+    perp = float(min(perplexity, max(5.0, (len(idx) - 1) / 3.0)))
+    emb = TSNE(
+        n_components=2,
+        perplexity=perp,
+        init="pca",
+        learning_rate="auto",
+        random_state=seed,
+    ).fit_transform(x)
+
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+    for ax, y, names, colors, subtitle in [
+        (axes[0], y_true, label_names_true, label_colors_true, "Expert labels"),
+        (axes[1], y_pred, label_names_pred, label_colors_pred, "GM substages"),
+    ]:
+        _scatter_tsne_panel(ax, emb, y, names, colors, title=subtitle)
+    fig.suptitle(title, fontsize=12, y=1.02)
+    os.makedirs(os.path.dirname(save_path) or ".", exist_ok=True)
+    fig.tight_layout()
+    fig.savefig(save_path, dpi=300, bbox_inches="tight")
+    plt.close(fig)

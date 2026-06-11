@@ -18,7 +18,8 @@ LADDER_LABELS = {
     "cgmvae_locked": "cGMVAE",
     "chmmgmvae_locked": "cHMM–GMVAE",
 }
-THESIS_HMM_REF = 0.51
+# Thesis expert-feature HMM (~0.51) used a different protocol; not plotted as holdout baseline.
+THESIS_HMM_REF: float | None = None
 
 SUBSTAGE_COLORS = [
     "#4E79A7", "#F28E2B", "#E15759", "#76B7B2", "#59A14F",
