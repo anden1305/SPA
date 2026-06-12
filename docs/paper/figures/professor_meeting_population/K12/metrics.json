@@ -1,0 +1,7 @@
+{
+  "K": 12,
+  "best_seed": 2,
+  "nmi": 0.4034,
+  "npz": "results/cv4fold/paper_k_sweep/population/K12/population_k_sweep_K12_20260612-011734/plots/2/results.npz",
+  "run": "population_k_sweep_K12_20260612-011734"
+}

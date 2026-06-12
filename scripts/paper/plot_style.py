@@ -27,6 +27,15 @@ SUBSTAGE_COLORS = [
     "#86BCB6", "#D37295", "#A0CBE8", "#FABFD2", "#B6992D",
 ]
 
+# Macro true-label colours used in physiology grids (Awake/NREM/REM/Artifact).
+MACRO_LABEL_COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c", "#e41a1c"]
+
+# Subject-mix column: avoid tab20 greens/blues that collide with REM/Wake in true-label mix.
+SUBJECT_MIX_CMAP = "twilight_shifted"
+
+# Default text scale for thesis Fig 27 / frequency_plot grids.
+FREQUENCY_GRID_FONT_SCALE = 1.45
+
 
 def apply_paper_style() -> None:
     mpl.rcParams.update(

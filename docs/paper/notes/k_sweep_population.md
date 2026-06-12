@@ -12,10 +12,13 @@
 
 ```bash
 PYTHONPATH=. python3 scripts/cv4fold/generate_chmm_k_sweep_population.py
+# Holdout-style (no artifact epochs): add --no-artifact
 ```
 
+Default keeps artifact epochs (`remove_artifact: false`). `--no-artifact` sets `remove_artifact: true` on all mice (same as fold-4 K-sweep).
+
 Configs: `src/config/run/cvaemarhmm/cv4fold/paper_k_sweep/population/chmmgmvae_K{K}.yaml`  
-`runs: 5`, `seed: 499`, K=3…15.
+`runs: 5`, `seed: 499`, K=3…15. **Artifact epochs retained** (`remove_artifact: false` on all mice).
 
 ## Submit (gpuv100)
 
@@ -23,13 +26,37 @@ Configs: `src/config/run/cvaemarhmm/cv4fold/paper_k_sweep/population/chmmgmvae_K
 bash hpc/submit/cv4fold/submit_chmm_k_sweep_population.sh
 ```
 
+**Spill backups** (9 jobs: K7–K15, one per K rotated a100/a10/l40s; seeds 599/699/799):
+
+```bash
+bash hpc/submit/cv4fold/submit_chmm_k_sweep_population_spill.sh
+```
+
+**OOM retry** (gpuv100, -n 4, 6GB/slot, batch 96, top-up seeds for partial K):
+
+```bash
+bash hpc/submit/cv4fold/submit_chmm_k_sweep_population_retry.sh
+```
+
+Configs: `paper_k_sweep/population_retry/` (same `results_dir` as `population/`).
+
 `hpc/output/cv4fold/paper_k_sweep/population/k_sweep_K*_*.out`
 
 ## Figures (after training)
 
+Full pack (Fig 27, t-SNE, PCA, transitions, …):
+
 ```bash
 bsub < hpc/submit/paper/run_population_biology_meeting.sh
 ```
+
+**Incremental** (Fig 27 + t-SNE only, for K that already have `results.npz` — safe while GPU jobs still run):
+
+```bash
+bsub < hpc/submit/paper/run_population_biology_meeting_incremental.sh
+```
+
+Per-K outputs include `K{k}_tsne_scatter_true.png` and `K{k}_tsne_scatter_predicted.png` (shared embedding).
 
 Output: `results/cv4fold/paper_figures/biology_meeting_population/`  
 Staging: `docs/paper/figures/professor_meeting_population/`

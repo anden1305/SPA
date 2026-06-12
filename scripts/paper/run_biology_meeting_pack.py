@@ -11,10 +11,14 @@ Also mirrors candidate K folders to docs/paper/figures/professor_meeting/.
 from __future__ import annotations
 
 import argparse
+import csv
 import json
+import re
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
+
+import numpy as np
 
 from scripts.paper.plot_fig4_substage_compact import plot_compact as plot_biology_compact
 from scripts.paper.plot_figure27_compact import run as run_publication_panels
@@ -25,7 +29,11 @@ from scripts.paper.run_k_sweep_review_pack import (
     write_metrics_table,
 )
 from scripts.substage_analysis.fig27_from_npz import plot_fig27_gmm_predicted
-from scripts.substage_analysis.full_analysis_from_npz import run_full_thesis_analysis, run_tsne_from_npz
+from scripts.substage_analysis.full_analysis_from_npz import (
+    TSNE_N_SAMPLES,
+    run_full_thesis_analysis,
+    run_tsne_from_npz,
+)
 
 REPO = Path(__file__).resolve().parents[2]
 DEFAULT_ROOT = REPO / "results/cv4fold/paper_k_sweep/fold_4"
@@ -67,6 +75,103 @@ def _write_k_readme(k_dir: Path, meta: dict) -> None:
     (k_dir / "README.md").write_text("\n".join(lines), encoding="utf-8")
 
 
+def _active_substages_from_npz(npz_path: Path) -> int:
+    data = np.load(npz_path)
+    y = data["y_hat"].reshape(-1).astype(int)
+    return int(np.count_nonzero(np.bincount(y)))
+
+
+def _predicted_unique_from_metrics(metrics_path: Path) -> int | None:
+    if not metrics_path.is_file():
+        return None
+    m = re.search(r"^Predicted unique states:\s*(\d+)", metrics_path.read_text(encoding="utf-8"), re.M)
+    return int(m.group(1)) if m else None
+
+
+def _all_npz_seeds_for_k(k_dir: Path) -> list[tuple[int, Path, float | None]]:
+    """(plot_index, npz_path, nmi) for every seed export under K{k}/."""
+    if not k_dir.is_dir():
+        return []
+    out: list[tuple[int, Path, float | None]] = []
+    for run in sorted(k_dir.iterdir(), key=lambda p: p.stat().st_mtime):
+        if not run.is_dir():
+            continue
+        plots = run / "plots"
+        if not plots.is_dir():
+            continue
+        for seed_dir in sorted(
+            (p for p in plots.iterdir() if p.is_dir() and p.name.isdigit()),
+            key=lambda p: int(p.name),
+        ):
+            npz = seed_dir / "results.npz"
+            if not npz.is_file():
+                continue
+            nmi = None
+            mt = seed_dir / "metrics.txt"
+            if mt.is_file():
+                m = re.search(r"^NMI:\s*([0-9.+-eE]+)", mt.read_text(encoding="utf-8"), re.M)
+                if m:
+                    nmi = float(m.group(1))
+            out.append((int(seed_dir.name), npz, nmi))
+    return out
+
+
+def write_active_substages_table(
+    root: Path,
+    out_dir: Path,
+    *,
+    k_min: int,
+    k_max: int,
+    scores: dict[int, dict],
+) -> dict[int, dict]:
+    """Per-K configured vs active substages (best seed + seed range)."""
+    rows: list[dict] = []
+    by_k: dict[int, dict] = {}
+    for k in range(k_min, k_max + 1):
+        k_dir = root / f"K{k}"
+        hit = best_npz_for_k(root, k)
+        seed_exports = _all_npz_seeds_for_k(k_dir)
+        active_best: int | None = None
+        best_seed: int | None = None
+        best_nmi: float | None = None
+        if hit is not None:
+            npz, best_seed, best_nmi = hit
+            active_best = _active_substages_from_npz(npz)
+
+        active_vals = [_active_substages_from_npz(npz) for _, npz, _ in seed_exports]
+
+        row = {
+            "K": k,
+            "configured_K": k,
+            "n_seeds_with_npz": len(seed_exports),
+            "has_results_npz": hit is not None,
+            "active_substages_best_seed": "" if active_best is None else str(active_best),
+            "best_seed": "" if best_seed is None else str(best_seed),
+            "nmi_best": "" if best_nmi is None else f"{best_nmi:.4f}",
+            "active_substages_min": "" if not active_vals else str(min(active_vals)),
+            "active_substages_max": "" if not active_vals else str(max(active_vals)),
+            "active_substages_mean": ""
+            if not active_vals
+            else f"{sum(active_vals) / len(active_vals):.1f}",
+            "state_collapse": ""
+            if active_best is None
+            else ("yes" if active_best < k else "no"),
+            "run": scores[k]["run"] if k in scores else "",
+        }
+        rows.append(row)
+        by_k[k] = {**row, "active_substages_best_seed": active_best}
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    csv_path = out_dir / "k_sweep_active_substages.csv"
+    with csv_path.open("w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=list(rows[0].keys()) if rows else [])
+        w.writeheader()
+        w.writerows(rows)
+    json_path = out_dir / "k_sweep_active_substages.json"
+    json_path.write_text(json.dumps({"by_k": {str(k): v for k, v in by_k.items()}}, indent=2), encoding="utf-8")
+    return by_k
+
+
 def _write_overview_readme(
     out_dir: Path,
     chosen_k: int,
@@ -93,8 +198,9 @@ def _write_overview_readme(
         "## Start here",
         "",
         "1. `00_overview/k_sweep_dual_axis.pdf` — NMI + log p(z) vs K (thesis Fig 23)",
-        "2. Compare candidate folders: **K03, K04, K05, K07** (see table below)",
-        "3. Per-K README in each folder lists what to show",
+        "2. `00_overview/k_sweep_active_substages.csv` — configured K vs **active** substates used",
+        "3. Compare candidate folders (see table below)",
+        "4. Per-K README in each folder lists what to show",
         "",
         "## Candidate comparison",
         "",
@@ -137,6 +243,17 @@ def main() -> int:
     parser.add_argument("--skip-thesis-plots", action="store_true")
     parser.add_argument("--fig27-only", action="store_true", help="Only regenerate Fig 27 frequency grids")
     parser.add_argument("--tsne-only", action="store_true", help="Only regenerate t-SNE true/predicted scatters")
+    parser.add_argument(
+        "--tsne-samples",
+        type=int,
+        default=TSNE_N_SAMPLES,
+        help=f"Latent epochs subsampled for t-SNE (default {TSNE_N_SAMPLES:,})",
+    )
+    parser.add_argument(
+        "--fig27-tsne-only",
+        action="store_true",
+        help="Fig 27 + t-SNE only (skip full thesis stack; for incremental population postprocess)",
+    )
     parser.add_argument("--skip-publication", action="store_true")
     parser.add_argument(
         "--protocol",
@@ -176,6 +293,9 @@ def main() -> int:
         json.dumps({"chosen_k": chosen_k, "by_k": {str(k): v for k, v in sorted(scores.items())}}, indent=2),
         encoding="utf-8",
     )
+    active_by_k = write_active_substages_table(
+        args.root, overview, k_min=args.k_min, k_max=args.k_max, scores=scores
+    )
 
     k_values = args.k_list if args.k_list else list(range(args.k_min, args.k_max + 1))
     per_k: dict[str, dict] = {}
@@ -197,16 +317,20 @@ def main() -> int:
             "run": scores[k]["run"] if k in scores else "",
         }
 
-        if args.fig27_only:
+        if args.fig27_only or args.fig27_tsne_only:
             meta["n_active_substages"] = plot_fig27_gmm_predicted(
                 npz, k_dir / "frequency_plot_gmm_predicted.png", k=k, nmi=nmi
             )
-        elif args.tsne_only:
-            run_tsne_from_npz(npz, k_dir, k=k, nmi=nmi)
         elif not args.skip_thesis_plots:
+            meta["n_active_substages"] = _active_substages_from_npz(npz)
+        if args.tsne_only or args.fig27_tsne_only:
+            run_tsne_from_npz(npz, k_dir, k=k, nmi=nmi, n_samples=args.tsne_samples)
+        if not (args.fig27_only or args.tsne_only or args.fig27_tsne_only) and not args.skip_thesis_plots:
             run_full_thesis_analysis(npz, k_dir, k=k, nmi=nmi)
+            if "n_active_substages" not in meta:
+                meta["n_active_substages"] = _active_substages_from_npz(npz)
 
-        if not args.skip_publication and not args.fig27_only and not args.tsne_only:
+        if not args.skip_publication and not args.fig27_only and not args.tsne_only and not args.fig27_tsne_only:
             plot_biology_compact(npz, k_dir / "biology_compact.pdf")
             run_publication_panels(
                 npz,
@@ -227,13 +351,20 @@ def main() -> int:
         "root": str(args.root),
         "out_dir": str(args.out_dir),
         "chosen_k": chosen_k,
+        "active_substages": {str(k): v for k, v in active_by_k.items()},
         "per_k": per_k,
     }
     (args.out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
     if args.sync_professor_dir:
         professor_dir.mkdir(parents=True, exist_ok=True)
-        for name in ("k_sweep_dual_axis.pdf", "k_sweep_dual_axis.png", "k_sweep_metrics_table.csv"):
+        for name in (
+            "k_sweep_dual_axis.pdf",
+            "k_sweep_dual_axis.png",
+            "k_sweep_metrics_table.csv",
+            "k_sweep_active_substages.csv",
+            "k_sweep_active_substages.json",
+        ):
             src = overview / name
             if src.is_file():
                 shutil.copy(src, professor_dir / name)

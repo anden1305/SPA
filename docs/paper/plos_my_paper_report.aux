@@ -6,89 +6,93 @@
 \citation{rose2025mssv}
 \citation{rose2026consensus}
 \citation{miladinovic2019spindle,wang2026rest}
+\citation{garciaciudad2024temporal}
 \citation{barger2019accusleep,yaghouby2016segway}
-\citation{sunagawa2013faster,yamada2024faster2,katsageorgiou2018mcRBM,cusinato2024wucss}
-\citation{elmgreen2026thesis}
-\citation{dilokthanakul2016gmvae,sohn2015cvae,johnson2016svae,ebbers2017hmmvae}
+\citation{sunagawa2013faster,yamada2024faster2,cusinato2024wucss}
+\citation{katsageorgiou2018mcRBM}
+\citation{stevner2019human}
 \citation{katsageorgiou2018mcRBM,somnotate2024}
+\citation{dilokthanakul2016gmvae,sohn2015cvae,johnson2016svae,ebbers2017hmmvae}
 \citation{rose2025mssv}
-\citation{elmgreen2026thesis}
-\citation{elmgreen2026thesis}
-\newlabel{sec:data}{{}{2}{Data}{section*.3}{}}
+\citation{garciaciudad2024temporal}
+\citation{stevner2019human,miladinovic2019spindle,garciaciudad2024temporal}
 \citation{ebbers2017hmmvae}
-\citation{elmgreen2026thesis}
+\newlabel{sec:data}{{}{2}{Data}{section*.3}{}}
+\newlabel{sec:methods}{{}{2}{Methods}{section*.4}{}}
+\newlabel{eq:encoder}{{1}{2}{Conditional variational models and latent priors}{equation.0.1}{}}
 \citation{ebbers2017hmmvae,johnson2016svae}
-\newlabel{sec:methods}{{}{3}{Methods}{section*.4}{}}
-\newlabel{eq:encoder}{{1}{3}{Model ladder and architecture}{equation.0.1}{}}
-\newlabel{eq:decoder}{{2}{3}{Model ladder and architecture}{equation.0.2}{}}
+\citation{barger2019accusleep,yaghouby2016segway}
+\newlabel{eq:decoder}{{2}{3}{Conditional variational models and latent priors}{equation.0.2}{}}
 \@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces \textbf  {Conditional GMVAE architecture.} \textbf  {Encoder:} spectral EEG/EMG maps pass through CNN ($K{=}[7,5,5,3]$) and MLP blocks; subject ID feeds a subject embedder used only in the decoder. \textbf  {Latent:} diagonal Gaussian posterior with dimension $d{=}6$ feeds a Gaussian-mixture (cGMVAE) or sticky HMM--GMM (cHMM--GMVAE) prior. \textbf  {Decoder:} latent vector concatenated with subject embedding, then CNN reconstruction; training minimises MSE reconstruction plus $\beta \times $ prior KL. At holdout, only the encoder and prior are used for staging (no subject ID, no decoder).}}{3}{figure.caption.6}\protected@file@percent }
 \providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
 \newlabel{fig_arch}{{1}{3}{\textbf {Conditional GMVAE architecture.} \textbf {Encoder:} spectral EEG/EMG maps pass through CNN ($K{=}[7,5,5,3]$) and MLP blocks; subject ID feeds a subject embedder used only in the decoder. \textbf {Latent:} diagonal Gaussian posterior with dimension $d{=}6$ feeds a Gaussian-mixture (cGMVAE) or sticky HMM--GMM (cHMM--GMVAE) prior. \textbf {Decoder:} latent vector concatenated with subject embedding, then CNN reconstruction; training minimises MSE reconstruction plus $\beta \times $ prior KL. At holdout, only the encoder and prior are used for staging (no subject ID, no decoder)}{figure.caption.6}{}}
-\citation{barger2019accusleep,yaghouby2016segway}
-\citation{elmgreen2026thesis}
-\citation{elmgreen2026thesis}
+\newlabel{eq:viterbi}{{3}{3}{Conditional variational models and latent priors}{equation.0.3}{}}
 \citation{katsageorgiou2018mcRBM}
-\newlabel{eq:viterbi}{{3}{4}{Model ladder and architecture}{equation.0.3}{}}
-\newlabel{eq:nmi}{{4}{4}{Cross-validation and holdout protocol}{equation.0.4}{}}
 \citation{barger2019accusleep}
+\citation{garciaciudad2024temporal}
 \citation{rose2026consensus}
-\citation{katsageorgiou2018mcRBM}
+\newlabel{eq:nmi}{{4}{4}{Cross-validation and holdout protocol}{equation.0.4}{}}
 \@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces \textbf  {Joint holdout prior NMI by fold (best-of-three seeds, locked recipes, $K{=}3$).}}}{5}{table.caption.11}\protected@file@percent }
 \newlabel{table1}{{1}{5}{\textbf {Joint holdout prior NMI by fold (best-of-three seeds, locked recipes, $K{=}3$).}}{table.caption.11}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces \textbf  {Fair per-laboratory holdout comparison (mean over four folds; $K{=}3$).} \textbf  {Joint:} train on all laboratories; report metrics on held-out mice from the listed site only. \textbf  {Within:} train and evaluate within the same site. All rows use the \textbf  {same locked preprocessing} per laboratory (spectral bandpass, montage, post-normalisation from incohort ablation winners; \nameref {S4_Appendix}) and matched CNN--VAE capacity ($d{=}6$, \texttt  {wide\_mlp}, 200 epochs, batch 128, three seeds). cGMVAE, HMMGMVAE, and cHMM--GMVAE share learning rate $1.3 \times 10^{-3}$; they differ only in embedding use ($8$ vs.\ $0$), sequence length ($T{=}1$ vs.\ $T{=}64$), and prior type (static GMM vs.\ HMM--GMM vs.\ warm sticky HMM--GMM). HMM (raw) uses the time-domain pipeline (no shared deep front-end). VAE models report \textbf  {best-of-three} prior NMI and matching macro accuracy, averaged across folds. Per-fold within-lab and joint breakdowns: \nameref {S2_Table}. Incohort ceiling NMI from per-lab ablation sweeps (upper reference, not holdout): \nameref {S7_Table}. HMM (raw): $\mathit  {runs}{=}1$; incomplete grid (\nameref {S6_Table}).}}{6}{table.caption.13}\protected@file@percent }
-\newlabel{table2}{{2}{6}{\textbf {Fair per-laboratory holdout comparison (mean over four folds; $K{=}3$).} \textbf {Joint:} train on all laboratories; report metrics on held-out mice from the listed site only. \textbf {Within:} train and evaluate within the same site. All rows use the \textbf {same locked preprocessing} per laboratory (spectral bandpass, montage, post-normalisation from incohort ablation winners; \nameref {S4_Appendix}) and matched CNN--VAE capacity ($d{=}6$, \texttt {wide\_mlp}, 200 epochs, batch 128, three seeds). cGMVAE, HMMGMVAE, and cHMM--GMVAE share learning rate $1.3 \times 10^{-3}$; they differ only in embedding use ($8$ vs.\ $0$), sequence length ($T{=}1$ vs.\ $T{=}64$), and prior type (static GMM vs.\ HMM--GMM vs.\ warm sticky HMM--GMM). HMM (raw) uses the time-domain pipeline (no shared deep front-end). VAE models report \textbf {best-of-three} prior NMI and matching macro accuracy, averaged across folds. Per-fold within-lab and joint breakdowns: \nameref {S2_Table}. Incohort ceiling NMI from per-lab ablation sweeps (upper reference, not holdout): \nameref {S7_Table}. HMM (raw): $\mathit {runs}{=}1$; incomplete grid (\nameref {S6_Table})}{table.caption.13}{}}
-\citation{somnotate2024,grieger2021prerem}
-\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces \textbf  {Substage resolution sweep (joint holdout fold~4).} Mean validation prior NMI (blue) and mean log prior density $\log p(\mathbf  {z}_{1:T})/(T\cdot L)$ with $T{=}64$ latent time steps and $L{=}6$ latent dimensions (orange) versus mixture count $K$; shaded bands: mean $\pm $ SD across seeds; dashed line: chosen $K{=}4$.}}{7}{figure.caption.15}\protected@file@percent }
-\newlabel{fig2}{{2}{7}{\textbf {Substage resolution sweep (joint holdout fold~4).} Mean validation prior NMI (blue) and mean log prior density $\log p(\mathbf {z}_{1:T})/(T\cdot L)$ with $T{=}64$ latent time steps and $L{=}6$ latent dimensions (orange) versus mixture count $K$; shaded bands: mean $\pm $ SD across seeds; dashed line: chosen $K{=}4$}{figure.caption.15}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Fair per-laboratory holdout comparison (mean over four folds; $K{=}3$). Joint: train on all laboratories; report metrics on held-out mice from the listed site only. Within: train and evaluate within the same site. All rows use the same locked preprocessing per laboratory (spectral bandpass, montage, post-normalisation from incohort ablation winners; \nameref {S4_Appendix}) and matched CNN--VAE capacity ($d{=}6$, \texttt  {wide\_mlp}, 200 epochs, batch 128, three seeds). cGMVAE, HMMGMVAE, and cHMM--GMVAE share learning rate $1.3 \times 10^{-3}$; they differ only in embedding use ($8$ vs.\ $0$), sequence length ($T{=}1$ vs.\ $T{=}64$), and prior type (static GMM vs.\ HMM--GMM vs.\ warm sticky HMM--GMM). HMM (raw) uses the time-domain pipeline (no shared deep front-end). VAE models report best-of-three prior NMI and matching macro accuracy, averaged across folds. Per-fold within-lab and joint breakdowns: \nameref {S2_Table}. Incohort ceiling NMI from per-lab ablation sweeps (upper reference, not holdout): \nameref {S7_Table}. HMM (raw): $\mathit  {runs}{=}1$; incomplete grid (\nameref {S6_Table}).}}{5}{table.caption.13}\protected@file@percent }
+\newlabel{table2}{{2}{5}{Fair per-laboratory holdout comparison (mean over four folds; $K{=}3$). Joint: train on all laboratories; report metrics on held-out mice from the listed site only. Within: train and evaluate within the same site. All rows use the same locked preprocessing per laboratory (spectral bandpass, montage, post-normalisation from incohort ablation winners; \nameref {S4_Appendix}) and matched CNN--VAE capacity ($d{=}6$, \texttt {wide\_mlp}, 200 epochs, batch 128, three seeds). cGMVAE, HMMGMVAE, and cHMM--GMVAE share learning rate $1.3 \times 10^{-3}$; they differ only in embedding use ($8$ vs.\ $0$), sequence length ($T{=}1$ vs.\ $T{=}64$), and prior type (static GMM vs.\ HMM--GMM vs.\ warm sticky HMM--GMM). HMM (raw) uses the time-domain pipeline (no shared deep front-end). VAE models report best-of-three prior NMI and matching macro accuracy, averaged across folds. Per-fold within-lab and joint breakdowns: \nameref {S2_Table}. Incohort ceiling NMI from per-lab ablation sweeps (upper reference, not holdout): \nameref {S7_Table}. HMM (raw): $\mathit {runs}{=}1$; incomplete grid (\nameref {S6_Table})}{table.caption.13}{}}
+\citation{katsageorgiou2018mcRBM}
+\citation{stevner2019human}
+\citation{elmgreen2026thesis}
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces \textbf  {Substage resolution sweep (joint holdout fold~4).} Mean validation prior NMI (blue) and mean log prior density $\log p(\mathbf  {z}_{1:T})/(T\cdot L)$ with $T{=}64$ latent time steps and $L{=}6$ latent dimensions (orange) versus mixture count $K$; shaded bands: mean $\pm $ SD across seeds; dashed line: chosen $K{=}4$.}}{6}{figure.caption.15}\protected@file@percent }
+\newlabel{fig2}{{2}{6}{\textbf {Substage resolution sweep (joint holdout fold~4).} Mean validation prior NMI (blue) and mean log prior density $\log p(\mathbf {z}_{1:T})/(T\cdot L)$ with $T{=}64$ latent time steps and $L{=}6$ latent dimensions (orange) versus mixture count $K$; shaded bands: mean $\pm $ SD across seeds; dashed line: chosen $K{=}4$}{figure.caption.15}{}}
 \citation{rose2026consensus}
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces \textbf  {Substage organisation and physiology (fold~4 holdout).} \textbf  {A,} Taxonomy schematic ($K{=}13$ placeholder): latent PCA layout and significant transition edges. \textbf  {B,} Physiology grid ($K{=}4$, best seed): EEG/EMG spectra, features, true macro mix, and subject mix per discovered substate.}}{7}{figure.caption.17}\protected@file@percent }
+\newlabel{fig3}{{3}{7}{\textbf {Substage organisation and physiology (fold~4 holdout).} \textbf {A,} Taxonomy schematic ($K{=}13$ placeholder): latent PCA layout and significant transition edges. \textbf {B,} Physiology grid ($K{=}4$, best seed): EEG/EMG spectra, features, true macro mix, and subject mix per discovered substate}{figure.caption.17}{}}
+\newlabel{S7_Appendix_arc}{{}{7}{Research arc: from thesis to this report}{section*.22}{}}
 \citation{elmgreen2026thesis}
-\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces \textbf  {Substage dynamics ($K{=}4$, fold 4 holdout).} \textbf  {A,} Row-normalised transition matrix (probability of next state given a state change). \textbf  {B,} Two-hour hypnogram: discovered substates (top) and expert macro labels (bottom).}}{8}{figure.caption.17}\protected@file@percent }
-\newlabel{fig3}{{3}{8}{\textbf {Substage dynamics ($K{=}4$, fold 4 holdout).} \textbf {A,} Row-normalised transition matrix (probability of next state given a state change). \textbf {B,} Two-hour hypnogram: discovered substates (top) and expert macro labels (bottom)}{figure.caption.17}{}}
-\newlabel{S7_Appendix_arc}{{}{9}{Research arc: from thesis to this report}{section*.22}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces \textbf  {Research arc (story map).} Columns: synthetic validation, empirical MSSV benchmarks, and special-course extensions. The locked paper protocol (bold path) is decoder-only cGMVAE/cHMM--GMVAE on quality-screened labs~2/3/5 with zero-shot holdout.}}{10}{figure.caption.28}\protected@file@percent }
-\newlabel{fig_story_map}{{4}{10}{\textbf {Research arc (story map).} Columns: synthetic validation, empirical MSSV benchmarks, and special-course extensions. The locked paper protocol (bold path) is decoder-only cGMVAE/cHMM--GMVAE on quality-screened labs~2/3/5 with zero-shot holdout}{figure.caption.28}{}}
-\newlabel{S1_Fig}{{}{10}{S1 Fig}{section*.30}{}}
-\newlabel{S2_Fig}{{}{11}{S2 Fig}{section*.31}{}}
-\newlabel{S4_Fig}{{}{12}{S4 Fig}{section*.32}{}}
-\newlabel{S5_Fig}{{}{13}{S5 Fig}{section*.33}{}}
-\newlabel{S2_Table}{{}{13}{S2 Table}{section*.34}{}}
-\newlabel{S3_Table}{{}{15}{S3 Table}{section*.35}{}}
-\newlabel{S4_Table}{{}{15}{S4 Table}{section*.36}{}}
-\newlabel{S5_Table}{{}{15}{S5 Table}{section*.37}{}}
-\newlabel{S6_Table}{{}{15}{S6 Table}{section*.38}{}}
-\newlabel{S7_Table}{{}{15}{S7 Table}{section*.39}{}}
+\newlabel{S8_Table}{{}{8}{S8 Table}{section*.29}{}}
+\newlabel{S9_Table}{{}{9}{S9 Table}{section*.30}{}}
+\newlabel{S1_Fig}{{}{10}{S1 Fig}{section*.32}{}}
+\newlabel{S2_Fig}{{}{10}{S2 Fig}{section*.33}{}}
+\newlabel{S3_Fig}{{}{10}{S3 Fig}{section*.34}{}}
+\newlabel{S2_Table}{{}{10}{S2 Table}{section*.36}{}}
+\newlabel{S3_Table}{{}{11}{S3 Table}{section*.37}{}}
+\newlabel{S4_Table}{{}{11}{S4 Table}{section*.38}{}}
+\newlabel{S5_Table}{{}{11}{S5 Table}{section*.39}{}}
+\newlabel{S6_Table}{{}{12}{S6 Table}{section*.40}{}}
+\newlabel{S7_Table}{{}{12}{S7 Table}{section*.41}{}}
+\newlabel{S1_Appendix}{{}{12}{Full HMM--GMM prior and warm-start}{section*.42}{}}
+\newlabel{eq:emission}{{5}{12}{Full HMM--GMM prior and warm-start}{equation.0.5}{}}
+\newlabel{eq:forward}{{6}{12}{Full HMM--GMM prior and warm-start}{equation.0.6}{}}
 \citation{ebbers2017hmmvae,johnson2016svae}
-\citation{elmgreen2026thesis}
+\citation{garciaciudad2024temporal}
+\citation{ciudad2026qslp}
+\citation{rose2026consensus}
 \bibdata{assets/references}
-\bibcite{rose2025mssv}{1}
-\newlabel{S1_Appendix}{{}{16}{Full HMM--GMM prior and warm-start}{section*.40}{}}
-\newlabel{eq:emission}{{5}{16}{Full HMM--GMM prior and warm-start}{equation.0.5}{}}
-\newlabel{eq:forward}{{6}{16}{Full HMM--GMM prior and warm-start}{equation.0.6}{}}
-\newlabel{eq:kl_hmm}{{7}{16}{Full HMM--GMM prior and warm-start}{equation.0.7}{}}
-\newlabel{S2_Appendix}{{}{16}{S2 Appendix}{section*.42}{}}
-\newlabel{S3_Appendix}{{}{16}{S3 Appendix}{section*.43}{}}
-\newlabel{S4_Appendix}{{}{16}{S4 Appendix}{section*.44}{}}
-\newlabel{S1_Appendix_synth}{{}{16}{S1 Appendix (synthetic)}{section*.45}{}}
-\newlabel{S1_File}{{}{16}{S1 File}{section*.47}{}}
-\newlabel{S1_Table}{{}{16}{S1 Table}{section*.48}{}}
-\bibcite{rose2026consensus}{2}
-\bibcite{miladinovic2019spindle}{3}
-\bibcite{wang2026rest}{4}
-\bibcite{barger2019accusleep}{5}
-\bibcite{yaghouby2016segway}{6}
-\bibcite{sunagawa2013faster}{7}
-\bibcite{yamada2024faster2}{8}
-\bibcite{katsageorgiou2018mcRBM}{9}
-\bibcite{cusinato2024wucss}{10}
-\bibcite{elmgreen2026thesis}{11}
-\bibcite{dilokthanakul2016gmvae}{12}
-\bibcite{sohn2015cvae}{13}
-\bibcite{johnson2016svae}{14}
-\bibcite{ebbers2017hmmvae}{15}
-\bibcite{somnotate2024}{16}
-\newlabel{S6_Fig}{{}{17}{S6 Fig}{section*.49}{}}
-\bibcite{grieger2021prerem}{17}
-\newlabel{LastPage}{{}{18}{S6 Fig.}{page.18}{}}
-\gdef\lastpage@lastpage{18}
-\gdef\lastpage@lastpageHy{18}
-\gdef \@abspage@last{18}
+\bibcite{katsageorgiou2018mcRBM}{1}
+\bibcite{rose2025mssv}{2}
+\bibcite{rose2026consensus}{3}
+\bibcite{miladinovic2019spindle}{4}
+\bibcite{wang2026rest}{5}
+\bibcite{garciaciudad2024temporal}{6}
+\newlabel{eq:kl_hmm}{{7}{13}{Full HMM--GMM prior and warm-start}{equation.0.7}{}}
+\newlabel{S2_Appendix}{{}{13}{S2 Appendix}{section*.44}{}}
+\newlabel{S3_Appendix}{{}{13}{S3 Appendix}{section*.45}{}}
+\newlabel{S4_Appendix}{{}{13}{S4 Appendix}{section*.46}{}}
+\newlabel{S1_Appendix_synth}{{}{13}{S1 Appendix (synthetic)}{section*.47}{}}
+\newlabel{S1_File}{{}{13}{S1 File}{section*.49}{}}
+\newlabel{S1_Table}{{}{13}{S1 Table}{section*.50}{}}
+\bibcite{barger2019accusleep}{7}
+\bibcite{yaghouby2016segway}{8}
+\bibcite{sunagawa2013faster}{9}
+\bibcite{yamada2024faster2}{10}
+\bibcite{cusinato2024wucss}{11}
+\bibcite{stevner2019human}{12}
+\bibcite{somnotate2024}{13}
+\bibcite{dilokthanakul2016gmvae}{14}
+\bibcite{sohn2015cvae}{15}
+\bibcite{johnson2016svae}{16}
+\bibcite{ebbers2017hmmvae}{17}
+\bibcite{grieger2021prerem}{18}
+\bibcite{ciudad2026qslp}{19}
+\bibcite{elmgreen2026thesis}{20}
+\newlabel{LastPage}{{}{14}{S1 Table.}{page.14}{}}
+\gdef\lastpage@lastpage{14}
+\gdef\lastpage@lastpageHy{14}
+\gdef \@abspage@last{14}

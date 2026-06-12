@@ -1,8 +1,8 @@
 {
-  "n_holdout": 48,
+  "n_holdout": 47,
   "n_k_sweep": 13,
   "joint_mean_accuracy": {
-    "cgmvae_locked": 0.68055,
+    "cgmvae_locked": 0.72295,
     "chmmgmvae_locked": 0.8791749999999999
   }
 }

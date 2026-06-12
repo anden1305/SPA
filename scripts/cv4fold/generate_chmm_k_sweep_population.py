@@ -2,6 +2,7 @@
 """K substage sweep on all 20 HQ mice (incohort train + val) for appendix / biology panels.
 
 Locked cHMM–GMVAE (warm_emb8_sticky92), 5 seeds per K, K=3…15.
+Training includes artifact epochs (remove_artifact: false).
 Separate from fold-4 holdout sweep — see docs/paper/k_sweep_population.md
 """
 
@@ -48,12 +49,14 @@ def _patch_k(cfg: dict[str, Any], k: int) -> dict[str, Any]:
     return out
 
 
-def build_population_chmm_base(manifest: dict) -> dict[str, Any]:
+def build_population_chmm_base(manifest: dict, *, include_artifact: bool = True) -> dict[str, Any]:
     """All 20 mice in both train and val (incohort substage discovery)."""
     mice = all_mice(manifest)
     entries = dataset_entries_with_lab_prepro(
         manifest, mice, extract_cvae_overrides=extract_lab_cvae_overrides
     )
+    for entry in entries:
+        entry["remove_artifact"] = not include_artifact
     cfg = build_unified_holdout_skeleton("chmmgmvae")
     cfg["train_datasets"] = copy.deepcopy(entries)
     cfg["val_datasets"] = copy.deepcopy(entries)
@@ -67,9 +70,12 @@ def _write_cfg(path: Path, cfg: dict[str, Any]) -> Path:
     return path
 
 
-def generate(manifest: dict, *, k_values: list[int]) -> list[Path]:
+def generate(manifest: dict, *, k_values: list[int], include_artifact: bool = True) -> list[Path]:
     written: list[Path] = []
-    base = _patch_lr(_patch_warm_emb8_sticky92(build_population_chmm_base(manifest)), LOCKED_LR)
+    base = _patch_lr(
+        _patch_warm_emb8_sticky92(build_population_chmm_base(manifest, include_artifact=include_artifact)),
+        LOCKED_LR,
+    )
     base["runs"] = POPULATION_RUNS
     base["seed"] = POPULATION_SEED
     base.setdefault("visualizer", {})["save_results_npz"] = True
@@ -83,16 +89,32 @@ def generate(manifest: dict, *, k_values: list[int]) -> list[Path]:
             cfg,
         )
         written.append(out_path)
-        print(f"Wrote {out_path} | K={k} mice=20 runs={POPULATION_RUNS} seed={POPULATION_SEED}")
+        artifact_note = "artifacts kept" if include_artifact else "artifacts removed"
+        print(
+            f"Wrote {out_path} | K={k} mice=20 runs={POPULATION_RUNS} "
+            f"seed={POPULATION_SEED} ({artifact_note})"
+        )
     return written
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--k", type=int, nargs="*", default=list(DEFAULT_K))
+    parser.add_argument(
+        "--include-artifact",
+        action="store_true",
+        default=True,
+        help="Keep artifact epochs (remove_artifact: false). Default for population biology.",
+    )
+    parser.add_argument(
+        "--no-artifact",
+        action="store_false",
+        dest="include_artifact",
+        help="Drop artifact epochs (remove_artifact: true), same as holdout K-sweep.",
+    )
     args = parser.parse_args()
     manifest = load_manifest()
-    paths = generate(manifest, k_values=args.k)
+    paths = generate(manifest, k_values=args.k, include_artifact=args.include_artifact)
     print(f"Generated {len(paths)} population K-sweep configs.")
     return 0
 

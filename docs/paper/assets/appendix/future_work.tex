@@ -1,0 +1,19 @@
+% Planned extensions (not part of locked holdout protocol).
+\subsection{Future directions}
+\label{S13_Appendix_future}
+
+\paragraph*{Laboratory and subject conditioning.}
+This report uses \emph{subject} embeddings in the decoder only (\nameref{S3_Appendix}).
+Preliminary cv4fold experiments with \emph{subject\_lab} embeddings (concatenating laboratory identity alongside mouse identity) collapsed on joint holdout (prior NMI near zero), suggesting that explicit lab tags did not stabilise cross-site transfer under the locked recipe.
+A middle ground worth testing is hierarchical or factorised conditioning: separate embeddings for acquisition site and animal, or adversarial removal of lab information from encoder latents while retaining subject-specific reconstruction in the decoder.
+Such designs may disentangle montage and scoring context from individual variability more cleanly than a single subject index when Bern, Copenhagen, and Lyon contribute unequal cohort sizes (\nameref{S8_Table}).
+
+\paragraph*{End-to-end CNN on raw EEG/EMG.}
+The locked pipeline maps each 4\,s epoch to a log-power spectral tensor via FFT and trains a CNN--VAE on that representation.
+The thesis showed that classical HMMs on \emph{raw} time-domain MSSV inputs fail to generalise across subjects (\nameref{S2_Appendix}); this report's HMM (raw) holdout baseline remains near chance on the cross-lab protocol (joint mean prior NMI 0.054).
+An open direction is to replace the hand-crafted spectral front-end with a convolutional encoder on band-pass filtered raw EEG/EMG traces, closer to supervised mouse CNN classifiers~\cite{garciaciudad2024temporal,miladinovic2019spindle}, while retaining the same decoder-only conditioning and sticky mixture prior at the latent level.
+Fair comparison would require matched context length ($T$ epochs), preprocessing locks per laboratory, and the same leave-mice-out folds; spectral and raw encoders need not share identical capacity.
+
+\paragraph*{Substage selection and biology review.}
+Mixture count $K$ was chosen on holdout fold~4 only (\nameref{sec:limitations}).
+Train-only or nested cross-validation for $K$, plus expert review of substage names from physiology panels (as in mcRBM~\cite{katsageorgiou2018mcRBM}), would strengthen claims beyond macro NMI.

@@ -79,7 +79,7 @@ Optional manual labels after expert review: `--taxonomy-json path/to/overrides.j
 - [`scripts/paper/plot_k_sweep_dual_axis.py`](../../scripts/paper/plot_k_sweep_dual_axis.py) — K-sweep (thesis Fig 23 style)
 - [`scripts/paper/plot_figure27_compact.py`](../../scripts/paper/plot_figure27_compact.py) — publication Fig 3–4
 - [`scripts/paper/plot_taxonomy_schematic.py`](../../scripts/paper/plot_taxonomy_schematic.py) — thesis Fig 30-style taxonomy
-- [`scripts/substage_analysis/`](../../scripts/substage_analysis/) — thesis PCA / transition / frequency modules
+- [`scripts/substage_analysis/frequency_plot.py`](../../scripts/substage_analysis/frequency_plot.py) — thesis Fig 27 grid (`subject_cmap=twilight_shifted`, `font_scale=1.45`)
 
 ## Staging
 

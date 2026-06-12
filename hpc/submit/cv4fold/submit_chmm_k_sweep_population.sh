@@ -6,15 +6,17 @@
 # Submit:
 #   bash hpc/submit/cv4fold/submit_chmm_k_sweep_population.sh
 #
-# After jobs finish, plot:
+# After jobs finish (full pack incl. t-SNE):
 #   bsub < hpc/submit/paper/run_population_biology_meeting.sh
+# While jobs still run — Fig 27 + t-SNE for finished K only:
+#   bsub < hpc/submit/paper/run_population_biology_meeting_incremental.sh
 
 set -euo pipefail
 SPA_ROOT="/work3/s204070/SPA"
 cd "${SPA_ROOT}"
 
 QUEUE="gpuv100"
-MEM="8GB"
+MEM="6GB"
 CPUS="4"
 WALLTIME="2:30"
 K_VALUES=($(seq 3 15))

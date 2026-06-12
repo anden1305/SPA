@@ -8,6 +8,8 @@ import numpy as np
 import seaborn as sns
 from sklearn.manifold import TSNE
 
+from src.visuals.layered_scatter import scatter_layered
+
 sns.set_theme(style="whitegrid", context="paper")
 
 ColorLike = Union[str, Tuple[float, float, float], Tuple[float, float, float, float]]
@@ -154,19 +156,16 @@ def pca_scatter_random_samples(
     # -----------------
     fig, ax = plt.subplots(figsize=(9, 7))
 
-    for c in range(C):
-        mask = (y_sel == c)
-        if not np.any(mask):
-            continue
-        ax.scatter(
-            pc1[mask],
-            pc2[mask],
-            s=point_size,
-            alpha=alpha,
-            label=label_names[c],
-            color=label_colors[c],
-            edgecolors="none",
-        )
+    colors_lut = {c: label_colors[c] for c in range(C)}
+    scatter_layered(
+        ax,
+        pc1,
+        pc2,
+        y_sel,
+        label_names=label_names if "Artifact" in label_names else None,
+        colors=colors_lut,
+        point_size=point_size,
+    )
 
     evr1 = explained_variance_ratio[0] if explained_variance_ratio.size > 0 else 0.0
     evr2 = explained_variance_ratio[1] if explained_variance_ratio.size > 1 else 0.0
@@ -174,7 +173,15 @@ def pca_scatter_random_samples(
     ax.set_xlabel(f"PC1 ({evr1*100:.1f}% var)")
     ax.set_ylabel(f"PC2 ({evr2*100:.1f}% var)")
     ax.set_title(analysis_name)
-    ax.legend(loc="best", frameon=True)
+    ax.legend(
+        handles=[
+            plt.Line2D([0], [0], marker="o", color="w", markerfacecolor=label_colors[c], label=label_names[c], markersize=8)
+            for c in range(C)
+            if np.any(y_sel == c)
+        ],
+        loc="best",
+        frameon=True,
+    )
     ax.grid(True, linewidth=0.5, alpha=0.35)
 
     # -----------------
@@ -201,24 +208,29 @@ def _scatter_tsne_panel(
     point_size: float = 14.0,
     alpha: float = 0.75,
 ) -> None:
-    c_count = len(label_names)
-    for c in range(c_count):
-        mask = labels == c
-        if not np.any(mask):
-            continue
-        ax.scatter(
-            emb[mask, 0],
-            emb[mask, 1],
-            s=point_size,
-            alpha=alpha,
-            label=label_names[c],
-            color=label_colors[c],
-            edgecolors="none",
-        )
+    colors_lut = {c: label_colors[c] for c in range(len(label_names))}
+    scatter_layered(
+        ax,
+        emb[:, 0],
+        emb[:, 1],
+        labels,
+        label_names=label_names if "Artifact" in label_names else None,
+        colors=colors_lut,
+        point_size=point_size,
+    )
     ax.set_xlabel("t-SNE 1")
     ax.set_ylabel("t-SNE 2")
     ax.set_title(title)
-    ax.legend(loc="best", frameon=True, fontsize=8)
+    ax.legend(
+        handles=[
+            plt.Line2D([0], [0], marker="o", color="w", markerfacecolor=label_colors[c], label=label_names[c], markersize=8)
+            for c in range(len(label_names))
+            if np.any(labels == c)
+        ],
+        loc="best",
+        frameon=True,
+        fontsize=8,
+    )
     ax.grid(True, linewidth=0.4, alpha=0.35)
 
 
@@ -251,13 +263,18 @@ def tsne_scatter_pair(
     if n_samples > n:
         raise ValueError(f"n_samples={n_samples} cannot exceed N={n}.")
 
+    n_use = min(n_samples, n)
     rng = np.random.default_rng(seed)
-    idx = rng.choice(n, size=n_samples, replace=False)
+    idx = rng.choice(n, size=n_use, replace=False)
     x = datapoints[idx].astype(np.float64, copy=False)
     y_true = labels_true[idx].astype(int, copy=False)
     y_pred = labels_pred[idx].astype(int, copy=False)
 
-    perp = float(min(perplexity, max(5.0, (n_samples - 1) / 3.0)))
+    if n_use > 15_000:
+        point_size = min(point_size, 8.0)
+        alpha = min(alpha, 0.55)
+
+    perp = float(min(perplexity, max(5.0, (n_use - 1) / 3.0)))
     tsne = TSNE(
         n_components=2,
         perplexity=perp,

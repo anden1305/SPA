@@ -7,9 +7,9 @@
       "max_nmi": 0.4974
     },
     "cgmvae_locked": {
-      "mean_nmi": 0.24289999999999998,
+      "mean_nmi": 0.282275,
       "n_folds": 4,
-      "min_nmi": 0.1414,
+      "min_nmi": 0.2563,
       "max_nmi": 0.3067
     },
     "chmmgmvae_locked": {
@@ -20,5 +20,5 @@
     }
   },
   "thesis_baseline": {},
-  "n_rows": 48
+  "n_rows": 47
 }

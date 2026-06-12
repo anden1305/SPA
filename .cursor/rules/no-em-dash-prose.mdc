@@ -1,0 +1,38 @@
+---
+description: No em dashes; avoid semicolon/colon chains in prose
+alwaysApply: true
+---
+
+# Prose punctuation (papers, docs, user-facing text)
+
+## Never use em dashes
+
+Do **not** use em dashes (`---`, `—`, `–` as a parenthetical break) in prose.
+
+| Instead of | Use |
+|------------|-----|
+| `X---Y` parenthetical | commas, parentheses, or a new sentence |
+| `X---consistent with Y` | period + new clause, or `, which is consistent with` |
+
+**OK to keep:** en dashes in ranges (`folds 3--4`, `0.01--1.0`), minus in math, `---` as missing table cells.
+
+## Avoid `;` and `:` as sentence glue
+
+Do not chain independent ideas with semicolons or lead-ins like `The arc: first X; then Y`.
+
+| Avoid | Prefer |
+|-------|--------|
+| `A; B` (two full clauses) | Two sentences, or `and` / `but` |
+| `First X; second Y` | `First X. Second Y.` |
+| `We find: X; Y; and Z` | Short sentences or a bullet list |
+| `calibrate expectations: A; B; C` | `SPINDLE … REST … García Ciudad …` as separate sentences |
+
+**OK:** semicolons inside statistical parentheticals (`Wilcoxon $p=0.06$; paired $t$ …`), `Contributions are threefold` with **(i)(ii)(iii)** items, colons before equations/lists of numbers, `Fig. 3A:` labels.
+
+## Examples
+
+- ❌ `the temporal prior adds a margin---consistent with supervised evidence`
+- ✅ `the temporal prior adds a consistent margin. This matches supervised evidence`
+
+- ❌ `Dataset details are in Methods; ablations are in the Appendix`
+- ✅ `Dataset details are in Methods. Ablations are in the Appendix`

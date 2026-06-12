@@ -1,5 +1,13 @@
 \begin{thebibliography}{10}
 
+\bibitem{katsageorgiou2018mcRBM}
+Katsageorgiou VM, Sona D, Zanotto M, Lassi G, Garcia-Garcia C, Tucci V, et~al.
+\newblock A novel unsupervised analysis of electrophysiological signals reveals
+  new sleep substages in mice.
+\newblock PLOS Biology. 2018;16(5):e2003663.
+\newblock \href {http://dx.doi.org/10.1371/journal.pbio.2003663}
+  {doi:10.1371/journal.pbio.2003663}.
+
 \bibitem{rose2025mssv}
 Rose L, Zahid AN, Ciudad JG, et~al.
 \newblock Mouse sleep staging validation dataset (MSSV).
@@ -34,6 +42,17 @@ Wang J, et~al.
 \newblock \href {http://dx.doi.org/10.1093/sleepadvances/zpag044}
   {doi:10.1093/sleepadvances/zpag044}.
 
+\bibitem{garciaciudad2024temporal}
+Garc{\'i}a~Ciudad J, M{\o}rup M, Kornum BR, Zahid AN.
+\newblock Evaluating the influence of temporal context on automatic mouse sleep
+  staging through the application of human models.
+\newblock In: 2024 46th Annual International Conference of the {IEEE}
+  Engineering in Medicine and Biology Society ({EMBC}); 2024. Available from:
+  \url{https://arxiv.org/abs/2406.16911}. \href
+  {http://arxiv.org/abs/2406.16911} {arXiv:2406.16911}. \href
+  {http://dx.doi.org/10.1109/EMBC53108.2024.10783224}
+  {doi:10.1109/EMBC53108.2024.10783224}.
+
 \bibitem{barger2019accusleep}
 Barger Z, Frye CG, Liu D, Dan Y, Bouchard KE.
 \newblock Robust, automated sleep scoring by a compact neural network with
@@ -62,14 +81,6 @@ Yamada RG, Matsuzawa K, Ode KL, Ueda HR.
 \newblock European Journal of Neuroscience. 2024;60(7):5467-86.
 \newblock \href {http://dx.doi.org/10.1111/ejn.16465} {doi:10.1111/ejn.16465}.
 
-\bibitem{katsageorgiou2018mcRBM}
-Katsageorgiou VM, Sona D, Zanotto M, Lassi G, Garcia-Garcia C, Tucci V, et~al.
-\newblock A novel unsupervised analysis of electrophysiological signals reveals
-  new sleep substages in mice.
-\newblock PLOS Biology. 2018;16(5):e2003663.
-\newblock \href {http://dx.doi.org/10.1371/journal.pbio.2003663}
-  {doi:10.1371/journal.pbio.2003663}.
-
 \bibitem{cusinato2024wucss}
 Cusinato R, Gross CT, et~al.
 \newblock Workflow for unsupervised classification of sleep states ({WUCSS}) in
@@ -78,13 +89,25 @@ Cusinato R, Gross CT, et~al.
 \newblock Unsupervised light/deep NREM; replace full author list from
   publisher.
 
-\bibitem{elmgreen2026thesis}
-Elmgreen OR, Bigom AH.
-\newblock Characterizing sleep patterns by use of dynamic unsupervised machine
-  learning approaches.
-\newblock MSc thesis, Technical University of Denmark. 2026.
-\newblock Population cGMVAE NMI $\approx$ 0.70; expert-feature HMM $\approx$
-  0.51 (single-lab LOSO); time-domain HMM $\approx$ 0.01.
+\bibitem{stevner2019human}
+Stevner ABA, Vidaurre D, Cabral J, Rapuano K, Nielsen SFV, Tagliazucchi E,
+  et~al.
+\newblock Discovery of key whole-brain transitions and dynamics during human
+  wakefulness and non-{REM} sleep.
+\newblock Nature Communications. 2019;10(1):1035.
+\newblock Available from:
+  \url{https://www.nature.com/articles/s41467-019-08934-3}. \href
+  {http://dx.doi.org/10.1038/s41467-019-08934-3}
+  {doi:10.1038/s41467-019-08934-3}.
+
+\bibitem{somnotate2024}
+authors S.
+\newblock Somnotate: A probabilistic sleep stage classifier for studying
+  vigilance state transitions.
+\newblock PLOS Computational Biology. 2024.
+\newblock Replace author list from publisher page before submission.
+\newblock \href {http://dx.doi.org/10.1371/journal.pcbi.1011793}
+  {doi:10.1371/journal.pcbi.1011793}.
 
 \bibitem{dilokthanakul2016gmvae}
 Dilokthanakul N, Mediano PAM, Garnelo M, et~al.
@@ -112,20 +135,26 @@ Ebbers J, Heymann J, Drude L, et~al.
   discovery.
 \newblock In: Interspeech; 2017. p. 488-92.
 
-\bibitem{somnotate2024}
-authors S.
-\newblock Somnotate: A probabilistic sleep stage classifier for studying
-  vigilance state transitions.
-\newblock PLOS Computational Biology. 2024.
-\newblock Replace author list from publisher page before submission.
-\newblock \href {http://dx.doi.org/10.1371/journal.pcbi.1011793}
-  {doi:10.1371/journal.pcbi.1011793}.
-
 \bibitem{grieger2021prerem}
 Grieger N, et~al.
 \newblock Automated scoring of pre-{REM} sleep in mice with deep learning.
 \newblock Scientific Reports. 2021.
 \newblock Supervised pre-REM transitions; verify full citation from publisher
   before submission.
+
+\bibitem{ciudad2026qslp}
+Ciudad JG, N{\o}rskov AV, Zahid AN, Kornum BR, M{\o}rup M. Aligning human and
+  mouse {EEG} representations of sleep stages with a quadruplet split latent
+  permutation auto-encoder; 2026.
+\newblock ICLR Workshop on Representational Alignment (Re-Align); OpenReview.
+\newblock Available from: \url{https://openreview.net/pdf?id=K3Z4jVHUnf}.
+
+\bibitem{elmgreen2026thesis}
+Elmgreen OR, Bigom AH.
+\newblock Characterizing sleep patterns by use of dynamic unsupervised machine
+  learning approaches.
+\newblock MSc thesis, Technical University of Denmark. 2026.
+\newblock Population cGMVAE NMI $\approx$ 0.70; expert-feature HMM $\approx$
+  0.51 (single-lab LOSO); time-domain HMM $\approx$ 0.01.
 
 \end{thebibliography}

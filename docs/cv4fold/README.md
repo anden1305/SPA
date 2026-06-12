@@ -18,7 +18,7 @@ Scrape helper (shows best + all seeds): `python3 scripts/cv4fold/scrape_experime
 
 **After cv4fold / holdout jobs finish:** run postprocess — [postprocess.md](postprocess.md) and [per_lab_holdout_pilot.md § When jobs finish](per_lab_holdout_pilot.md#when-jobs-finish-postprocess).
 
-**Status (2026-06-11):** Locked VAE holdout ladder **complete** (48/48 cells, best-of-3). **HMM (raw)** baseline **7/16** cells — see [holdout_results_status.md](holdout_results_status.md). Paper Table 2 uses per-lab fair comparison with fold min--max ranges.
+**Status (2026-06-12):** Locked VAE holdout ladder **complete** (48/48 cells, best-of-3). **HMM (raw)** within-lab **12/12**; joint fold~4 full `results.npz`; joint folds 1--3 closed with logged validation NMI — see [holdout_results_status.md](holdout_results_status.md).
 
 | Doc | Contents |
 |-----|----------|
@@ -27,6 +27,7 @@ Scrape helper (shows best + all seeds): `python3 scripts/cv4fold/scrape_experime
 | [incohort_to_cross_lab_strategy.md](incohort_to_cross_lab_strategy.md) | **How incohort locks → holdout → joint cv4fold** (strategies & pitfalls) |
 | [lab_2_locked_montage.md](lab_2_locked_montage.md) | **Locked EEG1+EEG4+EMG** + `rem_emg_wide_eeg4` recipe (0.593) |
 | [per_lab_holdout_pilot.md](per_lab_holdout_pilot.md) | **Within-lab holdout** (fold 4): cgmvae vs chmmgmvae, locked recipes |
+| Paper appendix **S8/S9 Table** | Cohort inventory + fold splits — regenerate: `PYTHONPATH=. python3 scripts/paper/build_cv4fold_split_tables.py` |
 | [unified_holdout_paper_line.md](unified_holdout_paper_line.md) | **Paper main line** — 3 models × 2 scopes, unified recipes + per-lab prepro |
 | [postprocess.md](postprocess.md) | **Lean postprocess** — best-of-3 JSON/CSV; disk-safe defaults |
 | [lab_preprocessing_review_20260607.md](lab_preprocessing_review_20260607.md) | **Data-driven lab review**, HQ plots, notch/EMG ablation backlog |

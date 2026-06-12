@@ -1,5 +1,0 @@
-source_folder: data/synthetic_data/many_bins
-run_name: many_bins
-sampling_rate_hz: 128
-n_epochs: 1000
-epoch_length_s: ?

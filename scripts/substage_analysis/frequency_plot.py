@@ -53,7 +53,7 @@ def plot_label_channel_frequency_grid(
     eeg_line_alpha: float = 0.35,
     eeg_line_lw: float = 0.8,
     eeg_label_alpha: float = 0.80,
-    eeg_label_fontsize: int = 9,
+    eeg_label_fontsize: int = 13,
     eeg_label_y: float = 0.985,
 
     # true-label distribution column
@@ -69,6 +69,7 @@ def plot_label_channel_frequency_grid(
     show_subject_dist_legend: bool = True,
     subject_max_legend_items: int = 30,
     subject_sort_legend: bool = True,
+    subject_cmap: str = "twilight_shifted",
 
     # lab distribution column (optional, right of subject mix)
     lab_ids: Optional[np.ndarray] = None,
@@ -104,6 +105,7 @@ def plot_label_channel_frequency_grid(
     bout_length_epoch_sec: float = 1.0,
 
     figsize_per_row: float = 2.6,
+    font_scale: float = 1.45,
     save_path: Optional[str] = None,
 ) -> None:
     """
@@ -472,9 +474,11 @@ def plot_label_channel_frequency_grid(
     else:
         sub_order = np.arange(S)
 
-    # Subject colors
-    cmap = plt.get_cmap("tab20" if S <= 20 else "hsv")
-    subject_colors: List[Tuple[float, float, float, float]] = [cmap(i / max(S - 1, 1)) for i in range(S)]
+    # Subject colors (distinct from macro true-label palette: Wake blue, NREM orange, REM green)
+    cmap = plt.get_cmap(subject_cmap)
+    subject_colors: List[Tuple[float, float, float, float]] = [
+        cmap(0.08 + 0.84 * i / max(S - 1, 1)) for i in range(S)
+    ]
 
     # Lab distribution (optional)
     has_lab_col = lab_ids is not None
@@ -636,6 +640,12 @@ def plot_label_channel_frequency_grid(
     fig_h = max(2.8, figsize_per_row * L)
     fig, axes = plt.subplots(L, C_plot, figsize=(fig_w, fig_h), sharey=False)
 
+    title_fs = int(round(14 * font_scale))
+    col_title_fs = int(round(11 * font_scale))
+    row_label_fs = int(round(10 * font_scale))
+    tick_fs = int(round(9 * font_scale))
+    legend_fs = int(round(8 * font_scale))
+
     if L == 1 and C_plot == 1:
         axes = np.array([[axes]])
     elif L == 1:
@@ -675,15 +685,20 @@ def plot_label_channel_frequency_grid(
             ax.grid(True, linewidth=0.4, alpha=0.35)
 
             if r == 0:
-                ax.set_title(str(channel_names[c_idx]))
+                ax.set_title(str(channel_names[c_idx]), fontsize=col_title_fs)
 
             if c_idx == 0:
-                ax.set_ylabel(f"{label_names[r]}\n{pred_pct[r]:.1f}% ({int(pred_counts[r])})")
+                ax.set_ylabel(
+                    f"{label_names[r]}\n{pred_pct[r]:.1f}% ({int(pred_counts[r])})",
+                    fontsize=row_label_fs,
+                )
 
             if r == L - 1:
-                ax.set_xlabel("Frequency (Hz)")
+                ax.set_xlabel("Frequency (Hz)", fontsize=tick_fs)
             else:
                 ax.tick_params(labelbottom=False)
+
+            ax.tick_params(axis="both", labelsize=tick_fs)
 
             tick_start = int(np.ceil(lo / 5.0) * 5)
             tick_end = int(np.floor(hi / 5.0) * 5)
@@ -707,10 +722,11 @@ def plot_label_channel_frequency_grid(
             )
 
             if r == 0:
-                axf.set_title(feature_titles[k])
+                axf.set_title(feature_titles[k], fontsize=col_title_fs)
 
             if r != L - 1:
                 axf.tick_params(labelbottom=False)
+            axf.tick_params(axis="both", labelsize=tick_fs)
 
         # ---- True label distribution ----
         axd = axes[r, true_dist_col_idx]
@@ -738,13 +754,14 @@ def plot_label_channel_frequency_grid(
         axd.grid(True, axis="x", linewidth=0.4, alpha=0.35)
 
         if r == 0:
-            axd.set_title(true_dist_col_title)
+            axd.set_title(true_dist_col_title, fontsize=col_title_fs)
 
         axd.set_yticks([])
         axd.set_xticks([0.0, 0.25, 0.5, 0.75, 1.0])
         axd.set_xticklabels(["0%", "25%", "50%", "75%", "100%"] if r == L - 1 else [])
+        axd.tick_params(axis="x", labelsize=tick_fs)
         if r == L - 1:
-            axd.set_xlabel("Percent")
+            axd.set_xlabel("Percent", fontsize=tick_fs)
 
         if r == 0:
             true_legend_handles = [
@@ -780,13 +797,14 @@ def plot_label_channel_frequency_grid(
 
         if r == 0:
             subtitle = "inv-total weighted" if subject_dist_mode == "inv_total" else "count-weighted"
-            axs.set_title(f"{subject_dist_col_title}\n({subtitle})")
+            axs.set_title(f"{subject_dist_col_title}\n({subtitle})", fontsize=col_title_fs)
 
         axs.set_yticks([])
         axs.set_xticks([0.0, 0.25, 0.5, 0.75, 1.0])
         axs.set_xticklabels(["0%", "25%", "50%", "75%", "100%"] if r == L - 1 else [])
+        axs.tick_params(axis="x", labelsize=tick_fs)
         if r == L - 1:
-            axs.set_xlabel("Percent")
+            axs.set_xlabel("Percent", fontsize=tick_fs)
 
         if r == 0:
             ordered_labels = [str(unique_subs[i]) for i in sub_order]
@@ -829,12 +847,13 @@ def plot_label_channel_frequency_grid(
             axl.set_ylim(-1.0, 1.0)
             axl.grid(True, axis="x", linewidth=0.4, alpha=0.35)
             if r == 0:
-                axl.set_title(lab_dist_col_title)
+                axl.set_title(lab_dist_col_title, fontsize=col_title_fs)
             axl.set_yticks([])
             axl.set_xticks([0.0, 0.25, 0.5, 0.75, 1.0])
             axl.set_xticklabels(["0%", "25%", "50%", "75%", "100%"] if r == L - 1 else [])
+            axl.tick_params(axis="x", labelsize=tick_fs)
             if r == L - 1:
-                axl.set_xlabel("Percent")
+                axl.set_xlabel("Percent", fontsize=tick_fs)
             if r == 0:
                 lab_legend_handles = [
                     plt.Rectangle((0, 0), 1, 1, color=lab_color_list[i], alpha=lab_dist_alpha)
@@ -842,7 +861,7 @@ def plot_label_channel_frequency_grid(
                 ]
                 lab_legend_labels = [str(unique_labs[i]) for i in lab_order]
 
-    fig.suptitle(plot_title, y=1.02, fontsize=14)
+    fig.suptitle(plot_title, y=1.02, fontsize=title_fs)
 
     right_margin = 0.965 if not has_lab_col else 0.94
     fig.tight_layout(rect=[0.0, 0.0, right_margin, 0.98])
@@ -855,6 +874,8 @@ def plot_label_channel_frequency_grid(
             bbox_to_anchor=(0.968, 0.98),
             frameon=False,
             title="True labels",
+            fontsize=legend_fs,
+            title_fontsize=legend_fs,
         )
 
     if show_subject_dist_legend and subj_legend_handles is not None:
@@ -865,7 +886,8 @@ def plot_label_channel_frequency_grid(
             bbox_to_anchor=(0.968 if not has_lab_col else 0.945, 0.02),
             frameon=False,
             title="Subjects",
-            fontsize=7,
+            fontsize=legend_fs,
+            title_fontsize=legend_fs,
         )
 
     if show_lab_dist_legend and lab_legend_handles is not None:
@@ -876,7 +898,8 @@ def plot_label_channel_frequency_grid(
             bbox_to_anchor=(0.968, 0.50),
             frameon=False,
             title="Labs",
-            fontsize=8,
+            fontsize=legend_fs,
+            title_fontsize=legend_fs,
         )
 
     if save_path is not None:

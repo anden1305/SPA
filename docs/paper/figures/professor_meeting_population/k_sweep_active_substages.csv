@@ -1,0 +1,14 @@
+K,configured_K,n_seeds_with_npz,has_results_npz,active_substages_best_seed,best_seed,nmi_best,active_substages_min,active_substages_max,active_substages_mean,state_collapse,run
+3,3,0,False,,,,,,,,
+4,4,0,False,,,,,,,,
+5,5,0,False,,,,,,,,
+6,6,0,False,,,,,,,,
+7,7,0,False,,,,,,,,
+8,8,0,False,,,,,,,,
+9,9,0,False,,,,,,,,
+10,10,0,False,,,,,,,,
+11,11,0,False,,,,,,,,
+12,12,3,True,12,2,0.4034,12,12,12.0,no,population_k_sweep_K12_20260612-011734
+13,13,0,False,,,,,,,,
+14,14,0,False,,,,,,,,
+15,15,4,True,10,2,0.4095,10,15,13.8,yes,population_k_sweep_K15_20260612-005731

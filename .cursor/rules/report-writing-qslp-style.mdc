@@ -1,10 +1,12 @@
 ---
-description: Report writing style — clarity and structure inspired by QSLP-AE (Ciudad et al., MSSV VAE colleague paper)
+description: Report structure and word budget — QSLP pacing reference (voice = oliver-thesis-plos-writing.mdc)
 globs: docs/paper/**/*.tex,docs/paper/**/*.md,paper/overleaf/**/*.tex
 alwaysApply: false
 ---
 
-# Report writing style (QSLP-AE reference)
+# Report writing structure (QSLP-AE reference)
+
+**Voice and tone:** [`oliver-thesis-plos-writing.mdc`](oliver-thesis-plos-writing.mdc) — thesis-derived British prose, mechanistic Results, validation-ladder thinking. **This file** covers section templates, word budget, and QSLP *explanation discipline* only.
 
 **Reference paper:** Ciudad et al., *Aligning human and mouse EEG representations of sleep stages with a quadruplet split latent permutation auto-encoder* ([OpenReview K3Z4jVHUnf](https://openreview.net/pdf?id=K3Z4jVHUnf), ICLR 2026 Re-Align workshop). Same MSSV cohort, shared supervisors (Mørup, Kornum). Full text extract: [`docs/paper/source_extraction/qslp_ae_reference.txt`](docs/paper/source_extraction/qslp_ae_reference.txt).
 
@@ -103,6 +105,8 @@ Cite colleague work when discussing shared MSSV preprocessing or representation-
 ---
 
 ## Prose rules (adapted from thesis prompt + reference style)
+
+See **[`oliver-thesis-plos-writing.mdc`](oliver-thesis-plos-writing.mdc)** for full voice guide, drafting prompt, and before/after examples. Summary:
 
 - **British English**, impersonal voice in Methods/Results (`this study`, `the model`).
 - **Lead with the claim**, then evidence — not the reverse.

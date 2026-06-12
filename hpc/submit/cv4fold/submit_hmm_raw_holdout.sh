@@ -25,8 +25,17 @@ mkdir -p hpc/output/cv4fold/hmm_raw
 _has_joint_result() {
   local fold="$1"
   local d="${SPA_ROOT}/results/cv4fold/hmm_raw/joint/fold_${fold}"
-  # Skip only when a run finished validation (failed shells have config.json only).
-  find "${d}" -name validations.json 2>/dev/null | grep -q .
+  # Skip when validation finished or fold accepted via partial log NMI (see hmm_raw_joint_partial.json).
+  find "${d}" -name validations.json 2>/dev/null | grep -q . && return 0
+  python3 - <<PY
+import json, sys
+from pathlib import Path
+p = Path("${SPA_ROOT}/paper/overleaf/tables/hmm_raw_joint_partial.json")
+fold = "${fold}"
+if p.is_file() and fold in json.loads(p.read_text()).get("folds", {}):
+    sys.exit(0)
+sys.exit(1)
+PY
 }
 
 _submit_joint() {

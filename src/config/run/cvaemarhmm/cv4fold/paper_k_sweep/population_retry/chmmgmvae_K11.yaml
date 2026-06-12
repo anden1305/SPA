@@ -1,0 +1,2110 @@
+trainer:
+  epochs: 200
+  learning_rate: 0.0013
+  optimizer: adam
+  grad_clip: 0.5
+  validate_per_epoch: 1
+  early_stopping:
+    enabled: false
+    patience: 100
+    min_delta: 0.001
+  scheduler:
+    enabled: false
+    type: exponential
+    step_size: null
+    gamma: 0.99
+validator:
+  nmi: true
+  accuracy: true
+  cross_nmi: true
+  learning_rate: true
+  state_distinctness: true
+  summary_statistics: true
+  log_likelihood: true
+visualizer:
+  losses: true
+  learning_rate: true
+  pca_tripanel: true
+  confusion_matrix: true
+  state_distinctness: true
+  summary_statistics: true
+  historic_values: true
+  save_results_npz: true
+dataloader:
+  num_batches: 64
+  batch_size: 96
+  validation_batch_size: 96
+  window_size: 512
+  stride: 512
+  shuffle: true
+  normalize: true
+  use_legacy: false
+  transforms: []
+  sequence_length: 64
+cvae:
+  normalize_global: false
+  pre_normalize: false
+  post_normalize: true
+  percentile_clip_channels: false
+  perform_hanning_window: false
+  band_pass_filter_fft: true
+  band_pass_freqs:
+  - - null
+    - 20.0
+  - - null
+    - 20.0
+  - - 5.0
+    - 60.0
+  band_pass_filter_type: frequency_domain
+  traning_pipeline: cvae
+  model_checkpoint_path: null
+  save_pretrained_checkpoint: false
+  reinit_marhmm: false
+model:
+  type: cvae_marhmm
+  covariance_type: full
+  init_strategy: random_uniform
+  init_noisy: true
+  features: false
+  params:
+    lags:
+    - 1
+    - 2
+    - 4
+    ridge: 0.1
+    var_reg: 0.05
+    sticky_coef: 0.1
+    sticky_kappa: 0.9
+    latent_dim: 6
+    enc_hidden_dims:
+    - 512
+    - 256
+    - 128
+    dec_hidden_dims:
+    - 128
+    - 256
+    - 512
+    conv_channels:
+    - 32
+    - 64
+    - 128
+    - 128
+    kernel_sizes:
+    - 7
+    - 5
+    - 5
+    - 3
+    strides:
+    - 2
+    - 2
+    - 2
+    - 2
+    paddings:
+    - 3
+    - 2
+    - 2
+    - 1
+    emb_dim: 8
+    decoder_only_conditioning: true
+    use_rms: false
+    prior: warm_hmm_gmm
+    min_beta: 0.01
+    max_beta: 1.0
+    beta_warmup_epochs: 0
+    beta_slowdown_epochs: 0
+    free_nats_per_dim: 0.0
+    no_beta_epochs: 10
+    num_gmm_states: 11
+    hmm_sticky_kappa: 0.92
+    hmm_estimate_transitions: true
+    gmm_warmup_epochs: 18
+    hmm_warmup_epochs: 37
+    hmm_transition_ramp_epochs: 18
+verbose: true
+validate_data: true
+runs: 5
+seed: 499
+train_datasets:
+- type: mssv
+  id: sub-071
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: false
+    robust_normalize: false
+    band_pass_freqs:
+    - - null
+      - 30.0
+    - - null
+      - 30.0
+    - - 3.0
+      - 100.0
+    append_channel_rms: false
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-071
+  run: 2
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: false
+    robust_normalize: false
+    band_pass_freqs:
+    - - null
+      - 30.0
+    - - null
+      - 30.0
+    - - 3.0
+      - 100.0
+    append_channel_rms: false
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-072
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: false
+    robust_normalize: false
+    band_pass_freqs:
+    - - null
+      - 30.0
+    - - null
+      - 30.0
+    - - 3.0
+      - 100.0
+    append_channel_rms: false
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-072
+  run: 2
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: false
+    robust_normalize: false
+    band_pass_freqs:
+    - - null
+      - 30.0
+    - - null
+      - 30.0
+    - - 3.0
+      - 100.0
+    append_channel_rms: false
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-076
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: false
+    robust_normalize: false
+    band_pass_freqs:
+    - - null
+      - 30.0
+    - - null
+      - 30.0
+    - - 3.0
+      - 100.0
+    append_channel_rms: false
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-076
+  run: 2
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: false
+    robust_normalize: false
+    band_pass_freqs:
+    - - null
+      - 30.0
+    - - null
+      - 30.0
+    - - 3.0
+      - 100.0
+    append_channel_rms: false
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-077
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: false
+    robust_normalize: false
+    band_pass_freqs:
+    - - null
+      - 30.0
+    - - null
+      - 30.0
+    - - 3.0
+      - 100.0
+    append_channel_rms: false
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-077
+  run: 2
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: false
+    robust_normalize: false
+    band_pass_freqs:
+    - - null
+      - 30.0
+    - - null
+      - 30.0
+    - - 3.0
+      - 100.0
+    append_channel_rms: false
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-080
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: false
+    robust_normalize: false
+    band_pass_freqs:
+    - - null
+      - 30.0
+    - - null
+      - 30.0
+    - - 3.0
+      - 100.0
+    append_channel_rms: false
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-080
+  run: 2
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: false
+    robust_normalize: false
+    band_pass_freqs:
+    - - null
+      - 30.0
+    - - null
+      - 30.0
+    - - 3.0
+      - 100.0
+    append_channel_rms: false
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-081
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: false
+    robust_normalize: false
+    band_pass_freqs:
+    - - null
+      - 30.0
+    - - null
+      - 30.0
+    - - 3.0
+      - 100.0
+    append_channel_rms: false
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-081
+  run: 2
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: false
+    robust_normalize: false
+    band_pass_freqs:
+    - - null
+      - 30.0
+    - - null
+      - 30.0
+    - - 3.0
+      - 100.0
+    append_channel_rms: false
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-038
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-038
+  run: 2
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-039
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-039
+  run: 2
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-039
+  run: 3
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-041
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-041
+  run: 2
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-041
+  run: 3
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-043
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-048
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-048
+  run: 2
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-048
+  run: 3
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-054
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-054
+  run: 2
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-056
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-059
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-060
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-069
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-087
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-087
+  run: 2
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-087
+  run: 3
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-087
+  run: 4
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-087
+  run: 5
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-087
+  run: 6
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-088
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-088
+  run: 2
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-089
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-089
+  run: 2
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-092
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-092
+  run: 2
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+val_datasets:
+- type: mssv
+  id: sub-071
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: false
+    robust_normalize: false
+    band_pass_freqs:
+    - - null
+      - 30.0
+    - - null
+      - 30.0
+    - - 3.0
+      - 100.0
+    append_channel_rms: false
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-071
+  run: 2
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: false
+    robust_normalize: false
+    band_pass_freqs:
+    - - null
+      - 30.0
+    - - null
+      - 30.0
+    - - 3.0
+      - 100.0
+    append_channel_rms: false
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-072
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: false
+    robust_normalize: false
+    band_pass_freqs:
+    - - null
+      - 30.0
+    - - null
+      - 30.0
+    - - 3.0
+      - 100.0
+    append_channel_rms: false
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-072
+  run: 2
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: false
+    robust_normalize: false
+    band_pass_freqs:
+    - - null
+      - 30.0
+    - - null
+      - 30.0
+    - - 3.0
+      - 100.0
+    append_channel_rms: false
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-076
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: false
+    robust_normalize: false
+    band_pass_freqs:
+    - - null
+      - 30.0
+    - - null
+      - 30.0
+    - - 3.0
+      - 100.0
+    append_channel_rms: false
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-076
+  run: 2
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: false
+    robust_normalize: false
+    band_pass_freqs:
+    - - null
+      - 30.0
+    - - null
+      - 30.0
+    - - 3.0
+      - 100.0
+    append_channel_rms: false
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-077
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: false
+    robust_normalize: false
+    band_pass_freqs:
+    - - null
+      - 30.0
+    - - null
+      - 30.0
+    - - 3.0
+      - 100.0
+    append_channel_rms: false
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-077
+  run: 2
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: false
+    robust_normalize: false
+    band_pass_freqs:
+    - - null
+      - 30.0
+    - - null
+      - 30.0
+    - - 3.0
+      - 100.0
+    append_channel_rms: false
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-080
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: false
+    robust_normalize: false
+    band_pass_freqs:
+    - - null
+      - 30.0
+    - - null
+      - 30.0
+    - - 3.0
+      - 100.0
+    append_channel_rms: false
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-080
+  run: 2
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: false
+    robust_normalize: false
+    band_pass_freqs:
+    - - null
+      - 30.0
+    - - null
+      - 30.0
+    - - 3.0
+      - 100.0
+    append_channel_rms: false
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-081
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: false
+    robust_normalize: false
+    band_pass_freqs:
+    - - null
+      - 30.0
+    - - null
+      - 30.0
+    - - 3.0
+      - 100.0
+    append_channel_rms: false
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-081
+  run: 2
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG4
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: false
+    robust_normalize: false
+    band_pass_freqs:
+    - - null
+      - 30.0
+    - - null
+      - 30.0
+    - - 3.0
+      - 100.0
+    append_channel_rms: false
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-038
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-038
+  run: 2
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-039
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-039
+  run: 2
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-039
+  run: 3
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-041
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-041
+  run: 2
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-041
+  run: 3
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-043
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-048
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-048
+  run: 2
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-048
+  run: 3
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-054
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-054
+  run: 2
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-056
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-059
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-060
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-069
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-087
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-087
+  run: 2
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-087
+  run: 3
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-087
+  run: 4
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-087
+  run: 5
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-087
+  run: 6
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-088
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-088
+  run: 2
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-089
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-089
+  run: 2
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-092
+  run: 1
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+- type: mssv
+  id: sub-092
+  run: 2
+  remove_artifact: false
+  signals:
+  - EEG1
+  - EEG2
+  - EMG
+  cvae_overrides:
+    normalize_global: false
+    pre_normalize: false
+    post_normalize: true
+    band_pass_freqs:
+    - - null
+      - 20.0
+    - - null
+      - 20.0
+    - - 5.0
+      - 60.0
+    percentile_clip_channels: false
+    perform_hanning_window: false
+    band_pass_filter_fft: true
+    band_pass_filter_type: frequency_domain
+results_dir: results/cv4fold/paper_k_sweep/population/K11
+run_name: population_k_sweep_K11

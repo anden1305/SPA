@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from scripts.paper.plot_style import FREQUENCY_GRID_FONT_SCALE, SUBJECT_MIX_CMAP
 from scripts.substage_analysis.frequency_plot import plot_label_channel_frequency_grid
 
 REPO = Path(__file__).resolve().parents[2]
@@ -140,6 +141,8 @@ def plot_fig27_gmm_predicted(
         ),
         subject_dist_col_title="Subject mix (inv-total weighted)",
         lab_dist_col_title="Lab mix (inv-total weighted)",
+        subject_cmap=SUBJECT_MIX_CMAP,
+        font_scale=FREQUENCY_GRID_FONT_SCALE,
         figsize_per_row=2.6,
     )
     return n_active

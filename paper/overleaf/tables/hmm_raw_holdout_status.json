@@ -2,7 +2,7 @@
   "expected_joint_folds": 4,
   "expected_within_lab_cells": 12,
   "joint_pooled_ok": 1,
-  "within_lab_ok": 6,
+  "within_lab_ok": 12,
   "joint_per_lab_ok": 3,
   "incomplete": true,
   "cells": [
@@ -10,24 +10,24 @@
       "scope": "joint",
       "fold": "1",
       "lab": "all",
-      "status": "no_npz",
-      "nmi": null,
+      "status": "partial_log",
+      "nmi": 0.0031,
       "macro_accuracy": null
     },
     {
       "scope": "joint",
       "fold": "2",
       "lab": "all",
-      "status": "no_npz",
-      "nmi": null,
+      "status": "partial_log",
+      "nmi": 0.0011,
       "macro_accuracy": null
     },
     {
       "scope": "joint",
       "fold": "3",
       "lab": "all",
-      "status": "no_npz",
-      "nmi": null,
+      "status": "partial_log",
+      "nmi": 0.0034,
       "macro_accuracy": null
     },
     {
@@ -66,17 +66,17 @@
       "scope": "within_lab",
       "fold": "4",
       "lab": "lab_2",
-      "status": "no_npz",
-      "nmi": null,
-      "macro_accuracy": null
+      "status": "ok",
+      "nmi": 0.0153,
+      "macro_accuracy": 0.5153
     },
     {
       "scope": "within_lab",
       "fold": "1",
       "lab": "lab_3",
-      "status": "no_npz",
-      "nmi": null,
-      "macro_accuracy": null
+      "status": "ok",
+      "nmi": 0.046,
+      "macro_accuracy": 0.579
     },
     {
       "scope": "within_lab",
@@ -90,17 +90,17 @@
       "scope": "within_lab",
       "fold": "3",
       "lab": "lab_3",
-      "status": "no_npz",
-      "nmi": null,
-      "macro_accuracy": null
+      "status": "ok",
+      "nmi": 0.0282,
+      "macro_accuracy": 0.5806
     },
     {
       "scope": "within_lab",
       "fold": "4",
       "lab": "lab_3",
-      "status": "no_npz",
-      "nmi": null,
-      "macro_accuracy": null
+      "status": "ok",
+      "nmi": 0.0384,
+      "macro_accuracy": 0.6254
     },
     {
       "scope": "within_lab",
@@ -122,17 +122,17 @@
       "scope": "within_lab",
       "fold": "3",
       "lab": "lab_5",
-      "status": "no_npz",
-      "nmi": null,
-      "macro_accuracy": null
+      "status": "ok",
+      "nmi": 0.0,
+      "macro_accuracy": 0.4817
     },
     {
       "scope": "within_lab",
       "fold": "4",
       "lab": "lab_5",
-      "status": "no_npz",
-      "nmi": null,
-      "macro_accuracy": null
+      "status": "ok",
+      "nmi": 0.0004,
+      "macro_accuracy": 0.4597
     }
   ],
   "joint_per_lab": [

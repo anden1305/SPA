@@ -100,7 +100,14 @@ class DataLoaderCollection:
         feature_dims = set([dl.get_feature_dim() for dl in self.data_loaders])
         assert len(feature_dims) == 1, "All data loaders must have the same feature dimension."
         self.feature_dim = feature_dims.pop()
-        self.state_names = self.datasets[0].get_state_names()
+        # Mixed labs may differ in macro stage count when artifact epochs are kept
+        # (e.g. lab 2/4: 3 stages; lab 3/5: 4 with Artifact). Use names from the
+        # dataset with the most stages so len(state_names) == num_states.
+        self.state_names = max(
+            (ds.get_state_names() or [] for ds in self.datasets),
+            key=len,
+            default=[],
+        )
         assert len(self.state_names) == self.num_states, "Number of state names must match number of states."
      
     def get_transforms(self) -> list[BaseTransform]:

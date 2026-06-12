@@ -1,6 +1,6 @@
 # Paper holdout experiments (4-rung ladder)
 
-**Added 2026-06-09; updated 2026-06-11.** Main line: joint + within-lab locked holdout across **cGMVAE**, **HMMGMVAE**, **cHMMGMVAE** (complete). **HMM (raw)** baseline: **incomplete** — see [holdout_results_status.md](../cv4fold/holdout_results_status.md).
+**Added 2026-06-09; updated 2026-06-12.** Main line: joint + within-lab locked holdout across **cGMVAE**, **HMMGMVAE**, **cHMMGMVAE** (complete). **HMM (raw)** baseline: **closed** (within-lab 12/12; joint fold~4 full; joint folds 1--3 logged NMI) — see [holdout_results_status.md](../cv4fold/holdout_results_status.md).
 
 Canonical design: [unified_holdout_paper_line.md](../cv4fold/unified_holdout_paper_line.md).
 
@@ -34,7 +34,7 @@ Code: [`src/models/vae.py`](../../src/models/vae.py) — `use_encoder_conditioni
 | `hmmgmvae_locked` | 0 | 64 | hmm_gmm | 1.3e-3 |
 | `chmmgmvae_locked` | 8 | 64 | warm_hmm_gmm, κ=0.92 | 1.3e-3 |
 
-Bottom ladder rung: **`hmm_raw`** (time-domain HMM on raw EEG/EMG, same cv4fold folds, `runs: 1`) — **7/16 cells** with `results.npz` (2026-06-11). Thesis expert-feature HMM (~0.51) used a different single-lab LOSO protocol and is not comparable.
+Bottom ladder rung: **`hmm_raw`** (time-domain HMM on raw EEG/EMG, same cv4fold folds, `runs: 1`) — within-lab **12/12** `results.npz`; joint fold~4 full; joint folds 1--3 logged NMI only (2026-06-12). Thesis expert-feature HMM (~0.51) used a different single-lab LOSO protocol and is not comparable.
 
 ---
 
@@ -94,7 +94,7 @@ PYTHONPATH=. python3 scripts/paper/build_holdout_scope_table.py
 PYTHONPATH=. python3 scripts/paper/plot_ladder_figure.py
 ```
 
-LaTeX outputs: `T1_joint_holdout_ladder.tex`, `T2_holdout_fair_comparison.tex` (mean [fold min--max], best-of-3 VAE), `S2_within_lab_holdout.tex`, `S6_hmm_raw_status.tex`.
+LaTeX outputs: `T1_joint_holdout_ladder.tex`, `T2_holdout_fair_comparison.tex` (mean [fold min--max], best-of-3 VAE), `S2_within_lab_holdout.tex`. HMM (raw) completion grid: `docs/cv4fold/hmm_raw_holdout_status.tex` (repo docs only).
 
 **Uncertainty:** Table 2 shows fold means only; caption states best-of-3 selection due to seed instability.
 
@@ -109,4 +109,4 @@ LaTeX outputs: `T1_joint_holdout_ladder.tex`, `T2_holdout_fair_comparison.tex` (
 
 **Do not** compare absolute NMI between within-lab vs joint — different train pools.
 
-**VAE ladder (2026-06-11):** complete (48/48). **HMM raw:** 7/16 — [holdout_results_status.md](../cv4fold/holdout_results_status.md).
+**VAE ladder (2026-06-11):** complete (48/48). **HMM raw:** closed — [holdout_results_status.md](../cv4fold/holdout_results_status.md).

@@ -23,7 +23,7 @@ NPZ_K4 = (
 NPZ_HOLDOUT = (
     REPO
     / "results/cv4fold/joint_holdout/fold_4/chmmgmvae_locked"
-    / "joint_ho_f4_chmmgmvae_locked_20260609-042207/plots/1/results.npz"
+    / "joint_ho_f4_chmmgmvae_locked_20260610-040158/plots/1/results.npz"
 )
 
 

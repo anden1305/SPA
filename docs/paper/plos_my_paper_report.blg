@@ -7,48 +7,51 @@ Reallocated global_strs (elt_size=200001) to 20 items from 10.
 Reallocated glb_str_end (elt_size=4) to 20 items from 10.
 Reallocated wiz_functions (elt_size=4) to 6000 items from 3000.
 Database file #1: assets/references.bib
+Warning--empty pages in garciaciudad2024temporal
 Warning--empty pages in dilokthanakul2016gmvae
 Warning--empty pages in sohn2015cvae
 Warning--empty pages in johnson2016svae
-You've used 17 entries,
+Warning--empty author and editor in ciudad2026qslp
+Warning--missing publisher in ciudad2026qslp
+You've used 20 entries,
             3507 wiz_defined-function locations,
-            798 strings with 9240 characters,
-and the built_in function-call counts, 34634 in all, are:
-= -- 3931
-> -- 335
-< -- 152
-+ -- 148
-- -- 67
-* -- 2803
-:= -- 3765
-add.period$ -- 79
-call.type$ -- 17
-change.case$ -- 15
-chr.to.int$ -- 356
-cite$ -- 20
-duplicate$ -- 2698
-empty$ -- 3377
-format.name$ -- 79
-if$ -- 8097
+            818 strings with 10483 characters,
+and the built_in function-call counts, 42800 in all, are:
+= -- 4898
+> -- 403
+< -- 160
++ -- 190
+- -- 83
+* -- 3559
+:= -- 4650
+add.period$ -- 90
+call.type$ -- 20
+change.case$ -- 17
+chr.to.int$ -- 376
+cite$ -- 26
+duplicate$ -- 3206
+empty$ -- 4192
+format.name$ -- 98
+if$ -- 9989
 int.to.chr$ -- 0
-int.to.str$ -- 17
-missing$ -- 183
-newline$ -- 103
-num.names$ -- 17
-pop$ -- 474
+int.to.str$ -- 20
+missing$ -- 216
+newline$ -- 119
+num.names$ -- 20
+pop$ -- 550
 preamble$ -- 1
 purify$ -- 0
 quote$ -- 0
-skip$ -- 380
+skip$ -- 449
 stack$ -- 0
-substring$ -- 6627
-swap$ -- 456
-text.length$ -- 37
+substring$ -- 8419
+swap$ -- 538
+text.length$ -- 38
 text.prefix$ -- 0
 top$ -- 0
 type$ -- 0
-warning$ -- 3
-while$ -- 165
-width$ -- 19
-write$ -- 213
-(There were 3 warnings)
+warning$ -- 6
+while$ -- 194
+width$ -- 22
+write$ -- 251
+(There were 6 warnings)

@@ -19,6 +19,7 @@ Added 2026-06-07. Entry point for thesis / experiment docs.
 | [data/](data/) | Paper cohort dump, lab mapping |
 | [plans/](plans/) | Working plans (not canonical runbooks) |
 | [paper/](paper/README.md) | Journal paper: related work, holdout ladder, Overleaf skeleton |
+| [specialkursus_learning_objectives.md](specialkursus_learning_objectives.md) | Specialkursus læringsmål — opfyldelsesvurdering (2026-06-11) |
 
 ## External
 

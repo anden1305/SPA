@@ -1,12 +1,12 @@
 #!/bin/bash
-# CPU job: Fig 27 + biology meeting pack from population K-sweep (all 20 mice).
+# CPU job: full biology meeting pack from population K-sweep (all 20 mice).
 # Run after population training jobs finish.
 #
 #   bsub < hpc/submit/paper/run_population_biology_meeting.sh
 
 #BSUB -J paper_bio_pop
 #BSUB -q hpc
-#BSUB -W 1:00
+#BSUB -W 2:00
 #BSUB -n 4
 #BSUB -R "rusage[mem=16GB]"
 #BSUB -o hpc/output/paper/population_biology_meeting_%J.out

@@ -22,6 +22,7 @@ LABEL_COLORS_PRED = [
 ]
 SEED = 124
 N_SAMPLES = 7500
+TSNE_N_SAMPLES = 25_000
 
 
 def remap_labels(y: np.ndarray) -> np.ndarray:
@@ -71,20 +72,36 @@ def plot_pca_true_vs_predicted(
     y_true = labels_true[idx]
     y_pred = labels_pred[idx]
 
+    from src.visuals.layered_scatter import scatter_layered
+
     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
     for ax, y, names, colors, subtitle in [
         (axes[0], y_true, label_names_true, LABEL_COLORS_TRUE[: len(label_names_true)], "Expert labels"),
         (axes[1], y_pred, label_names_pred, LABEL_COLORS_PRED[: len(label_names_pred)], "GM substages"),
     ]:
-        for c in range(len(names)):
-            mask = y == c
-            if not np.any(mask):
-                continue
-            ax.scatter(pc1[mask], pc2[mask], s=14, alpha=0.7, color=colors[c], label=names[c], edgecolors="none")
+        colors_lut = {c: colors[c] for c in range(len(names))}
+        scatter_layered(
+            ax,
+            pc1,
+            pc2,
+            y,
+            label_names=names if "Artifact" in names else None,
+            colors=colors_lut,
+            point_size=14,
+        )
         ax.set_xlabel(f"PC1 ({evr[0] * 100:.1f}% var)")
         ax.set_ylabel(f"PC2 ({evr[1] * 100:.1f}% var)")
         ax.set_title(subtitle)
-        ax.legend(loc="best", fontsize=8, frameon=True)
+        ax.legend(
+            handles=[
+                plt.Line2D([0], [0], marker="o", color="w", markerfacecolor=colors[c], label=names[c], markersize=8)
+                for c in range(len(names))
+                if np.any(y == c)
+            ],
+            loc="best",
+            fontsize=8,
+            frameon=True,
+        )
         ax.grid(True, linewidth=0.4, alpha=0.35)
     fig.suptitle(title, fontsize=12, y=1.02)
     Path(save_path).parent.mkdir(parents=True, exist_ok=True)
@@ -234,6 +251,7 @@ def run_full_thesis_analysis(
         title=f"{title_k} latent dimensions by substage{nmi_s}",
     )
 
+    tsne_n = min(TSNE_N_SAMPLES, datapoints.shape[0])
     tsne_scatter_pair(
         datapoints=datapoints,
         labels_true=labels_true,
@@ -242,11 +260,11 @@ def run_full_thesis_analysis(
         label_names_pred=label_names_pred,
         label_colors_true=LABEL_COLORS_TRUE[:n_true],
         label_colors_pred=LABEL_COLORS_PRED[:n_pred],
-        analysis_name=f"{title_k} latent t-SNE{nmi_s}",
+        analysis_name=f"{title_k} latent t-SNE{nmi_s} (n={tsne_n:,})",
         save_path_true=str(_save("tsne_true", out_dir / f"{prefix}tsne_scatter_true.png")),
         save_path_pred=str(_save("tsne_predicted", out_dir / f"{prefix}tsne_scatter_predicted.png")),
         seed=SEED,
-        n_samples=n_samples,
+        n_samples=tsne_n,
     )
 
     return outputs
@@ -258,6 +276,7 @@ def run_tsne_from_npz(
     *,
     k: int | None = None,
     nmi: float | None = None,
+    n_samples: int | None = None,
 ) -> dict[str, str]:
     """t-SNE only: expert vs GM substage scatters (shared embedding)."""
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -270,7 +289,7 @@ def run_tsne_from_npz(
     n_pred = int(labels_pred.max()) + 1
     label_names_true = ["Awake", "NREM", "REM", "Artifact"][:n_true]
     label_names_pred = [f"Substage {i + 1}" for i in range(n_pred)]
-    n_samples = min(N_SAMPLES, datapoints.shape[0])
+    tsne_n = min(n_samples if n_samples is not None else TSNE_N_SAMPLES, datapoints.shape[0])
 
     prefix = f"K{k}_" if k is not None else ""
     title_k = f"K={k}" if k is not None else ""
@@ -287,11 +306,11 @@ def run_tsne_from_npz(
         label_names_pred=label_names_pred,
         label_colors_true=LABEL_COLORS_TRUE[:n_true],
         label_colors_pred=LABEL_COLORS_PRED[:n_pred],
-        analysis_name=f"{title_k} latent t-SNE{nmi_s}",
+        analysis_name=f"{title_k} latent t-SNE{nmi_s} (n={tsne_n:,})",
         save_path_true=str(true_path),
         save_path_pred=str(pred_path),
         seed=SEED,
-        n_samples=n_samples,
+        n_samples=tsne_n,
     )
     outputs["tsne_scatter_true"] = str(true_path)
     outputs["tsne_scatter_predicted"] = str(pred_path)

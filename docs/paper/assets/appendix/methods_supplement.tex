@@ -1,0 +1,58 @@
+% Technical methods detail moved from main text for readability (Appendix B).
+
+\subsection{Locked hyperparameters}
+Latent dimension $d{=}6$ (matched to thesis-scale mixture models), embedding dimension 8, learning rate $1.3 \times 10^{-3}$, batch size 128, 200 epochs, three random seeds per fold.
+Sequence length $T{=}64$ epochs (${\sim}4.3$\,min); sticky self-transition weight $\kappa{=}0.92$.
+CNN channel widths $[32,64,128,128]$, kernel sizes $[7,5,5,3]$, strides 2; MLP widths $[512,256,128]$ (encoder) and $[128,256,512]$ (decoder).
+Full YAML paths: \nameref{S1_File}.
+
+\subsection{Incohort ablation rationale}
+Per-laboratory spectral bandpass, montage, post-normalisation, and MLP width were fixed from incohort sweeps before any holdout run (\nameref{S4_Appendix}, \nameref{S7_Table}).
+These runs pool all mice within a site and estimate a performance \emph{ceiling}; they do not use leave-mice-out folds.
+
+\subsection{Sensitivity checks}
+On joint holdout fold~4, shortening the sequence to $T{=}32$ without the warm sticky schedule collapsed prior NMI (best seed ${\sim}0.17$), whereas $T{=}64$ with warm training reached ${\sim}0.65$.
+On laboratory~3 incohort, warm-started HMM--GMM beat a cold HMM--GMM start (best-of-three prior NMI 0.734 vs.\ 0.694); gains were smaller on laboratories~2 and~5, where simpler priors remained competitive.
+We did not grid-search every knob at holdout; locked settings prioritise reproducibility.
+
+\subsection{Warm prior schedule (cHMM--GMVAE)}
+Epochs 1--17: standard Gaussian KL on the encoder.
+Epoch 18: $K$-means on encoder means initialises GMM emissions.
+Epochs 18--36: independent mixture KL.
+From epoch 37: sticky HMM--GMM transitions ramp in over 18 epochs~\cite{ebbers2017hmmvae,johnson2016svae}.
+$\beta$ is 0 for the first ten epochs, then ramps linearly from 0.01 to 1.0.
+
+\subsection{Staging on encoder means}
+At holdout, emissions use $\boldsymbol{\mu}_t$ rather than sampled $\mathbf{z}_t$.
+The posterior mean can bias emission scores slightly relative to stochastic latents but reduces Monte Carlo variance in Viterbi decoding and improves reproducibility across seeds once the encoder is trained.
+
+\subsection{Unsupervised checkpoint score}
+Expert labels are not used to select weights during training.
+Let $\tilde{\omega}(\varepsilon)$ denote validation log-likelihood (sequence-normalised negative ELBO) and $H_{\mathrm{norm}}(\hat{Y})$ the entropy of the predicted state histogram normalised by $\log K$ ($0$ = collapse to one state, $1$ = uniform occupancy).
+Following the thesis composite criterion~\cite{elmgreen2026thesis},
+\begin{equation}
+\label{eq:checkpoint}
+S(\varepsilon) = \beta_{\mathrm{ckpt}}\,\tilde{\omega}(\varepsilon) + (1-\beta_{\mathrm{ckpt}})\,H_{\mathrm{norm}}(\hat{Y}),
+\qquad \beta_{\mathrm{ckpt}} = 0.9.
+\end{equation}
+The epoch maximising $S(\varepsilon)$ after a 5\% warmup is retained per seed.
+Prior NMI against expert macros is computed only \emph{after} checkpoint selection for reporting.
+
+\subsection{Macro-aligned accuracy and label switching}
+Macro accuracy maps each predicted cluster to its dominant expert macro label (Hungarian alignment when $K{=}3$), then reports the fraction of epochs matching Wake/NREM/REM.
+Accuracy can exceed chance and diverge from NMI when $K>3$ substates collapse onto the same macro label, when too few clusters are active, or when clusters are macro-pure but permuted.
+Mixture components are identifiable only up to permutation; NMI is invariant to permutations, but cluster indices differ across seeds unless post-hoc alignment is applied for tables and figures.
+
+\subsection{Seed aggregation and inferential tests}
+Each fold trains three seeds; holdout prior NMI is evaluated at each seed's $S(\varepsilon)$ checkpoint; the maximum across seeds is the headline fold score (Tables~\ref{table1}--\ref{table2}, \nameref{S11_Table}).
+Paired fold-level $\Delta\mathrm{NMI} = \mathrm{NMI}_{\mathrm{cHMM}} - \mathrm{NMI}_{\mathrm{cGMVAE}}$ uses the same held-out mice ($n{=}4$ folds).
+We report mean $\Delta$, bootstrap 95\% CI (10\,000 resamples), one-sided Wilcoxon ($H_0$: median $\Delta \le 0$), and paired $t$-test as sensitivity (\nameref{S12_Table}, \nameref{S8_Fig}).
+Fold~4 per-mouse paired tests are a secondary unit-of-analysis check (\nameref{S2_Fig}).
+
+\subsection{Prior log-likelihood at holdout}
+Holdout prior log-likelihood complements NMI when judging unsupervised fit (\nameref{S14_Table}).
+For \textbf{cGMVAE} ($T{=}1$), each 4\,s epoch is treated independently: the reported value is the mean $\log p(z_t)$ under the static GMM prior on encoder means (metrics.txt \texttt{Likelihood}).
+For \textbf{HMMGMVAE} and \textbf{cHMM--GMVAE} ($T{=}64$), windows of 64 contiguous epochs are scored with the HMM forward marginal: metrics.txt reports mean $\log p(z_{1:T})$ per sequence (\texttt{log p(z\_1:T)}).
+Because the sequence length differs, raw totals are \emph{not} comparable across cGMVAE and sequence-prior models.
+The normalised column divides cGMVAE values by $L{=}6$ (per-latent-dimension mean log-density at $T{=}1$) and sequence models by $T\cdot L$ (matching the K-sweep axis in Fig~\ref{fig2}).
+Higher normalised values indicate better prior density on held-out latents; they need not track NMI when expert macros misalign with mixture components.
