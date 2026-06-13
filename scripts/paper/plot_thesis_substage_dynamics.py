@@ -16,7 +16,15 @@ from scripts.paper.plot_style import SUBSTAGE_COLORS, apply_paper_style, panel_l
 from scripts.substage_analysis.full_analysis_from_npz import remap_labels
 
 MACRO_NAMES = ["Wake", "NREM", "REM"]
+MACRO_ORDER = ["Wake", "NREM", "REM"]
 EPOCH_SEC = 4.0
+
+# Light fills for per-row / macro-band backgrounds (dominant expert macro per substage).
+MACRO_BAND_STYLES = {
+    "Wake": ("#D6EAF8", "Wake"),
+    "NREM": ("#FDEBD0", "NREM"),
+    "REM": ("#D5F5F5", "REM"),
+}
 
 GROUP_STYLES = {
     "Awake": ("#D6EAF8", "Awake"),
@@ -82,7 +90,6 @@ def _classify_substage(
 
 
 def _build_substage_meta(y_pred: np.ndarray, y_true: np.ndarray, k: int) -> list[SubstageMeta]:
-    group_order = list(GROUP_STYLES.keys())
     raw: list[SubstageMeta] = []
     for s in range(k):
         group, dom, med_s = _classify_substage(y_pred, y_true, s)
@@ -102,8 +109,8 @@ def _build_substage_meta(y_pred: np.ndarray, y_true: np.ndarray, k: int) -> list
 
     ordered: list[SubstageMeta] = []
     y = float(k - 1)
-    for g in group_order:
-        members = sorted([m for m in raw if m.group == g], key=lambda m: -m.occupancy)
+    for macro in MACRO_ORDER:
+        members = sorted([m for m in raw if m.dominant_macro == macro], key=lambda m: -m.occupancy)
         for m in members:
             ordered.append(
                 SubstageMeta(
@@ -119,6 +126,23 @@ def _build_substage_meta(y_pred: np.ndarray, y_true: np.ndarray, k: int) -> list
             )
             y -= 1.0
     return ordered
+
+
+def _draw_macro_backgrounds(ax, meta: list[SubstageMeta]) -> None:
+    """Contiguous macro bands (Wake / NREM / REM) behind substage rows."""
+    sorted_meta = sorted(meta, key=lambda item: -item.y_pos)
+    i = 0
+    while i < len(sorted_meta):
+        dom = sorted_meta[i].dominant_macro
+        j = i + 1
+        while j < len(sorted_meta) and sorted_meta[j].dominant_macro == dom:
+            j += 1
+        block = sorted_meta[i:j]
+        y_bot = min(m.y_pos for m in block) - 0.5
+        y_top = max(m.y_pos for m in block) + 0.5
+        fill = MACRO_BAND_STYLES.get(dom, MACRO_BAND_STYLES["Wake"])[0]
+        ax.axhspan(y_bot, y_top, facecolor=fill, edgecolor="none", zorder=0)
+        i = j
 
 
 def _pick_excerpt(y: np.ndarray, n_epochs: int) -> int:
@@ -216,31 +240,9 @@ def plot_hypnogram_thesis(
     t_edges = np.concatenate([[time_min[0] - dt / 2], time_min[:-1] + dt / 2, [time_min[-1] + dt / 2]])
 
     fig, ax = plt.subplots(figsize=(7.2, 4.6))
+    fig.subplots_adjust(left=0.26)
 
-    # Group background bands
-    groups_present: list[tuple[str, float, float]] = []
-    for g in GROUP_STYLES:
-        members = [m for m in meta if m.group == g]
-        if not members:
-            continue
-        y_top = max(m.y_pos for m in members) + 0.5
-        y_bot = min(m.y_pos for m in members) - 0.5
-        groups_present.append((g, y_bot, y_top))
-
-    for g, y_bot, y_top in groups_present:
-        color, label = GROUP_STYLES[g]
-        ax.axhspan(y_bot, y_top, facecolor=color, edgecolor="none", zorder=0)
-        ax.text(
-            -0.02,
-            (y_bot + y_top) / 2,
-            label,
-            transform=ax.get_yaxis_transform(),
-            ha="right",
-            va="center",
-            fontsize=7.5,
-            color="#444444",
-            clip_on=False,
-        )
+    _draw_macro_backgrounds(ax, meta)
 
     segments: list[list[tuple[float, float]]] = []
     seg_colors: list[str] = []
@@ -261,15 +263,32 @@ def plot_hypnogram_thesis(
     ax.set_ylim(min(m.y_pos for m in meta) - 0.6, max(m.y_pos for m in meta) + 0.6)
     ax.set_xlabel("Time (minutes)")
     ax.set_ylabel("Predicted substage")
-    ax.set_yticks([m.y_pos for m in meta])
-    ax.set_yticklabels([f"{m.name} ({m.dominant_macro})" for m in meta], fontsize=8)
+    sorted_meta = sorted(meta, key=lambda m: -m.y_pos)
+    ax.set_yticks([m.y_pos for m in sorted_meta])
+    ax.set_yticklabels([f"{m.name} ({m.dominant_macro})" for m in sorted_meta], fontsize=8)
     ax.set_axisbelow(True)
-    ax.yaxis.grid(True, color="0.88", linewidth=0.6, linestyle="-", zorder=1)
+    ax.yaxis.grid(True, color="0.88", linewidth=0.6, linestyle="-", zorder=0.5)
     ax.tick_params(axis="x", labelsize=8)
 
     save_figure(fig, out_path)
     plt.close(fig)
     return start
+
+
+def plot_hypnogram_from_npz(
+    npz_path: Path,
+    out_path: Path,
+    *,
+    minutes: float = 30.0,
+) -> None:
+    """30 min substage hypnogram with per-row macro shading from results.npz."""
+    data = np.load(npz_path)
+    y_pred = remap_labels(data["y_hat"].reshape(-1))
+    y_true = data["y_true"].reshape(-1)
+    k = int(y_pred.max()) + 1
+    meta = _build_substage_meta(y_pred, y_true, k)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    plot_hypnogram_thesis(y_pred, y_true, meta, out_path, minutes=minutes)
 
 
 def plot_combined(
@@ -334,13 +353,7 @@ def plot_combined(
         cbar.set_label(r"$P(\mathrm{next} \mid \mathrm{current})$", fontsize=8)
         cbar.ax.tick_params(labelsize=7)
 
-        for g in GROUP_STYLES:
-            members = [mx for mx in meta if mx.group == g]
-            if not members:
-                continue
-            y_top = max(mx.y_pos for mx in members) + 0.5
-            y_bot = min(mx.y_pos for mx in members) - 0.5
-            ax_h.axhspan(y_bot, y_top, facecolor=GROUP_STYLES[g][0], edgecolor="none", zorder=0)
+        _draw_macro_backgrounds(ax_h, meta)
 
         segments: list[list[tuple[float, float]]] = []
         seg_colors: list[str] = []

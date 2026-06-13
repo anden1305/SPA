@@ -1,22 +1,26 @@
 % Within-laboratory ablation ceiling (locks preprocessing before holdout).
 \subsection{Incohort performance ceiling}
-\label{S7_Table}
+\label{app:incohort_ceiling}
 
-Before cross-laboratory holdout, we ran extensive within-laboratory sweeps over preprocessing, CNN--VAE architecture, prior tier (static GMM vs.\ HMM--GMM vs.\ warm sticky HMM--GMM), and sequence length $T$.
+Before cross-laboratory holdout, we ran extensive within-laboratory sweeps over preprocessing, CNN--VAE architecture, prior tier (static GMM vs.\ HMM--GMM vs.\ warm sticky HMM--GMM), and sequence length $T$ (Table~\ref{app:tab:incohort}).
 All mice in a laboratory were pooled for training and validation tuning (no leave-mice-out).
 Reported values are best-of-three prior NMI at $K{=}3$ with decoder-only conditioning.
-These runs fixed the per-site recipes in \nameref{S4_Appendix} and estimate an upper performance bound when site-specific tuning is allowed.
+These runs fixed the per-site recipes in \apdx{app:data:preprocessing} and estimate an upper performance bound when site-specific tuning is allowed.
 They are \emph{not} the locked holdout protocol in Table~\ref{table2}.
 Macro accuracy was not logged systematically in the incohort sweeps.
 
 Bern (laboratory~2): cGMVAE reached 0.593 with EEG1+EEG4, no post-normalisation, and EEG 0--30\,Hz.
 Temporal priors did not beat the static mixture at $T{=}1$ (best cHMM--GMVAE 0.571 with warm prior and 50\,Hz notch).
 Copenhagen (laboratory~3): cGMVAE peaked at 0.737; warm cHMM--GMVAE at $T{=}64$ matched within 0.003 (0.734).
-Lyon (laboratory~5): cHMM--GMVAE with EMG-wide notch preprocessing at $T{=}32$ reached 0.640 versus 0.534 for cGMVAE, though only one of three seeds was healthy at that peak.
+Lyon (laboratory~5): cHMM--GMVAE with EMG-wide notch preprocessing at $T{=}32$ reached 0.640 versus 0.534 for cGMVAE.
 
 \apptabdesc{Incohort ceiling prior NMI. Best-of-three prior NMI and winning configuration per laboratory and model.}
+\label{app:tab:incohort}
 \apptabular{\input{assets/tables/S7_incohort_ceiling.tex}}
 
 \noindent{\small\textbf{Ceiling reference only.}
 Holdout within-lab NMI and accuracy under the same locked recipes appear in Table~\ref{table2}.
-Joint holdout remains below these ceilings because leave-mice-out validation is strictly harder than pooling all laboratory mice during tuning.}\par\vspace{0.5em}
+Joint holdout remains below these ceilings because leave-mice-out validation is strictly harder than pooling all laboratory mice during tuning.
+The ceilings also show that cGMVAE can reach much higher prior NMI under site-tuned incohort settings (for example 0.737 at Copenhagen) than under the unified holdout recipe (joint mean 0.282).
+That gap is expected because holdout locks one preprocessing and training recipe across cGMVAE, HMMGMVAE, and cHMM--GMVAE for fair prior comparison rather than maximising the static mixture alone.
+A useful follow-up is to select cGMVAE-specific hyperparameters from incohort sweeps at $T{=}1$ and re-run joint holdout, to see how much of the incohort ceiling transfers under leave-mice-out and whether cHMM--GMVAE retains its margin.}\par\vspace{0.5em}

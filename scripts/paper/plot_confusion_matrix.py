@@ -15,10 +15,21 @@ from src.helpers.align_labels import align_labels_hungarian
 
 REPO = Path(__file__).resolve().parents[2]
 MACRO_NAMES = ["Wake", "NREM", "REM"]
+MACRO_MATRIX_CMAP = "Blues"
+MACRO_MATRIX_VMIN = 0.0
+MACRO_MATRIX_VMAX = 1.0
+MACRO_MATRIX_FIGSIZE = (3.35, 3.05)
+MACRO_MATRIX_TICK_FONTSIZE = 9
+MACRO_MATRIX_LABEL_FONTSIZE = 9
+MACRO_MATRIX_ANNOT_FONTSIZE = 8
+
+
+def _macro_matrix_text_color(value: float) -> str:
+    return "white" if value > 0.45 else "#1E3A5F"
 DEFAULT_NPZ = (
     REPO
-    / "results/cv4fold/joint_holdout/fold_4/chmmgmvae_locked"
-    / "joint_ho_f4_chmmgmvae_locked_20260610-040158/plots/1/results.npz"
+    / "results/cv4fold/joint_holdout/fold_3/chmmgmvae_locked"
+    / "joint_ho_f3_chmmgmvae_locked_20260610-010029/plots/2/results.npz"
 )
 
 
@@ -73,29 +84,30 @@ def plot_confusion(npz_path: Path, out_path: Path) -> dict:
 
     y_pred_macro = _predicted_macro(y_true, y_pred)
     cm = _confusion_matrix_3x3(y_true, y_pred_macro)
+    counts = np.zeros((3, 3), dtype=int)
+    for i in range(3):
+        mask_i = y_true == i
+        for j in range(3):
+            counts[i, j] = int((mask_i & (y_pred_macro == j)).sum())
 
-    fig, ax = plt.subplots(figsize=(3.35, 3.05))
-    im = ax.imshow(cm, cmap="Blues", vmin=0.0, vmax=1.0, aspect="equal")
+    fig, ax = plt.subplots(figsize=MACRO_MATRIX_FIGSIZE)
+    im = ax.imshow(cm, cmap=MACRO_MATRIX_CMAP, vmin=MACRO_MATRIX_VMIN, vmax=MACRO_MATRIX_VMAX, aspect="equal")
 
     ax.set_xticks(np.arange(3))
     ax.set_yticks(np.arange(3))
-    ax.set_xticklabels(MACRO_NAMES, fontsize=9)
-    ax.set_yticklabels(MACRO_NAMES, fontsize=9)
-    ax.set_xlabel("Predicted macro", fontsize=9)
-    ax.set_ylabel("Expert macro", fontsize=9)
+    ax.set_xticklabels(MACRO_NAMES, fontsize=MACRO_MATRIX_TICK_FONTSIZE)
+    ax.set_yticklabels(MACRO_NAMES, fontsize=MACRO_MATRIX_TICK_FONTSIZE)
+    ax.set_xlabel("Predicted macro", fontsize=MACRO_MATRIX_LABEL_FONTSIZE)
+    ax.set_ylabel("Expert macro", fontsize=MACRO_MATRIX_LABEL_FONTSIZE)
     ax.tick_params(length=0)
 
     for i in range(3):
         for j in range(3):
             v = cm[i, j]
-            n = int((y_true == i).sum() * v) if (y_true == i).any() else 0
-            txt = f"{v:.2f}"
-            if i == 2 or j == 2:
-                txt = f"{v:.2f}\n(n={n})"
             ax.text(
-                j, i, txt,
-                ha="center", va="center", fontsize=8 if (i == 2 or j == 2) else 8.5,
-                color="white" if v > 0.45 else "#1E3A5F",
+                j, i, f"{v:.2f}\n(n={counts[i, j]})",
+                ha="center", va="center", fontsize=MACRO_MATRIX_ANNOT_FONTSIZE,
+                color=_macro_matrix_text_color(v),
                 fontweight="bold" if i == j else "normal",
             )
 
@@ -124,7 +136,7 @@ def main() -> int:
     parser.add_argument(
         "--out",
         type=Path,
-        default=REPO / "docs/paper/figures/supplementary/S3_confusion.pdf",
+        default=REPO / "docs/paper/figures/main/Fig_macro_confusion_f3.pdf",
     )
     args = parser.parse_args()
     if not args.npz.is_file():

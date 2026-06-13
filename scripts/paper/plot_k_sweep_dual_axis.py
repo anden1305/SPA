@@ -58,11 +58,16 @@ def collect_k_sweep(
     k_max: int = 15,
     *,
     include_extra2: bool = False,
+    drop_ll_outliers: bool = True,
 ) -> dict[int, dict]:
     """Per-K seed metrics (primary 3-seed runs by default)."""
     from scripts.paper.k_sweep_metrics import collect_k_sweep_merged
 
-    return collect_k_sweep_merged(root, k_min, k_max, include_extra2=include_extra2)
+    return collect_k_sweep_merged(
+        root, k_min, k_max,
+        include_extra2=include_extra2,
+        drop_ll_outliers=drop_ll_outliers,
+    )
 
 
 def pick_chosen_k(scores: dict[int, dict], *, criterion: str = "best") -> int | None:
@@ -181,10 +186,17 @@ def main() -> int:
         action="store_true",
         help="Merge supplemental extra2 seed batches (default: primary 3-seed runs only)",
     )
+    parser.add_argument(
+        "--no-drop-ll-outliers",
+        action="store_true",
+        help="Keep collapsed-seed log p(z₁:T) values in likelihood aggregates",
+    )
     args = parser.parse_args()
 
     scores = collect_k_sweep(
-        args.root, args.k_min, args.k_max, include_extra2=args.include_extra2,
+        args.root, args.k_min, args.k_max,
+        include_extra2=args.include_extra2,
+        drop_ll_outliers=not args.no_drop_ll_outliers,
     )
     if not scores:
         raise SystemExit(f"No K-sweep metrics found under {args.root}")

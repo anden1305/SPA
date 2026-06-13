@@ -1,17 +1,20 @@
 % Incohort ceiling reference (best-of-3 prior NMI from per-lab ablation sweeps).
 % Protocol: all mice in lab, no cross-fold holdout; per-lab preprocessing/arch locks.
 % See docs/cv4fold/ablations/ablation_findings_20260608.md
-\begin{tabular}{|l|l|r|l|}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{|l|l|r|>{\raggedright\arraybackslash}p{0.46\linewidth}|}
 \hline
-\textbf{Lab} & \textbf{Model} & \textbf{Best NMI} & \textbf{Winning lock (summary)} \\
+\textbf{Lab} & \textbf{Model} & \textbf{NMI} & \textbf{Winning lock (summary)} \\
 \thickhline
-2 & cGMVAE & 0.593 & EEG1+EEG4, no post-normalisation, EEG 0--30\,Hz, EMG 3--100\,Hz \\
-2 & cHMM--GMVAE & 0.571 & warm prior + 50\,Hz notch, below cGMVAE at $T{=}1$ \\
+2 & cGMVAE & 0.593 & EEG1+EEG4; no post-norm.; EEG 0--30\,Hz; EMG 3--100\,Hz \\
+2 & cHMM--GMVAE & 0.571 & Warm prior; 50\,Hz notch \\
 \hline
-3 & cGMVAE & 0.737 & post-normalisation, EEG 0--20\,Hz, MLP widths 512--256--128 \\
-3 & cHMM--GMVAE & 0.734 & warm HMM--GMM, $T{=}64$, same preprocessing and architecture locks \\
+3 & cGMVAE & 0.737 & Post-norm.; EEG 0--20\,Hz; MLP 512--256--128 \\
+3 & cHMM--GMVAE & 0.734 & Warm HMM--GMM; $T{=}64$; same preprocessing \\
 \hline
-5 & cGMVAE & 0.534 & post-normalisation, EEG 0--20\,Hz, MLP widths 512--256--128 \\
-5 & cHMM--GMVAE & 0.640 & EMG wide + notch, $T{=}32$ (1/3 seeds healthy) \\
+5 & cGMVAE & 0.534 & Post-norm.; EEG 0--20\,Hz; MLP 512--256--128 \\
+5 & cHMM--GMVAE & 0.640 & EMG wide + notch; $T{=}32$ \\
 \hline
 \end{tabular}
+\normalsize

@@ -1,0 +1,21 @@
+{
+  "npz": "/work3/s204070/SPA/results/cv4fold/joint_holdout/fold_3/chmmgmvae_locked/joint_ho_f3_chmmgmvae_locked_20260610-010029/plots/2/results.npz",
+  "n_epochs": 97792,
+  "transition_change_only": {
+    "Wake": {
+      "Wake": null,
+      "NREM": 0.82,
+      "REM": 0.18
+    },
+    "NREM": {
+      "Wake": 0.2480553154710458,
+      "NREM": null,
+      "REM": 0.7519446845289542
+    },
+    "REM": {
+      "Wake": 0.11889596602972399,
+      "NREM": 0.881104033970276,
+      "REM": null
+    }
+  }
+}

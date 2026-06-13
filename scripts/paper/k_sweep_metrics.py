@@ -9,6 +9,33 @@ import numpy as np
 
 from scripts.paper.plot_k_sweep_dual_axis import _parse_metrics
 
+# Per-seed log p(z₁:T) failures beyond this MAD band are dropped from likelihood aggregates.
+_LL_OUTLIER_MAD_SCALE = 3.0
+_LL_OUTLIER_MAD_FACTOR = 1.4826
+_LL_OUTLIER_MIN_ABS = 500.0
+
+
+def _filter_ll_outlier_seeds(
+    seeds: list[dict],
+    *,
+    min_keep: int = 2,
+) -> tuple[list[dict], int]:
+    """Drop seeds whose log p(z₁:T) is far from the per-K median (robust MAD rule)."""
+    with_ll = [s for s in seeds if "log_p_z" in s]
+    without_ll = [s for s in seeds if "log_p_z" not in s]
+    if len(with_ll) <= 2:
+        return seeds, 0
+    lls = np.array([s["log_p_z"] for s in with_ll], dtype=float)
+    median = float(np.median(lls))
+    mad = float(np.median(np.abs(lls - median)))
+    if mad < 1.0:
+        mad = float(np.std(lls)) if len(lls) > 1 else 100.0
+    threshold = max(_LL_OUTLIER_MAD_SCALE * _LL_OUTLIER_MAD_FACTOR * mad, _LL_OUTLIER_MIN_ABS)
+    kept = [s for s in with_ll if abs(s["log_p_z"] - median) <= threshold]
+    if len(kept) < min_keep:
+        return seeds, 0
+    return kept + without_ll, len(with_ll) - len(kept)
+
 
 def _read_seed_metrics(run_dir: Path) -> list[tuple[int, dict[str, float]]]:
     """Return [(plot_index, metrics), ...] for one run directory."""
@@ -51,6 +78,7 @@ def collect_k_sweep_merged(
     k_max: int = 15,
     *,
     include_extra2: bool = False,
+    drop_ll_outliers: bool = True,
 ) -> dict[int, dict]:
     """Per-K aggregates using seeds across run directories.
 
@@ -72,6 +100,9 @@ def collect_k_sweep_merged(
                 seeds = [s for s in seeds if s["run"] == latest]
         if not seeds:
             continue
+        n_ll_dropped = 0
+        if drop_ll_outliers:
+            seeds, n_ll_dropped = _filter_ll_outlier_seeds(seeds)
         nmis = [s["nmi"] for s in seeds]
         lls = [s["log_p_z"] for s in seeds if "log_p_z" in s]
         runs = sorted({s["run"] for s in seeds})
@@ -79,6 +110,7 @@ def collect_k_sweep_merged(
             "run": runs[-1] if runs else "",
             "runs_merged": runs,
             "n_seeds": len(seeds),
+            "n_ll_outliers_dropped": n_ll_dropped,
             "seeds": [{k: v for k, v in s.items() if k != "run"} for s in seeds],
             "nmi_mean": float(np.mean(nmis)),
             "nmi_std": float(np.std(nmis)) if len(nmis) > 1 else 0.0,

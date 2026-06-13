@@ -9,22 +9,23 @@ Quality screening retains mice with low EEG drift and EMG that separates Wake fr
 Drift is quantified as relative 0.5--2\,Hz power $\leq 0.2$ of 0.5--30\,Hz on each retained electrode.
 Wake/NREM separability uses a root-mean-square ratio $\geq 2$ on neck EMG.
 The screened cohort comprises 20 mice (6 Bern, 10 Copenhagen, 4 Lyon) with 42 recording runs and ${\sim}453$\,h of EEG/EMG (${\sim}4.1 \times 10^{5}$ artefact-free 4\,s epochs after screening).
-Training mice never appear in the validation fold for a given split (\nameref{S9_Table}).
+Training mice never appear in the validation fold for a given split (\apdx{app:data:splits}).
 No new animal procedures were performed.
 
-\noindent\textbf{S8 Table.}\label{S8_Table}\par
 \apptabdesc{Quality-screened cohort inventory. Per-mouse recording runs, hours, and 4\,s epoch counts (MSSV annotation grid).}
+\label{app:tab:cohort}
 \apptabular{\small\input{assets/tables/S8_cv4fold_cohort.tex}}
 
 \subsection{Preprocessing and spectral inputs}
-\label{S4_Appendix}
+\label{app:data:preprocessing}
 
-Montages are harmonised to a parietal-frontal EEG differential plus neck EMG (laboratory~2: EEG1 and EEG4; laboratories~3 and~5: EEG1 and EEG2).
+Montages are harmonised to a parietal-frontal EEG differential plus neck EMG.
+Bern (laboratory~2) provides four EEG contacts (EEG1/2 parietal, EEG3/4 frontal); we use EEG1 and EEG4 to match the single parietal--frontal pairing at laboratories~3 and~5 (EEG1 parietal, EEG2 frontal).
 Recordings are segmented into 4\,s epochs at 128\,Hz. Artifact epochs are removed.
 Each epoch is a log-power spectral map $\mathbf{x}_t \in \mathbb{R}^{C \times F}$, batched into contiguous sequences for temporal models without hand-crafted expert features.
 
-Per-laboratory channel sets were fixed from incohort ablation winners (full sweep outcomes in \nameref{S7_Table}).
-Spectral passbands are summarised in \nameref{app:data:bands}.
+Per-laboratory channel sets were fixed from incohort ablation winners (full sweep outcomes in \apdx{app:incohort_ceiling}).
+Spectral passbands are summarised in \apdx{app:data:bands}.
 
 \subsection{Spectral bands and frequency content}
 \label{app:data:bands}
@@ -47,24 +48,24 @@ Lyon (lab~5) & EEG1, EEG2 & 0--20\,Hz & 5--60\,Hz \\
 \end{tabular}}
 
 \paragraph*{Diagnostic and physiology bands.}
-Quality screening compares relative 0.5--2\,Hz EEG power to 0.5--30\,Hz total (\nameref{app:data:cohort}).
-For substage physiology panels (Figs~\ref{fig3}--\ref{fig4}) and summary tables, log-power spectra are aggregated into interpretable bands on the same frequency grid:
+Quality screening compares relative 0.5--2\,Hz EEG power to 0.5--30\,Hz total (\apdx{app:data:cohort}).
+For substage physiology panels (Fig~\ref{fig3} and Fig~\ref{fig4}) and summary tables, log-power spectra are aggregated into interpretable bands on the same frequency grid:
 delta 0.5--4\,Hz, theta 4--8\,Hz, and broadband EMG power summed over the retained EMG passband.
 Reported $\theta/\delta$ ratios use these bands.
 
-Bern uses no per-epoch post-normalisation on log-power spectra.
-Copenhagen and Lyon apply per-epoch z-scoring of log-power after band limiting (post-normalisation).
-These limits were chosen from incohort ablations (\nameref{S7_Table}) and held fixed for all cross-laboratory holdout runs.
+Bern uses no post-normalisation on log-power spectra.
+Copenhagen and Lyon apply run-wise z-scoring after band limiting: for each recording run, each channel's log-power spectrum is scaled by the mean and standard deviation computed across all 4\,s epochs in that run (post-normalisation).
+These limits were chosen from incohort ablations (\apdx{app:incohort_ceiling}) and held fixed for all cross-laboratory holdout runs.
 
 \subsection{Cross-validation protocol}
 \label{app:data:splits}
 
 Folds were designed so each site contributes holdout mice every fold while balancing validation load: fold~1 is epoch-heaviest (${\sim}32\%$ of cohort epochs in validation, driven by long Copenhagen and Lyon recordings) whereas folds~2--4 hold out 21--25\% of epochs each.
+We use four folds because Lyon contributes only four quality-screened mice, which is the maximum fold count for strict mouse-level holdout.
 sub-069 is assigned to fold~2 rather than fold~4 so Copenhagen does not contribute four simultaneous holdout mice on the substage-analysis fold.
 Each VAE configuration trains three random seeds per fold. Reported metrics use the best prior NMI among seeds.
 
-\paragraph*{S9 Table.}
-\label{S9_Table}
 \apptabdesc{Four-fold leave-mice-out assignments. Top: held-out mice per site and fold.
 Bottom: validation versus training pool sizes (joint scope trains on all non-held-out mice across sites).}
+\label{app:tab:splits}
 \apptabular{\input{assets/tables/S9_cv4fold_splits.tex}}

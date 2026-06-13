@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build Fig 3: 2×2 population latent grid (K=6, 9, 12 PCA + K=12 hypnogram)."""
+"""Build main-text Fig 3: population K=8 PCA + hypnogram (two-panel stack)."""
 
 from __future__ import annotations
 
@@ -39,26 +39,26 @@ def _image_aspect(path: Path) -> float:
     return w / h
 
 
-def _panel_label_below(ax, letter: str) -> None:
+def _panel_label(ax, letter: str) -> None:
     ax.text(
-        0.5,
-        -0.045,
+        0.015,
+        0.985,
         letter,
         transform=ax.transAxes,
-        ha="center",
+        ha="left",
         va="top",
-        fontsize=11,
-        fontweight="normal",
+        fontsize=13,
+        fontweight="bold",
         family="serif",
+        bbox={"boxstyle": "round,pad=0.12", "facecolor": "white", "edgecolor": "none", "alpha": 0.9},
+        zorder=10,
     )
 
 
-def build_grid(out_path: Path) -> None:
+def build_k8_figure(out_path: Path, *, k: int = 8) -> None:
     panels: list[tuple[str, Path]] = [
-        ("A", _panel_path(6, "pca")),
-        ("B", _panel_path(9, "pca")),
-        ("C", _panel_path(12, "pca")),
-        ("D", _panel_path(12, "hypnogram")),
+        ("A", _panel_path(k, "pca")),
+        ("B", _panel_path(k, "hypnogram")),
     ]
 
     apply_paper_style()
@@ -70,40 +70,33 @@ def build_grid(out_path: Path) -> None:
         }
     )
 
-    fig_w = 7.0
-    col_w = fig_w * 0.47
+    fig_w = 4.2
     aspects = [_image_aspect(path) for _, path in panels]
-    row_hs = [
-        col_w / min(aspects[0], aspects[1]),
-        col_w / min(aspects[2], aspects[3]),
-    ]
-    label_pad = 0.28
-    row_gap = 0.10
-    fig_h = row_hs[0] + row_hs[1] + row_gap + label_pad
+    row_hs = [fig_w / asp for asp in aspects]
+    row_gap = 0.14
+    fig_h = sum(row_hs) + row_gap
 
     fig = plt.figure(figsize=(fig_w, fig_h))
     gs = fig.add_gridspec(
         2,
-        2,
+        1,
         height_ratios=row_hs,
         hspace=row_gap / min(row_hs),
-        wspace=0.05,
         left=0.02,
         right=0.98,
         top=0.99,
-        bottom=label_pad / fig_h,
+        bottom=0.02,
     )
 
     for idx, (label, path) in enumerate(panels):
-        r, c = divmod(idx, 2)
-        ax = fig.add_subplot(gs[r, c])
+        ax = fig.add_subplot(gs[idx, 0])
         img = mpimg.imread(path)
         h, w = img.shape[:2]
         ax.imshow(img, aspect="equal", interpolation="antialiased")
         ax.set_xlim(0, w)
         ax.set_ylim(h, 0)
         ax.axis("off")
-        _panel_label_below(ax, label)
+        _panel_label(ax, label)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     save_figure(fig, out_path)
@@ -115,10 +108,11 @@ def main() -> int:
     parser.add_argument(
         "--out",
         type=Path,
-        default=REPO / "docs/paper/figures/main/Fig_population_pca_2x2.png",
+        default=REPO / "docs/paper/figures/main/Fig_population_K8_latent.png",
     )
+    parser.add_argument("--k", type=int, default=8)
     args = parser.parse_args()
-    build_grid(args.out)
+    build_k8_figure(args.out, k=args.k)
     print(f"Wrote {args.out}")
     return 0
 

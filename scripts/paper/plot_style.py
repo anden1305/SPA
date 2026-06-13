@@ -34,7 +34,7 @@ MACRO_LABEL_COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c", "#e41a1c"]
 SUBJECT_MIX_CMAP = "twilight_shifted"
 
 # Default text scale for thesis Fig 27 / frequency_plot grids.
-FREQUENCY_GRID_FONT_SCALE = 1.45
+FREQUENCY_GRID_FONT_SCALE = 1.55
 
 
 def apply_paper_style() -> None:

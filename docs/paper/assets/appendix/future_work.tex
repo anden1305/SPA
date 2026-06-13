@@ -14,6 +14,11 @@ The thesis showed that classical HMMs on \emph{raw} time-domain MSSV inputs fail
 An open direction is to replace the hand-crafted spectral front-end with a convolutional encoder on band-pass filtered raw EEG/EMG traces, closer to supervised mouse CNN classifiers~\cite{garciaciudad2024temporal,miladinovic2019spindle}, while retaining the same decoder-only conditioning and sticky mixture prior at the latent level.
 Fair comparison would require matched context length ($T$ epochs), preprocessing locks per laboratory, and the same leave-mice-out folds; spectral and raw encoders need not share identical capacity.
 
+\paragraph*{Static mixture tuning.}
+Holdout comparisons lock preprocessing and CNN--VAE settings across cGMVAE, HMMGMVAE, and cHMM--GMVAE (\nameref{sec:methods}, Tables~\ref{table1} and~\ref{table2}).
+Incohort ceilings (\nameref{S7_Table}) suggest cGMVAE may be under-tuned under that unified recipe relative to site-specific incohort winners.
+Re-running joint holdout with cGMVAE-only hyperparameter search (still at $T{=}1$) would test whether the static prior closes more of the gap to within-laboratory ceilings before attributing the full holdout margin to the temporal HMM--GMM prior.
+
 \paragraph*{Substage selection and biology review.}
 Mixture count $K$ was chosen on holdout fold~4 only (\nameref{sec:limitations}).
 Train-only or nested cross-validation for $K$, plus expert review of substage names from physiology panels (as in mcRBM~\cite{katsageorgiou2018mcRBM}), would strengthen claims beyond macro NMI.

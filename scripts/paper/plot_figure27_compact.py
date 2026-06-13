@@ -308,7 +308,9 @@ def run(
     )
 
     if out_hypno is not None:
-        plot_hypnogram_dual(labels_pred, labels_true_v, colors, out_hypno)
+        from scripts.paper.plot_thesis_substage_dynamics import plot_hypnogram_from_npz
+
+        plot_hypnogram_from_npz(npz_path, out_hypno, minutes=30.0)
 
     if out_fig4 is not None:
         plot_fig4_combined(labels_pred, names_short, colors, labels_true_v, out_fig4, out_transition.with_suffix(".csv"))

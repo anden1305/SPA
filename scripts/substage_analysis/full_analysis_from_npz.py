@@ -76,7 +76,7 @@ def plot_pca_true_vs_predicted(
     from src.visuals.layered_scatter import scatter_layered
 
     title_kw = {"fontweight": "normal", "family": "serif"}
-    axis_kw = {"fontweight": "normal", "family": "serif", "fontsize": 9}
+    axis_kw = {"fontweight": "normal", "family": "serif", "fontsize": 10}
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
     for ax, y, names, colors, subtitle in [
@@ -95,7 +95,7 @@ def plot_pca_true_vs_predicted(
         )
         ax.set_xlabel(f"PC1 ({evr[0] * 100:.1f}% var)", **axis_kw)
         ax.set_ylabel(f"PC2 ({evr[1] * 100:.1f}% var)", **axis_kw)
-        ax.set_title(subtitle, fontsize=10, **title_kw)
+        ax.set_title(subtitle, fontsize=11, **title_kw)
         ax.legend(
             handles=[
                 plt.Line2D([0], [0], marker="o", color="w", markerfacecolor=colors[c], label=names[c], markersize=8)
