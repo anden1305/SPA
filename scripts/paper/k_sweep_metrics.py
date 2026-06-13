@@ -45,14 +45,31 @@ def collect_all_seeds_for_k(k_dir: Path) -> list[dict]:
     return merged
 
 
-def collect_k_sweep_merged(root: Path, k_min: int = 3, k_max: int = 15) -> dict[int, dict]:
-    """Per-K aggregates using all available seeds across run directories."""
+def collect_k_sweep_merged(
+    root: Path,
+    k_min: int = 3,
+    k_max: int = 15,
+    *,
+    include_extra2: bool = False,
+) -> dict[int, dict]:
+    """Per-K aggregates using seeds across run directories.
+
+    By default uses one run per K: holdout excludes ``extra2`` batches; when several
+    non-extra2 runs exist (population retries), keeps only the latest run directory.
+    Pass ``include_extra2=True`` to merge all run directories.
+    """
     out: dict[int, dict] = {}
     if not root.is_dir():
         return out
     for k in range(k_min, k_max + 1):
         k_dir = root / f"K{k}"
         seeds = collect_all_seeds_for_k(k_dir)
+        if not include_extra2:
+            seeds = [s for s in seeds if "extra2" not in s.get("run", "")]
+            run_names = sorted({s["run"] for s in seeds})
+            if len(run_names) > 1:
+                latest = max(run_names, key=lambda name: (k_dir / name).stat().st_mtime)
+                seeds = [s for s in seeds if s["run"] == latest]
         if not seeds:
             continue
         nmis = [s["nmi"] for s in seeds]

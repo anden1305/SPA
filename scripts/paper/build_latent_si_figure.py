@@ -17,6 +17,7 @@ from scripts.substage_analysis.full_analysis_from_npz import (
     _fit_pca_scores,
     remap_labels,
 )
+from scripts.substage_analysis.labels import PREDICTED_SUBSTAGE_LABEL
 from scripts.substage_analysis.plot_substages import _scatter_tsne_panel
 from sklearn.manifold import TSNE
 
@@ -79,7 +80,7 @@ def build_latent_si_figure(
 
     for ax, y, names, colors, subtitle in [
         (axes[0, 0], y_true, names_true, colors_true, "Expert labels"),
-        (axes[0, 1], y_pred, names_pred, colors_pred, "GM substages"),
+        (axes[0, 1], y_pred, names_pred, colors_pred, PREDICTED_SUBSTAGE_LABEL),
     ]:
         for c in range(len(names)):
             mask = y == c
@@ -98,7 +99,7 @@ def build_latent_si_figure(
 
     for ax, y, names, colors, subtitle in [
         (axes[1, 0], y_true, names_true, colors_true, "Expert labels"),
-        (axes[1, 1], y_pred, names_pred, colors_pred, "GM substages"),
+        (axes[1, 1], y_pred, names_pred, colors_pred, PREDICTED_SUBSTAGE_LABEL),
     ]:
         _scatter_tsne_panel(
             ax, emb, y, names, colors, title=subtitle, point_size=8, alpha=0.65,

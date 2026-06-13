@@ -1,6 +1,7 @@
 % Technical methods detail moved from main text for readability (Appendix B).
 
 \subsection{Locked hyperparameters}
+\label{app:methods:hyper}
 Latent dimension $d{=}6$ (matched to thesis-scale mixture models), embedding dimension 8, learning rate $1.3 \times 10^{-3}$, batch size 128, 200 epochs, three random seeds per fold.
 Sequence length $T{=}64$ epochs (${\sim}4.3$\,min); sticky self-transition weight $\kappa{=}0.92$.
 CNN channel widths $[32,64,128,128]$, kernel sizes $[7,5,5,3]$, strides 2; MLP widths $[512,256,128]$ (encoder) and $[128,256,512]$ (decoder).
@@ -16,6 +17,7 @@ On laboratory~3 incohort, warm-started HMM--GMM beat a cold HMM--GMM start (best
 We did not grid-search every knob at holdout; locked settings prioritise reproducibility.
 
 \subsection{Warm prior schedule (cHMM--GMVAE)}
+\label{app:methods:warmstart}
 Epochs 1--17: standard Gaussian KL on the encoder.
 Epoch 18: $K$-means on encoder means initialises GMM emissions.
 Epochs 18--36: independent mixture KL.
@@ -43,11 +45,19 @@ Macro accuracy maps each predicted cluster to its dominant expert macro label (H
 Accuracy can exceed chance and diverge from NMI when $K>3$ substates collapse onto the same macro label, when too few clusters are active, or when clusters are macro-pure but permuted.
 Mixture components are identifiable only up to permutation; NMI is invariant to permutations, but cluster indices differ across seeds unless post-hoc alignment is applied for tables and figures.
 
-\subsection{Seed aggregation and inferential tests}
+\subsection{Raw time-domain HMM baseline}
+\label{S2_Appendix}
+Classical HMMs on raw MSSV EEG/EMG voltages do not generalise across subjects in the MSc thesis (thesis Ch.~5).
+On the locked cross-lab protocol, joint HMM (raw) prior NMI is near chance (mean 0.054; fold~4 peak 0.21), motivating the spectral CNN front-end used throughout this report.
+
+\subsection{Seed aggregation and substage validity}
 Each fold trains three seeds; holdout prior NMI is evaluated at each seed's $S(\varepsilon)$ checkpoint; the maximum across seeds is the headline fold score (Tables~\ref{table1}--\ref{table2}, \nameref{S11_Table}).
-Paired fold-level $\Delta\mathrm{NMI} = \mathrm{NMI}_{\mathrm{cHMM}} - \mathrm{NMI}_{\mathrm{cGMVAE}}$ uses the same held-out mice ($n{=}4$ folds).
-We report mean $\Delta$, bootstrap 95\% CI (10\,000 resamples), one-sided Wilcoxon ($H_0$: median $\Delta \le 0$), and paired $t$-test as sensitivity (\nameref{S12_Table}, \nameref{S8_Fig}).
-Fold~4 per-mouse paired tests are a secondary unit-of-analysis check (\nameref{S2_Fig}).
+For macro model comparison we report paired fold-level $\Delta\mathrm{NMI}$ with bootstrap 95\% CI ($B{=}10\,000$) and note that all four folds favour cHMM--GMVAE; formal $p$-values with $n{=}4$ folds are omitted as under-powered.
+
+For substage sweeps, macro NMI alone is insufficient when $K$ exceeds the expert grid.
+We therefore report per-$K$ validity in \nameref{S12_Table}: active component count, minimum occupancy, mean latent ED, Fisher trace, Cram\'{e}r's $V$, prior NMI, and $p_{\mathrm{perm}}$.
+The permutation shuffles predicted substage labels on a fixed latent subsample ($n \leq 6000$ epochs) and recomputes mean pairwise ED; $p_{\mathrm{perm}}$ is the one-sided fraction of null values $\geq$ the observed ED.
+This tests whether mixture assignments carve separated regions in latent space, independent of expert label agreement.
 
 \subsection{Prior log-likelihood at holdout}
 Holdout prior log-likelihood complements NMI when judging unsupervised fit (\nameref{S14_Table}).

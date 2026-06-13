@@ -8,6 +8,7 @@ import numpy as np
 import seaborn as sns
 from sklearn.manifold import TSNE
 
+from scripts.substage_analysis.labels import PREDICTED_SUBSTAGE_LABEL
 from src.visuals.layered_scatter import scatter_layered
 
 sns.set_theme(style="whitegrid", context="paper")
@@ -286,7 +287,7 @@ def tsne_scatter_pair(
 
     for path, labels, names, colors, subtitle in [
         (save_path_true, y_true, label_names_true, label_colors_true, "Expert labels"),
-        (save_path_pred, y_pred, label_names_pred, label_colors_pred, "GM substages"),
+        (save_path_pred, y_pred, label_names_pred, label_colors_pred, PREDICTED_SUBSTAGE_LABEL),
     ]:
         fig, ax = plt.subplots(figsize=(9, 7))
         _scatter_tsne_panel(
@@ -339,7 +340,7 @@ def tsne_true_vs_predicted(
     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
     for ax, y, names, colors, subtitle in [
         (axes[0], y_true, label_names_true, label_colors_true, "Expert labels"),
-        (axes[1], y_pred, label_names_pred, label_colors_pred, "GM substages"),
+        (axes[1], y_pred, label_names_pred, label_colors_pred, PREDICTED_SUBSTAGE_LABEL),
     ]:
         _scatter_tsne_panel(ax, emb, y, names, colors, title=subtitle)
     fig.suptitle(title, fontsize=12, y=1.02)

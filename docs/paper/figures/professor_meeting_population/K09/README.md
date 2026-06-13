@@ -1,13 +1,13 @@
 # K = 9
 
-- **Best seed:** 1
-- **Prior NMI:** 0.3965
+- **Best seed:** 2
+- **Prior NMI:** 0.4342
 - **Run:** `population_k_sweep_K9_spill_l40s_20260612-101504`
 
 ## Show Birgitte (in order)
 
 1. `frequency_plot_gmm_predicted.png` — thesis Fig 27 physiology grid (all K rows)
-2. `pca_comparison_true_vs_predicted.png` — expert vs GM substages in latent space
+2. `pca_comparison_true_vs_predicted.png` — expert vs cHMM–GMVAE substages in latent space
 3. `tsne_scatter_true.png` / `tsne_scatter_predicted.png` — t-SNE of same latent subsample
 4. `transition_matrix_predicted.png` — switching dynamics
 5. `label_distribution.png` — occupancy / rare states

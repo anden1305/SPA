@@ -11,6 +11,7 @@ import numpy as np
 from scripts.substage_analysis.distribution_plot import plot_label_distribution
 from scripts.substage_analysis.fig27_from_npz import plot_fig27_gmm_predicted
 from scripts.substage_analysis.kmeans import kmeans_predict_labels
+from scripts.substage_analysis.labels import PREDICTED_SUBSTAGE_LABEL
 from scripts.substage_analysis.plot_substages import pca_scatter_random_samples, tsne_scatter_pair
 from scripts.substage_analysis.transition_matrix import plot_transition_matrix
 
@@ -74,10 +75,13 @@ def plot_pca_true_vs_predicted(
 
     from src.visuals.layered_scatter import scatter_layered
 
+    title_kw = {"fontweight": "normal", "family": "serif"}
+    axis_kw = {"fontweight": "normal", "family": "serif", "fontsize": 9}
+
     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
     for ax, y, names, colors, subtitle in [
         (axes[0], y_true, label_names_true, LABEL_COLORS_TRUE[: len(label_names_true)], "Expert labels"),
-        (axes[1], y_pred, label_names_pred, LABEL_COLORS_PRED[: len(label_names_pred)], "GM substages"),
+        (axes[1], y_pred, label_names_pred, LABEL_COLORS_PRED[: len(label_names_pred)], PREDICTED_SUBSTAGE_LABEL),
     ]:
         colors_lut = {c: colors[c] for c in range(len(names))}
         scatter_layered(
@@ -89,9 +93,9 @@ def plot_pca_true_vs_predicted(
             colors=colors_lut,
             point_size=14,
         )
-        ax.set_xlabel(f"PC1 ({evr[0] * 100:.1f}% var)")
-        ax.set_ylabel(f"PC2 ({evr[1] * 100:.1f}% var)")
-        ax.set_title(subtitle)
+        ax.set_xlabel(f"PC1 ({evr[0] * 100:.1f}% var)", **axis_kw)
+        ax.set_ylabel(f"PC2 ({evr[1] * 100:.1f}% var)", **axis_kw)
+        ax.set_title(subtitle, fontsize=10, **title_kw)
         ax.legend(
             handles=[
                 plt.Line2D([0], [0], marker="o", color="w", markerfacecolor=colors[c], label=names[c], markersize=8)
@@ -101,9 +105,13 @@ def plot_pca_true_vs_predicted(
             loc="best",
             fontsize=8,
             frameon=True,
+            prop={"weight": "normal", "family": "serif", "size": 8},
         )
         ax.grid(True, linewidth=0.4, alpha=0.35)
-    fig.suptitle(title, fontsize=12, y=1.02)
+        for label in ax.get_xticklabels() + ax.get_yticklabels():
+            label.set_fontweight("normal")
+            label.set_family("serif")
+    fig.suptitle(title, fontsize=11, y=1.02, fontweight="normal", family="serif")
     Path(save_path).parent.mkdir(parents=True, exist_ok=True)
     fig.tight_layout()
     fig.savefig(save_path, dpi=300, bbox_inches="tight")

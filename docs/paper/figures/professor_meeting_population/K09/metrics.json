@@ -1,8 +1,8 @@
 {
   "K": 9,
-  "best_seed": 1,
-  "nmi": 0.3965,
-  "npz": "results/cv4fold/paper_k_sweep/population/K9/population_k_sweep_K9_spill_l40s_20260612-101504/plots/1/results.npz",
+  "best_seed": 2,
+  "nmi": 0.4342,
+  "npz": "results/cv4fold/paper_k_sweep/population/K9/population_k_sweep_K9_20260613-144321/plots/2/results.npz",
   "run": "population_k_sweep_K9_spill_l40s_20260612-101504",
   "n_active_substages": 9
 }

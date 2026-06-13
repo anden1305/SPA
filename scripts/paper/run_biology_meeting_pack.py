@@ -52,7 +52,7 @@ def _write_k_readme(k_dir: Path, meta: dict) -> None:
         "## Show Birgitte (in order)",
         "",
         "1. `frequency_plot_gmm_predicted.png` — thesis Fig 27 physiology grid (all K rows)",
-        "2. `pca_comparison_true_vs_predicted.png` — expert vs GM substages in latent space",
+        "2. `pca_comparison_true_vs_predicted.png` — expert vs cHMM–GMVAE substages in latent space",
         "3. `tsne_scatter_true.png` / `tsne_scatter_predicted.png` — t-SNE of same latent subsample",
         "4. `transition_matrix_predicted.png` — switching dynamics",
         "5. `label_distribution.png` — occupancy / rare states",
@@ -199,6 +199,7 @@ def _write_overview_readme(
         "",
         "1. `00_overview/k_sweep_dual_axis.pdf` — NMI + log p(z) vs K (thesis Fig 23)",
         "2. `00_overview/k_sweep_active_substages.csv` — configured K vs **active** substates used",
+        "3. `00_overview/k_sweep_substage_validity_population.csv` — latent ED, Cramér V, $p_{perm}$ per K",
         "3. Compare candidate folders (see table below)",
         "4. Per-K README in each folder lists what to show",
         "",
@@ -287,7 +288,7 @@ def main() -> int:
 
     chosen_k = pick_chosen_k(scores)
     dual_pdf = overview / "k_sweep_dual_axis.pdf"
-    plot_dual_axis(scores, dual_pdf, chosen_k=chosen_k, title=dual_title)
+    plot_dual_axis(scores, dual_pdf, chosen_k=chosen_k, title=dual_title, ll_norm="none")
     write_metrics_table(scores, overview / "k_sweep_metrics_table.csv")
     (overview / "k_sweep_summary.json").write_text(
         json.dumps({"chosen_k": chosen_k, "by_k": {str(k): v for k, v in sorted(scores.items())}}, indent=2),
@@ -296,6 +297,22 @@ def main() -> int:
     active_by_k = write_active_substages_table(
         args.root, overview, k_min=args.k_min, k_max=args.k_max, scores=scores
     )
+
+    # Substage validity stats (latent separation permutation, Cramér's V, occupancy)
+    try:
+        from scripts.paper.compute_substage_sweep_statistics import collect_sweep, write_csv, write_tex
+
+        tag = "population" if args.protocol == "population" else "holdout_fold4"
+        validity_rows = collect_sweep(args.root, args.k_min, args.k_max, n_perm=100)
+        if validity_rows:
+            write_csv(validity_rows, overview / f"k_sweep_substage_validity_{tag}.csv")
+            write_tex(
+                validity_rows,
+                REPO / f"docs/paper/assets/tables/S12_substage_validity_{tag}.tex",
+                caption_tag=tag,
+            )
+    except Exception as exc:
+        print(f"Warning: substage validity stats skipped: {exc}")
 
     k_values = args.k_list if args.k_list else list(range(args.k_min, args.k_max + 1))
     per_k: dict[str, dict] = {}

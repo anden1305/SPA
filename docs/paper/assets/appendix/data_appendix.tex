@@ -3,7 +3,7 @@
 \label{app:data:cohort}
 
 MSSV (OpenNeuro ds006366)~\cite{rose2025mssv} comprises invasive EEG and neck EMG from 92 mice across five European laboratories, with expert Wake, NREM, REM, and Artifact labels on a 4\,s grid for evaluation only.
-This report analyses laboratories 2 (Bern), 3 (Copenhagen), and 5 (Lyon): healthy wild-type sites with complementary montages, excluding laboratories 1 and 4 (pathology-specific or single-electrode cohorts).
+This report analyses laboratories 2 (Bern), 3 (Copenhagen), and 5 (Lyon): healthy wild-type sites with different electrode layouts, excluding laboratories 1 and 4 (pathology-specific or single-electrode cohorts).
 
 Quality screening retains mice with low EEG drift and EMG that separates Wake from NREM.
 Drift is quantified as relative 0.5--2\,Hz power $\leq 0.2$ of 0.5--30\,Hz on each retained electrode.
@@ -12,10 +12,9 @@ The screened cohort comprises 20 mice (6 Bern, 10 Copenhagen, 4 Lyon) with 42 re
 Training mice never appear in the validation fold for a given split (\nameref{S9_Table}).
 No new animal procedures were performed.
 
-\paragraph*{S8 Table.}
-\label{S8_Table}
-\apptabdesc{\textbf{Quality-screened cohort inventory.} Per-mouse recording runs, hours, and 4\,s epoch counts (MSSV annotation grid).}
-\apptabular{\input{assets/tables/S8_cv4fold_cohort.tex}}
+\noindent\textbf{S8 Table.}\label{S8_Table}\par
+\apptabdesc{Quality-screened cohort inventory. Per-mouse recording runs, hours, and 4\,s epoch counts (MSSV annotation grid).}
+\apptabular{\small\input{assets/tables/S8_cv4fold_cohort.tex}}
 
 \subsection{Preprocessing and spectral inputs}
 \label{S4_Appendix}
@@ -36,8 +35,7 @@ Band limiting is applied in the frequency domain on the complex spectrum before 
 The model therefore receives the full spectral shape inside each passband, not a small vector of hand-defined sleep bands.
 
 \paragraph*{Locked per-laboratory passbands (holdout protocol).}
-\begin{center}
-\small
+\apptabular{\small
 \begin{tabular}{|l|l|l|l|}
 \hline
 \textbf{Site} & \textbf{EEG channels} & \textbf{EEG passband} & \textbf{EMG passband} \\
@@ -46,18 +44,17 @@ Bern (lab~2) & EEG1, EEG4 & 0--30\,Hz & 3--100\,Hz ($\leq 64$\,Hz Nyquist) \\
 Copenhagen (lab~3) & EEG1, EEG2 & 0--20\,Hz & 5--60\,Hz \\
 Lyon (lab~5) & EEG1, EEG2 & 0--20\,Hz & 5--60\,Hz \\
 \hline
-\end{tabular}
-\end{center}
+\end{tabular}}
+
+\paragraph*{Diagnostic and physiology bands.}
+Quality screening compares relative 0.5--2\,Hz EEG power to 0.5--30\,Hz total (\nameref{app:data:cohort}).
+For substage physiology panels (Figs~\ref{fig3}--\ref{fig4}) and summary tables, log-power spectra are aggregated into interpretable bands on the same frequency grid:
+delta 0.5--4\,Hz, theta 4--8\,Hz, and broadband EMG power summed over the retained EMG passband.
+Reported $\theta/\delta$ ratios use these bands.
 
 Bern uses no per-epoch post-normalisation on log-power spectra.
 Copenhagen and Lyon apply per-epoch z-scoring of log-power after band limiting (post-normalisation).
 These limits were chosen from incohort ablations (\nameref{S7_Table}) and held fixed for all cross-laboratory holdout runs.
-
-\paragraph*{Diagnostic and physiology bands.}
-Quality screening compares relative 0.5--2\,Hz EEG power to 0.5--30\,Hz total (\nameref{app:data:cohort}).
-For substage physiology panels (Fig~\ref{fig3}, \nameref{S1_Fig}) and summary tables (\nameref{S3_Table}), log-power spectra are aggregated into interpretable bands on the same frequency grid:
-delta 0.5--4\,Hz, theta 4--8\,Hz, and broadband EMG power summed over the retained EMG passband.
-Reported $\theta/\delta$ ratios use these bands.
 
 \subsection{Cross-validation protocol}
 \label{app:data:splits}
@@ -68,6 +65,6 @@ Each VAE configuration trains three random seeds per fold. Reported metrics use 
 
 \paragraph*{S9 Table.}
 \label{S9_Table}
-\apptabdesc{\textbf{Four-fold leave-mice-out assignments.} Top: held-out mice per site and fold.
+\apptabdesc{Four-fold leave-mice-out assignments. Top: held-out mice per site and fold.
 Bottom: validation versus training pool sizes (joint scope trains on all non-held-out mice across sites).}
 \apptabular{\input{assets/tables/S9_cv4fold_splits.tex}}

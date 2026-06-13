@@ -52,11 +52,17 @@ def _read_seed_metrics(run_dir: Path) -> list[dict[str, float]]:
     return [m] if m else []
 
 
-def collect_k_sweep(root: Path, k_min: int = 3, k_max: int = 15) -> dict[int, dict]:
-    """Per-K seed metrics merged across all run dirs (base + extra2 jobs)."""
+def collect_k_sweep(
+    root: Path,
+    k_min: int = 3,
+    k_max: int = 15,
+    *,
+    include_extra2: bool = False,
+) -> dict[int, dict]:
+    """Per-K seed metrics (primary 3-seed runs by default)."""
     from scripts.paper.k_sweep_metrics import collect_k_sweep_merged
 
-    return collect_k_sweep_merged(root, k_min, k_max)
+    return collect_k_sweep_merged(root, k_min, k_max, include_extra2=include_extra2)
 
 
 def pick_chosen_k(scores: dict[int, dict], *, criterion: str = "best") -> int | None:
@@ -83,9 +89,9 @@ def plot_dual_axis(
     *,
     title: str = "cHMM–GMVAE (fold 4 holdout)",
     chosen_k: int | None = None,
-    ll_norm: str = "TL",
+    ll_norm: str = "none",
 ) -> None:
-    """Thesis Fig 23 styling: blue circles = NMI (left), orange squares = log p(z) (right)."""
+    """Thesis Fig 23 styling: blue circles = NMI (left), orange squares = log p(z₁:T) (right)."""
     div = _ll_norm_divisor(ll_norm)
     ks = sorted(scores.keys())
     nmi = np.array([scores[k]["nmi_mean"] for k in ks], dtype=float)
@@ -121,11 +127,11 @@ def plot_dual_axis(
         ax_ll = ax_nmi.twinx()
         ax_ll.set_facecolor("#F0F0F0")
         if ll_norm == "TL":
-            ll_ylabel = f"Mean log prior density\nlog p(z₁:T) / (T·L), T={SEQUENCE_LENGTH}, L={LATENT_DIM}"
+            ll_ylabel = f"Predictive likelihood\nlog p(z₁:T) / (T·L), T={SEQUENCE_LENGTH}, L={LATENT_DIM}"
         elif ll_norm == "T":
-            ll_ylabel = f"Mean log prior density\nlog p(z₁:T) / T, T={SEQUENCE_LENGTH}"
+            ll_ylabel = f"Predictive likelihood\nlog p(z₁:T) / T, T={SEQUENCE_LENGTH}"
         else:
-            ll_ylabel = "Predictive Likelihood\nlog p(z₁:T)"
+            ll_ylabel = "Predictive likelihood"
         ax_ll.set_ylabel(ll_ylabel, color=color_ll, fontsize=10)
         ax_ll.fill_between(x, ll_vals - ll_std_n, ll_vals + ll_std_n, color=color_ll, alpha=0.18, linewidth=0)
         (line_ll,) = ax_ll.plot(
@@ -167,12 +173,19 @@ def main() -> int:
     parser.add_argument(
         "--ll-norm",
         choices=("none", "T", "TL"),
-        default="TL",
-        help="Scale log p(z₁:T): TL = per latent dim per timestep (default)",
+        default="none",
+        help="Optional scale for log p(z₁:T); default is raw predictive likelihood",
+    )
+    parser.add_argument(
+        "--include-extra2",
+        action="store_true",
+        help="Merge supplemental extra2 seed batches (default: primary 3-seed runs only)",
     )
     args = parser.parse_args()
 
-    scores = collect_k_sweep(args.root, args.k_min, args.k_max)
+    scores = collect_k_sweep(
+        args.root, args.k_min, args.k_max, include_extra2=args.include_extra2,
+    )
     if not scores:
         raise SystemExit(f"No K-sweep metrics found under {args.root}")
 

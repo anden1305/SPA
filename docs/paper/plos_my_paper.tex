@@ -137,7 +137,7 @@
 
 % Bold the 'Figure #' in the caption and separate it from the title/caption with a period
 % Captions will be left justified
-\usepackage[aboveskip=1pt,labelfont=bf,labelsep=period,justification=raggedright,singlelinecheck=off]{caption}
+\usepackage[aboveskip=1pt,font=normal,labelfont=bf,labelsep=period,justification=raggedright,singlelinecheck=off]{caption}
 \renewcommand{\figurename}{Fig}
 
 % Please use the included `plos2025.bst` as your BibTeX style
@@ -149,11 +149,19 @@
 \makeatother
 
 % QSLP-style bold paragraph starter (see report_outline.md)
-\newcommand{\methodpara}[1]{\par\noindent\textbf{#1}\ }
+\newcommand{\methodpara}[1]{\par\vspace{0.85em}\noindent\textbf{#1}\ }
 
-% Appendix tables: left-aligned captions/notes; vertical padding around tabular
+% Appendix cross-ref: subsection labels render as A.1, B.2, etc. after \appendix
+\newcommand{\apdx}[1]{Appendix~\ref{#1}}
 \newcommand{\apptabdesc}[1]{\par\vspace{0.45em}\noindent#1\par\vspace{0.35em}}
-\newcommand{\apptabular}[1]{\par\begin{center}#1\end{center}\par\vspace{0.5em}}
+\newcommand{\apptabular}[1]{%
+  \par\vspace{0.35em}%
+  \begin{center}%
+  #1%
+  \end{center}%
+  \par\vspace{0.5em}%
+}
+\newcommand{\appfigdesc}[1]{\par\smallskip\noindent#1\par\smallskip}
 
 
 
@@ -181,22 +189,44 @@
 }%
 \makeatother
 \ifreportmode
+  \usepackage{titlesec}
+  \setcounter{secnumdepth}{2}
+  \titleformat{\section}{\normalfont\large\scshape\raggedright}{\thesection}{1em}{}
+  \titleformat{name=\section,numberless}{\normalfont\large\scshape\raggedright}{}{0pt}{}
+  \titleformat{\subsection}{\normalfont\normalsize\scshape\raggedright}{\thesubsection}{1em}{}
+  \titleformat{name=\subsection,numberless}{\normalfont\normalsize\scshape\raggedright}{}{0pt}{}
+  \titlespacing*{\section}{0pt}{2.0ex plus .4ex minus .2ex}{1.0ex}
+  \titlespacing*{\subsection}{0pt}{1.7ex plus .3ex minus .2ex}{0.85ex}
+  \newcommand{\papersection}[1]{\section{#1}}
+  \newcommand{\papersubsection}[1]{\subsection{#1}}
+  \newcommand{\paperacksection}{%
+    \vspace{1.75em}%
+    \par\noindent{\normalfont\normalsize\scshape Acknowledgments}\par\vspace{0.85em}%
+  }
+  \newcommand{\paperreferences}{%
+    \vspace{1.25em}%
+    \bibliography{assets/references}%
+  }
   \justifying
   \AtBeginDocument{\captionsetup{justification=justified,singlelinecheck=false}}
 \else
+  \newcommand{\papersection}[1]{\section*{#1}}
+  \newcommand{\papersubsection}[1]{\subsection*{#1}}
+  \newcommand{\paperacksection}{\section*{Acknowledgments}}
+  \newcommand{\paperreferences}{\bibliography{assets/references}}
   \raggedright
 \fi
 \newcommand{\paperfig}[2][\linewidth]{%
   \ifdraftfigures
     \par\medskip
-    \centering\includegraphics[width=#1,keepaspectratio]{#2}%
+    {\centering\includegraphics[width=#1,keepaspectratio]{#2}\par}%
     \par\medskip
   \fi
 }
 \newcommand{\suppfig}[2][0.88\linewidth]{%
   \ifdraftfigures
     \par\smallskip
-    \centering\includegraphics[width=#1,keepaspectratio]{#2}%
+    {\centering\includegraphics[width=#1,keepaspectratio]{#2}\par}%
     \par\smallskip
   \fi
 }
@@ -226,23 +256,27 @@
   \newgeometry{top=0.85in,left=1in,right=1in,footskip=0.75in}
   \fancyheadoffset[L]{0pt}
   \fancyfootoffset[L]{0pt}
+  \fancyhead[C]{\small\textit{To be submitted to PLOS Computational Biology}}
 \fi
 \vspace*{0.08in}
 
 \begin{center}
-{\LARGE
-Rethinking Sleep Staging
-\par\vspace{0.35em}}
-{\large
-Unsupervised cross-laboratory mouse sleep staging with temporal variational autoencoders and substage discovery
+\ifreportmode
+{\LARGE Rethinking Sleep Staging:\ }{\LARGE Unsupervised cross-laboratory mouse sleep staging with temporal variational autoencoders and substage discovery
 \par\vspace{0.45em}}
+\else
+{\LARGE Rethinking Sleep Staging:\ }{\LARGE Unsupervised cross-laboratory mouse sleep staging with temporal variational autoencoders and substage discovery
+\par\vspace{0.45em}}
+\fi
+\end{center}
+\begin{center}
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}c c c@{}}
+\textbf{Oliver Rosb\ae{}k Elmgreen}\textsuperscript{1*} &
+\textbf{Morten M\o{}rup}\textsuperscript{1} &
+\textbf{Birgitte Rahbek Kornum}\textsuperscript{2} \\
+\end{tabular*}
 \end{center}
 \begin{flushleft}
-\textbf{Oliver Rosb\ae{}k Elmgreen}\textsuperscript{1*},
-\textbf{Morten M\o{}rup}\textsuperscript{1},
-\textbf{Birgitte Rahbek Kornum}\textsuperscript{2}
-\\
-\smallskip
 \textsuperscript{1} Department of Applied Mathematics and Computer Science, Technical University of Denmark
 \\
 \textsuperscript{2} Department of Neuroscience, University of Copenhagen, Denmark
@@ -255,83 +289,94 @@ Unsupervised cross-laboratory mouse sleep staging with temporal variational auto
 \begin{center}
 \begin{minipage}{0.92\linewidth}
 \begin{center}
-{\large\bfseries Abstract}
+\ifreportmode{\large\scshape Abstract}\else{\large\bfseries Abstract}\fi
 \end{center}
 \vspace{0.35em}
 \justifying
 \noindent
-Cross-laboratory manual scoring of mouse sleep from EEG and EMG lacks consensus, and supervised models trained at one site often fail on others without retraining or per-animal calibration.
-On a quality-screened MSSV cohort (20 wild-type mice, laboratories 2/3/5, four-fold leave-mice-out cross-validation), decoder-only conditional variational autoencoders stage held-out animals from spectral inputs alone, without subject identifiers or manual baseline scoring at inference.
-A sticky HMM-GMM prior reaches mean prior normalised mutual information (NMI) 0.575 on joint cross-laboratory holdout versus 0.282 for a matched static mixture baseline (paired mean $\Delta = +0.29$ across four folds; one-sided Wilcoxon $p = 0.063$).
-After establishing cross-laboratory holdout staging, a resolution sweep asks whether Wake, NREM, and REM alone describe the data: at $K{=}4$ on held-out fold~4, substates carry distinct spectra, bout structure, and latent geometry beyond a single cluster per macro class, in line with finer unsupervised structure reported in rodents~\cite{katsageorgiou2018mcRBM,elmgreen2026thesis}.
-The framework supports cross-study comparison without harmonised expert labels but does not replace supervised scoring or recover REM reliably on strict holdout (REM recall ${\sim}3\%$).
+Cross-laboratory manual scoring of mouse sleep from electroencephalography (EEG) and electromyography (EMG) lacks consensus, and supervised models trained at one site often fail elsewhere without retraining or per-animal calibration.
+We study twenty quality-screened wild-type mice from three European Mouse Sleep Staging Validation (MSSV) laboratories under leave-mice-out cross-validation with four folds.
+Decoder-only conditional variational autoencoders (cVAE) assign states to held-out animals from spectral EEG and EMG alone, using only the encoder and a learned mixture prior at inference.
+A hidden Markov model--Gaussian mixture model (HMM--GMM) prior that models bout structure reached mean prior normalized mutual information (NMI) of 0.575 on joint cross-laboratory holdout, versus 0.282 for a matched static mixture, a gain of 0.29 NMI averaged over folds.
+Beyond three macro states, holdout macro NMI falls as mixture count $K$ increases while prior log-likelihood improves.
+We therefore select $K$ for biological interpretability near six to nine substates rather than from macro NMI alone.
+A population sweep on all twenty mice supports a $K{=}6$ map with six active substates and distinct Wake and non-rapid eye movement (NREM) components.
+The method enables comparison of sleep substage structure across acquisition sites before expert labels are harmonised.
 \end{minipage}
 \end{center}
 
-\ifreportmode
-% DTU report build: Author summary omitted (required only for PLOS Comp Biol submission).
-\else
 \section*{Author summary}
-We study how \textit{Mus musculus} sleep can be classified automatically from brain and muscle signals when recordings come from different laboratories with different equipment.
-Expert human scorers disagree across labs, and supervised computer models often fail on new sites.
-We built a family of unsupervised models that learn shared sleep patterns from many mice, then test them on held-out animals they have never seen, without asking a human to calibrate each new recording.
-Our best model combines a neural network that reads EEG and EMG with a temporal prior that enforces realistic sleep bout structure.
-It outperforms simpler models on cross-lab holdout and discovers finer sleep substates whose brain-wave profiles match known physiology.
-We validate substages with power spectra, muscle activity, and bout lengths, with guidance from sleep neuroscientists.
-This work offers a label-free route to comparing sleep across studies and may help researchers find transition states between wake, NREM, and REM that are hard to score by eye alone.
-\fi
+Sleep biologists score mouse EEG and EMG into Wake, NREM, and rapid eye movement (REM) sleep, but raters at different laboratories often disagree.
+We trained unsupervised models on mice from Bern, Copenhagen, and Lyon, then tested them on held-out animals the models had never seen, without calibrating each new recording by hand.
+Our best model reads spectral brain and muscle signals through a neural network and enforces realistic sleep bout structure with a temporal prior.
+It outperformed simpler baselines on cross-laboratory holdout and recovered finer substates whose spectra and bout lengths matched patterns we discussed with sleep neuroscientists at the Kornum laboratory.
+The approach is not yet accurate enough to replace supervised scoring, especially for REM, but it shows that substage structure can be studied across sites before expert labels are aligned.
 
 \ifreportmode\else\newgeometry{top=0.85in,left=1in,right=1in,footskip=0.75in}\fi
 \ifreportmode\else\linenumbers\fi
 
-\section*{Introduction}
+\papersection{Introduction}
 
-Rodent sleep is scored from EEG and EMG into Wake, non-rapid eye movement (NREM), and rapid eye movement (REM).
-That three-class vocabulary is the standard benchmark, but it compresses continuous physiology into coarse bins. Unsupervised work in mice has repeatedly resolved substages with distinct spectra, bout lengths, and transition roles that Wake/NREM/REM labels alone do not name~\cite{katsageorgiou2018mcRBM,stevner2019human,elmgreen2026thesis}.
-Montage and laboratory protocols nonetheless differ across studies~\cite{rose2025mssv}, so any claim that sleep structure extends beyond macro scoring must survive strict holdout on new animals and new sites.
-Rose et al.\ report limited cross-laboratory scoring consensus and poor transfer of published deep models across MSSV sites unless retrained on multi-laboratory data~\cite{rose2026consensus}.
-Supervised pipelines such as SPINDLE and REST can reach high accuracy under that regime but depend on expert labels that inherit rater noise~\cite{miladinovic2019spindle,wang2026rest}.
-Transductive tools including AccuSleep require roughly ten minutes of manually scored baseline per new mouse~\cite{barger2019accusleep,yaghouby2016segway}.
-These constraints motivate label-agnostic staging under strict population holdout without per-animal calibration at inference.
+Manual mouse sleep scores disagree across MSSV laboratories, and supervised models trained at one site fail on held-out animals elsewhere unless retrained or calibrated per mouse~\cite{rose2026consensus,miladinovic2019spindle,wang2026rest,barger2019accusleep,yaghouby2016segway}.
+Expert staging nonetheless maps continuous physiology into Wake, NREM, and REM, the standard three-class benchmark.
+Unsupervised work in mice has repeatedly resolved substages with distinct spectra, bout lengths, and transition roles that Wake/NREM/REM labels alone do not name~\cite{katsageorgiou2018mcRBM,stevner2019human,elmgreen2026thesis}.
+Montage and laboratory protocols differ across studies~\cite{rose2025mssv}.
+Claims that sleep structure extends beyond macro scoring must therefore be tested on new animals and new sites under population holdout without per-animal calibration at inference.
 
 Unsupervised sequence models infer latent structure directly from EEG and EMG dynamics and align naturally with bout persistence and transitions~\cite{stevner2019human}.
-Static clusterers and shallow HMMs discover states from raw or hand-crafted features but rarely evaluate zero-shot transfer to held-out mice from other laboratories under a shared population model~\cite{sunagawa2013faster,yamada2024faster2,cusinato2024wucss}.
-Katsageorgiou et al.\ resolved rodent substages beyond the macro taxonomy with distinct physiology and bout structure (mcRBM)~\cite{katsageorgiou2018mcRBM}, yet without cross-laboratory leave-mice-out holdout.
-Garc\'ia Ciudad et al.\ showed that longer temporal context improves supervised rodent staging, especially for REM~\cite{garciaciudad2024temporal}. That setting remains fully supervised and does not test label-free cross-site transfer.
-In a single-laboratory cohort with encoder+decoder conditioning and expert features, mixture-prior cGMVAE reached population prior NMI of about 0.70 under leave-one-subject-out prediction~\cite{elmgreen2026thesis}. Cross-laboratory holdout on spectral CNN inputs is substantially harder and is the focus here.
+Static clusterers and shallow hidden Markov models (HMMs) discover states from raw or hand-crafted features but rarely evaluate zero-shot transfer to held-out mice from other laboratories under a shared population model~\cite{sunagawa2013faster,yamada2024faster2,cusinato2024wucss}.
+Katsageorgiou et al.\ resolved rodent substages beyond the macro taxonomy with distinct physiology and bout structure in mcRBM~\cite{katsageorgiou2018mcRBM}, yet without cross-laboratory leave-mice-out holdout.
+Garc\'ia Ciudad et al.\ showed that longer temporal context improves supervised rodent staging, especially for REM~\cite{garciaciudad2024temporal}.
+That setting remains fully supervised and does not test unsupervised cross-site transfer.
+In a single-laboratory cohort with encoder+decoder conditioning and expert features, mixture-prior conditional Gaussian mixture variational autoencoder (cGMVAE) reached population prior NMI of about 0.70 under leave-one-subject-out prediction~\cite{elmgreen2026thesis}.
+Cross-laboratory holdout on spectral convolutional neural network (CNN) inputs is substantially harder and is the focus here.
 
-We extend that line with decoder-only conditional variational autoencoders and sticky HMM-GMM mixture priors. Subject embeddings condition reconstruction during training only, encoder latents remain free of identity information, and held-out mice are staged from the learned prior without subject identifiers~\cite{dilokthanakul2016gmvae,sohn2015cvae,johnson2016svae,ebbers2017hmmvae}.
-The report first validates decoder-only, cross-laboratory holdout staging at $K{=}3$ as a methodological prerequisite. It then tests whether the latent data support finer structure than Wake, NREM, and REM through mixture-resolution sweeps and physiology-first interpretation~\cite{elmgreen2026thesis}.
-Contributions are threefold. (i)~Decoder-only conditioning with zero-shot holdout staging. (ii)~A fair cross-laboratory ladder comparing static and temporal mixture priors on locked spectral inputs. (iii)~Evidence that unsupervised substates, with separated spectra, latent geometry, and transition structure, persist under holdout and motivate rethinking staging beyond the three-class grid.
-We analyse 20 quality-screened mice from MSSV laboratories 2, 3, and 5 (Bern, Copenhagen, Lyon) under four-fold leave-mice-out cross-validation, comparing a static Gaussian-mixture prior with a warm sticky HMM-GMM prior on matched inputs, then sweeping mixture resolution on held-out fold~4 and, complementarily, across the full cohort for substage physiology panels in the thesis tradition (Figs~27--30 therein~\cite{elmgreen2026thesis}).
-Dataset and protocol details are in \nameref{sec:data} and Appendix~\ref{app:data}. Training detail, prior equations, and ablations are in Appendices~\ref{S1_Appendix_methods}--\ref{app:ablations}.
+We extend decoder-only cVAE with HMM--GMM mixture priors~\cite{dilokthanakul2016gmvae,sohn2015cvae,johnson2016svae,ebbers2017hmmvae}.
+Subject embeddings condition reconstruction during training only.
+Held-out mice are staged from encoder means and the learned prior without subject identifiers.
+We validate zero-shot cross-laboratory holdout at $K{=}3$, then test whether latents support finer structure than Wake, NREM, and REM through mixture-resolution sweeps and physiology-first interpretation~\cite{katsageorgiou2018mcRBM,elmgreen2026thesis}.
+We compare a static Gaussian mixture model (GMM) prior with a warm conditional HMM--GMM variational autoencoder (cHMM--GMVAE) prior on locked spectral inputs across laboratories 2, 3, and 5 at Bern, Copenhagen, and Lyon.
+Holdout fold~4 is the generalisation benchmark for macro metrics.
+The full cohort supports substage physiology panels in the Appendix.
+Dataset and protocol details are in Section~\ref{sec:data} and Appendix~A.
 
-\section*{Data}
+\papersection{Data}
 \label{sec:data}
 
 \methodpara{Dataset and cohort.}
-MSSV (OpenNeuro ds006366)~\cite{rose2025mssv} comprises invasive EEG and neck EMG from 92 mice across five European laboratories, with expert Wake, NREM, REM, and Artifact labels on a 4\,s grid for evaluation only.
-We analyse laboratories 2 (Bern), 3 (Copenhagen), and 5 (Lyon): healthy wild-type sites with complementary montages, excluding laboratories 1 and 4 (pathology-specific or single-electrode cohorts).
-Quality screening retains mice with low EEG drift (relative 0.5-2\,Hz power $\leq 0.2$ of 0.5-30\,Hz on each retained electrode) and EMG that separates Wake from NREM (Wake/NREM root-mean-square ratio $\geq 2$; full criteria in \nameref{S4_Appendix}), yielding a 20-mouse cohort (6, 10, and 4 per site, ${\sim}453$\,h, four-fold leave-mice-out).
-The subset balances cross-laboratory coverage with stable spectral inputs. Training mice never appear in the validation fold for a given split (\nameref{S9_Table}).
+MSSV on OpenNeuro ds006366~\cite{rose2025mssv} comprises invasive EEG and neck EMG from 92 mice across five European laboratories.
+Expert Wake, NREM, REM, and Artifact labels are provided on a 4\,s grid for evaluation only.
+We analyse laboratories 2 at Bern, 3 at Copenhagen, and 5 at Lyon.
+These are healthy wild-type sites with different electrode layouts.
+We exclude laboratories 1 and 4 because they are pathology-specific or single-electrode cohorts.
+Quality screening retains mice with low EEG drift, defined as relative 0.5--2\,Hz power $\leq 0.2$ of 0.5--30\,Hz on each retained electrode.
+EMG must separate Wake from NREM with a Wake/NREM root-mean-square ratio $\geq 2$.
+The screened cohort comprises 20 mice with 6, 10, and 4 per site and ${\sim}453$\,h of recording under four-fold leave-mice-out cross-validation.
+The subset balances cross-laboratory coverage with stable spectral inputs.
+Training mice never appear in the validation fold for a given split.
 No new animal procedures were performed.
 
 \methodpara{Preprocessing and inputs.}
-Montages are harmonised to a parietal-frontal EEG differential plus neck EMG (lab~2: EEG1 and EEG4, labs~3/5: EEG1 and EEG2).
-Per-site spectral filters and band limits were fixed from incohort ablations (\nameref{S4_Appendix}, \nameref{app:data:bands}).
-Recordings are segmented into 4\,s epochs at 128\,Hz. Artifact epochs are removed.
+Montages are harmonised to a parietal--frontal EEG differential plus neck EMG.
+Laboratory 2 uses EEG1 and EEG4.
+Laboratories 3 and 5 use EEG1 and EEG2.
+Per-site spectral filters and band limits were fixed from incohort ablations before holdout.
+Recordings are segmented into 4\,s epochs at 128\,Hz.
+Artifact epochs are removed.
 Each epoch is a log-power spectral map $\mathbf{x}_t \in \mathbb{R}^{C \times F}$, batched into contiguous sequences for temporal models without hand-crafted expert features.
 
-\section*{Methods}
+\papersection{Methods}
 \label{sec:methods}
 
-\subsection*{Conditional variational models and latent priors}
+\papersubsection{Model and training}
 
-Spectral EEG/EMG epochs are mapped to a low-dimensional latent space by a convolutional variational autoencoder (cVAE).
-A subject embedding conditions reconstruction during training only. At holdout, staging uses encoder means and a learned mixture prior without subject identifiers.
-We compare two prior structures on matched inputs and cross-validation folds: a static Gaussian mixture (cGMVAE, $T{=}1$) and a warm sticky HMM-GMM sequence prior (cHMM-GMVAE, $T{=}64$ epochs, ${\sim}4.3$\,min), with $K{=}3$ for macro staging.
-HMMGMVAE without subject conditioning provides a sequence-prior baseline (Table~\ref{table1})~\cite{ebbers2017hmmvae}.
-Locked recipes, ablation rationale, and sensitivity checks are in \nameref{S1_Appendix_methods}.
+Spectral EEG/EMG epochs are mapped to a low-dimensional latent space by a cVAE.
+A subject embedding conditions reconstruction during training only.
+At holdout, staging uses encoder means and a learned mixture prior without subject identifiers.
+We compare two prior structures on matched inputs and cross-validation folds.
+cGMVAE uses a static GMM with $T{=}1$.
+cHMM--GMVAE uses a warm HMM--GMM sequence prior with $T{=}64$ epochs, about 4.3\,min, and $K{=}3$ for macro staging.
+HMM--GMM variational autoencoder without subject conditioning (HMMGMVAE) provides a sequence-prior baseline in Table~\ref{table1}~\cite{ebbers2017hmmvae}.
 
 \methodpara{Encoder-decoder.}
 Training batches are contiguous windows $\mathbf{x}_{1:T} \in \mathbb{R}^{T \times C \times F}$ with $T=64$.
@@ -342,233 +387,204 @@ q_{\boldsymbol{\phi}}(\mathbf{z}_t \mid \mathbf{x}_t) = \mathcal{N}\!\left(\math
 \qquad
 (\boldsymbol{\mu}_t, \log \boldsymbol{\sigma}_t^2) = f_{\boldsymbol{\phi}}(\mathbf{x}_t),
 \end{equation}
-with $f_{\boldsymbol{\phi}}$ a CNN-MLP encoder and $\mathbf{z}_t \in \mathbb{R}^{d}$, $d{=}6$.
+with $f_{\boldsymbol{\phi}}$ a CNN--multilayer perceptron (MLP) encoder and $\mathbf{z}_t \in \mathbb{R}^{d}$, $d{=}6$.
+Latent samples use the reparameterisation $\mathbf{z}_t = \boldsymbol{\mu}_t + \boldsymbol{\sigma}_t \odot \boldsymbol{\epsilon}_t$ with $\boldsymbol{\epsilon}_t \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$.
 The decoder reconstructs each epoch from $\mathbf{z}_t$ and, during training only, a subject embedding $\mathbf{e}_i \in \mathbb{R}^{8}$:
 \begin{equation}
 \label{eq:decoder}
 \hat{\mathbf{x}}_t = g_{\boldsymbol{\theta}}\!\left(\mathbf{z}_t, \mathbf{e}_i\right).
 \end{equation}
-Under decoder-only conditioning, $f_{\boldsymbol{\phi}}$ does not receive $\mathbf{e}_i$ (\nameref{S3_Appendix}).
-Architecture widths are in \nameref{S1_Appendix_methods} and Fig~\ref{fig_arch}.
+Under decoder-only conditioning, $f_{\boldsymbol{\phi}}$ does not receive $\mathbf{e}_i$.
+CNN and MLP widths and the full architecture diagram are in \apdx{app:methods:hyper} and \nameref{fig_arch}.
 
-\begin{paperfigure}
-\paperfig{figures/main/Fig_architecture.pdf}
-\caption{\textbf{Conditional GMVAE architecture.}
-\textbf{Encoder:} spectral EEG/EMG maps pass through CNN ($K{=}[7,5,5,3]$) and MLP blocks. Subject ID feeds a subject embedder used only in the decoder.
-\textbf{Latent:} diagonal Gaussian posterior with dimension $d{=}6$ feeds a Gaussian-mixture (cGMVAE) or sticky HMM-GMM (cHMM-GMVAE) prior.
-\textbf{Decoder:} latent vector concatenated with subject embedding, then CNN reconstruction. Training minimises MSE reconstruction plus $\beta \times$ prior KL.
-At holdout, only the encoder and prior are used for staging (no subject ID, no decoder).}
-\label{fig_arch}
-\end{paperfigure}
-
-\methodpara{Variational objective and prior.}
-Training minimises reconstruction error plus a $\beta$-weighted KL term ($\beta{=}0$ for ten epochs, then linear ramp 0.01--1.0; schedule in \nameref{S1_Appendix_methods}).
-cGMVAE uses a static Gaussian mixture prior. cHMM-GMVAE uses a sticky HMM-GMM prior ($\kappa{=}0.92$) with phased warm-start from encoder means (\nameref{S1_Appendix}, \nameref{S1_Appendix_methods})~\cite{ebbers2017hmmvae,johnson2016svae}.
+\methodpara{Training objective.}
+For each window $\mathbf{x}_{1:T}$, training minimises
+\begin{equation}
+\label{eq:loss}
+\mathcal{L} = \mathcal{L}_{\mathrm{recon}} + \beta\,\mathcal{L}_{\mathrm{KL}},
+\end{equation}
+where
+\begin{equation}
+\label{eq:recon}
+\mathcal{L}_{\mathrm{recon}} = \frac{1}{T}\sum_{t=1}^{T}\left\|\mathbf{x}_t - \hat{\mathbf{x}}_t\right\|_2^2
+\end{equation}
+is mean squared reconstruction error over $T$ contiguous 4\,s epochs.
+The Kullback--Leibler (KL) term is the sequence-averaged log-density ratio between the encoder posterior and the mixture prior,
+\begin{equation}
+\label{eq:kl_hmm}
+\mathcal{L}_{\mathrm{KL}} = \frac{1}{T}\sum_{t=1}^{T}\left[\log q_{\boldsymbol{\phi}}(\mathbf{z}_t \mid \mathbf{x}_t) - \log p(\mathbf{z}_{1:T})\right].
+\end{equation}
+For cHMM--GMVAE, $\log p(\mathbf{z}_{1:T})$ is the HMM--GMM forward marginal with emission densities $b_k(\mathbf{z}_t)$ and transition matrix $A$.
+For cGMVAE, each epoch is scored independently with a static GMM marginal at $T{=}1$.
+The weight $\beta$ is zero for the first ten epochs, then ramps linearly from 0.01 to 1.0.
+cHMM--GMVAE warm-starts the mixture prior from encoder means~\cite{ebbers2017hmmvae,johnson2016svae}.
+Phase timings and prior equations are in \apdx{S1_Appendix} and \apdx{app:methods:warmstart}.
 
 \methodpara{Prior-based staging at holdout.}
-Held-out mice are staged from encoder means $\boldsymbol{\mu}_t$ and the trained prior without subject embeddings or decoder reconstruction (\nameref{S1_Appendix_methods}).
+Held-out mice are staged from encoder means $\boldsymbol{\mu}_t$ and the trained prior without subject embeddings or decoder reconstruction.
 Static cGMVAE assigns $\hat{s}_t = \arg\max_k \left[\log \pi_k + \log b_k(\boldsymbol{\mu}_t)\right]$.
-cHMM-GMVAE applies Viterbi decoding,
+cHMM--GMVAE applies Viterbi decoding,
 \begin{equation}
 \label{eq:viterbi}
 \hat{\mathbf{s}}_{1:T} = \arg\max_{s_{1:T}} \left[\log \pi_{s_1} + \sum_{t=2}^{T}\log A_{s_{t-1}, s_t} + \sum_{t=1}^{T}\log b_{s_t}(\boldsymbol{\mu}_t)\right],
 \end{equation}
 with $B_{tk} = \log b_k(\boldsymbol{\mu}_t)$.
 
-\subsection*{Cross-validation and holdout protocol}
+\papersubsection{Evaluation protocol}
 
-\methodpara{Evaluation scopes.}
-The 20 quality-screened mice were partitioned into four folds with leave-mice-out cross-validation (\nameref{S8_Table}, \nameref{S9_Table}).
-Each fold holds out one to three mice per site (four to six mice total). The remaining 14-16 mice form the training pool and never overlap the validation set.
-Joint scope pools all training-fold mice from laboratories 2, 3, and 5 into one population model and tests on the held-out fold across sites.
-Within-lab scope restricts both training and validation to a single laboratory while using the same fold splits.
-Absolute prior NMI values between joint and within-lab scopes are not compared because the training distributions differ.
-
-\methodpara{Holdout inference.}
-Held-out mice are staged without subject identifiers and without decoder reconstruction.
-The encoder produces deterministic means $\boldsymbol{\mu}_t$ from spectral inputs only. Subject embeddings and the decoder are not used.
-State labels are assigned from the trained GMM or sticky HMM-GMM prior on $\boldsymbol{\mu}_t$ (Eq.~\eqref{eq:viterbi}, prior details in \nameref{S1_Appendix}).
-Per-laboratory spectral locks remain fixed at holdout.
-
-\methodpara{Agreement metrics.}
-Agreement with expert Wake, NREM, and REM labels was quantified primarily using normalised mutual information (NMI),
+The twenty quality-screened mice were partitioned into four leave-mice-out folds (\apdx{app:data:splits}).
+Joint scope pools all non-held-out mice from laboratories 2, 3, and 5 into one population model and tests on the held-out fold across sites.
+Within-lab scope restricts both training and validation to a single laboratory with the same fold assignments.
+Held-out mice are staged from encoder means and the trained mixture prior only, as in Eqs.~\eqref{eq:viterbi} and the holdout paragraph above.
+Per-laboratory spectral locks remain fixed.
+Agreement with expert Wake, NREM, and REM is prior NMI,
 \begin{equation}
 \label{eq:nmi}
 \mathrm{NMI}(Y,\hat{Y}) = \frac{2\,I(Y;\hat{Y})}{H(Y)+H(\hat{Y})},
 \end{equation}
 where $I$ is mutual information and $H$ Shannon entropy.
-Macro-aligned accuracy, Cohen's $\kappa$, and per-class recall are reported in \nameref{S4_Table} and \nameref{S10_Table}. Definitions are in \nameref{S1_Appendix_methods}.
-
-\methodpara{Checkpoints and inferential testing.}
-Training checkpoints are selected without expert labels using a composite validation score~\cite{elmgreen2026thesis} (Eq.~\eqref{eq:checkpoint}, \nameref{S1_Appendix_methods}).
-Each fold trains three seeds. We report the best holdout prior NMI across seeds (Tables~\ref{table1}--\ref{table2}) and paired cHMM--GMVAE vs.\ cGMVAE tests (\nameref{S12_Table}, \nameref{S8_Fig}).
-
-\subsection*{Training, substages, and reproducibility}
-
-\methodpara{Decoder-only conditioning.}
-Subject identity enters only the decoder path (Eq.~\eqref{eq:decoder}), not the encoder (Eq.~\eqref{eq:encoder}).
-Incohort ablations favoured decoder-only over encoder+decoder conditioning on all three laboratories (\nameref{S3_Appendix}).
-Nuisance amplitude and montage effects are absorbed during reconstruction while encoder means remain free of identity information for holdout staging--the design choice that separates this report from the thesis encoder+decoder recipe~\cite{elmgreen2026thesis}.
-
-\methodpara{Training and checkpoints.}
-Models are trained on all mice in the training folds. The best unsupervised checkpoint per seed is retained (Eq.~\eqref{eq:checkpoint}).
-Macro ladder comparisons use $K{=}3$. A substage sweep varies $K \in \{3,4,\ldots,15\}$ on joint holdout fold~4.
-We selected $K{=}4$ as the highest $K$ within one standard deviation of the peak mean NMI with non-degenerate occupancy (Fig~\ref{fig2}).
-Physiology summaries follow the thesis substage workflow~\cite{elmgreen2026thesis,katsageorgiou2018mcRBM}.
+Each fold trains three seeds; holdout prior NMI uses the best unsupervised checkpoint per seed and reports the maximum across seeds (Appendix~B).
+Macro-aligned accuracy, Cohen's $\kappa$, decoder-only ablation, and substage sweep setup are in Appendix~B and~C.
 
 \methodpara{Data and code availability.}
-MSSV is available on OpenNeuro (ds006366).
-Processed features, analysis code, and full experimental settings are provided as supplementary material (\nameref{S1_File}).
+MSSV is available on OpenNeuro as ds006366.
+Processed features, analysis code, and full experimental settings are provided as supplementary material in \nameref{S1_File}.
 
-\section*{Results and discussion}
+\papersection{Results and discussion}
 
-\subsection*{Cross-lab holdout performance}
+\papersubsection{Cross-laboratory holdout at macro resolution}
 
-Under joint population training with leave-mice-out four-fold cross-validation across MSSV laboratories 2, 3, and 5, decoder-only conditional models were evaluated on held-out mice staged without subject identifiers (Table~\ref{table1}).
-Supervised ceilings calibrate expectations (\nameref{S1_Table}). SPINDLE reaches high cross-laboratory accuracy under supervised retraining~\cite{miladinovic2019spindle}. REST reports $\kappa \approx 0.87$ on multi-strain mouse cohorts~\cite{wang2026rest}. Garc\'ia Ciudad et al.\ show that extending supervised context to ${\sim}28$\,s improves staging over single-epoch classifiers, with the largest REM gains~\cite{garciaciudad2024temporal}.
-Our best joint holdout prior NMI (0.575 mean for cHMM-GMVAE) is far below those supervised $\kappa$/accuracy values, as expected for zero-shot, label-free transfer without per-mouse calibration, but the relative lift over matched cGMVAE (+0.29 NMI) isolates the value of temporal priors under the same unsupervised constraint.
+We evaluated decoder-only cGMVAE and cHMM--GMVAE under joint leave-mice-out training on twenty quality-screened mice from Bern, Copenhagen, and Lyon (Table~\ref{table1}).
+Supervised pipelines on MSSV reach much higher accuracy when retrained per site or given long temporal context~\cite{miladinovic2019spindle,wang2026rest,garciaciudad2024temporal}.
+Under the same unsupervised constraint, cHMM--GMVAE reached mean prior NMI 0.575 versus 0.282 for matched cGMVAE, a gain of 0.29 averaged over four folds.
 
 \begin{table}[!ht]
 \centering
-\caption{\textbf{Joint holdout prior NMI by fold (best-of-three seeds, locked recipes, $K{=}3$).}
-HMM (raw) folds 1--3: best logged validation prior NMI from incomplete joint runs ($\leq 0.003$); fold~4 from full holdout.}
+\caption{Joint holdout prior NMI by fold (best-of-three seeds, locked recipes, $K{=}3$).
+The raw time-domain hidden Markov model (HMM) baseline folds 1--3 report best logged validation prior NMI from incomplete joint runs with $\leq 0.003$.
+Fold~4 uses the full holdout run.}
 \input{assets/tables/T1_joint_holdout_ladder.tex}
 \label{table1}
 \end{table}
 
-In Table~\ref{table1}, cHMM-GMVAE exceeds cGMVAE on every fold (mean prior NMI 0.575 vs.\ 0.282).
-Paired fold-level analysis yields mean $\Delta\mathrm{NMI} = +0.29$ (bootstrap 95\% CI [0.19, 0.36]; one-sided Wilcoxon $p = 0.063$; paired $t$-test $p = 0.011$; \nameref{S12_Table}, \nameref{S8_Fig}).
-The gain is positive on all four folds and persists when using seed means rather than best-of-three (mean $\Delta = +0.26$, Wilcoxon $p = 0.063$).
-Both models extract structure above chance-level macro agreement, but the temporal prior adds a consistent margin. This matches supervised evidence that mouse staging benefits from context beyond the current epoch, especially for REM~\cite{garciaciudad2024temporal}, here under label-free training and strict mouse holdout.
-The margin was largest on folds 3 and 4 (+0.36 and +0.41 NMI) and smallest on fold 2 (+0.10), where difficult Bern montages mix with held-out mice from all sites.
-Per-mouse fold-4 analysis (\nameref{S2_Fig}) shows the improvement is distributed across animals (paired Wilcoxon on six held-out mice: $p = 0.016$, mean $\Delta = +0.35$, \nameref{S12_Table}), not driven by a single outlier.
-Macro confusion on fold~4 (\nameref{S3_Fig}, \nameref{S10_Table}) confirms strong Wake and NREM alignment ($\kappa \approx 0.81$) at $K{=}3$, but REM recall remains low (${\sim}3\%$), indicating residual rare-class difficulty under label-free training despite temporal context.
-Per-fold breakdowns including HMMGMVAE appear in \nameref{S2_Table}. Seed variance is in \nameref{S11_Table}.
-These $K{=}3$ results establish that label-free models can align with expert Wake/NREM/REM on held-out mice across laboratories. They do not imply that three classes are sufficient descriptions of the signal.
+In Table~\ref{table1}, the temporal prior improves every fold.
+The largest margins appear on folds 3 and 4 at +0.36 and +0.41 NMI.
+The smallest gain is on fold 2 at +0.10, where Bern montages mix with held-out mice from all sites.
+Fold~4 confusion (\nameref{S3_Fig}) shows strong Wake and NREM alignment but REM recall near 3\%.
+Thus unsupervised models recover coarse Wake/NREM/REM structure on held-out mice across laboratories, well above chance but below supervised ceilings.
+Three macro classes remain an incomplete description of the signal.
 
-\subsection*{Laboratory heterogeneity}
+\papersubsection{Laboratory-specific transfer}
 
-Table~\ref{table2} compares holdout performance under joint population training versus within-laboratory training on the \emph{same} held-out mice from each site.
-For joint training, NMI and macro-aligned accuracy are computed on laboratory-specific holdout subsets only (not pooled across sites).
+Table~\ref{table2} compares joint population training with within-laboratory training on the \emph{same} held-out mice from each site.
+For joint training, NMI and macro-aligned accuracy are computed on laboratory-specific holdout subsets only, not pooled across sites.
 
 \begin{table}[!ht]
 \centering
 \caption{Fair per-laboratory holdout comparison (mean over four folds, $K{=}3$).
-Joint: train on all laboratories, report metrics on held-out mice from the listed site only.
-Within: train and evaluate within the same site.
-All rows use the same locked preprocessing per laboratory (spectral bandpass, montage, post-normalisation from incohort ablation winners, \nameref{S4_Appendix}) and matched CNN--VAE capacity ($d{=}6$, MLP widths 512--256--128, 200 epochs, batch 128, three seeds).
-cGMVAE, HMMGMVAE, and cHMM-GMVAE share learning rate $1.3 \times 10^{-3}$. They differ only in embedding use ($8$ vs.\ $0$), sequence length ($T{=}1$ vs.\ $T{=}64$), and prior type (static GMM vs.\ HMM--GMM vs.\ warm sticky HMM--GMM).
-HMM (raw) uses the time-domain pipeline (no shared deep front-end).
+Joint training uses all laboratories but reports metrics on held-out mice from the listed site only.
+Within training trains and evaluates inside the same site.
+All rows use locked preprocessing per laboratory and matched CNN--variational autoencoder (VAE) capacity with $d{=}6$, MLP widths 512--256--128, 200 epochs, batch 128, and three seeds.
+cGMVAE, HMMGMVAE, and cHMM--GMVAE share learning rate $1.3 \times 10^{-3}$ and differ in embedding use, sequence length, and prior type.
+HMM (raw) uses the time-domain pipeline without a shared deep front-end.
 VAE models report best-of-three prior NMI and matching macro accuracy, averaged across folds.
-Per-fold within-lab and joint breakdowns: \nameref{S2_Table}.
-Incohort ceiling NMI from per-lab ablation sweeps (upper reference, not holdout): \nameref{S7_Table}.
-HMM (raw): $\mathit{runs}{=}1$; joint per-site NMI for folds 1--3 unavailable (pooled joint NMI $\leq 0.003$).}
+HMM (raw) has $\mathit{runs}{=}1$.}
 \input{assets/tables/T2_holdout_fair_comparison.tex}
 \label{table2}
 \end{table}
 
-Table~\ref{table2} shows that within-lab training consistently exceeds joint training on the same holdout mice (largest gap on laboratory~2), while cHMM-GMVAE leads on laboratory~3 under both scopes. This pattern is consistent with residual covariate shift when pooling heterogeneous spectral profiles across sites.
-Joint holdout is weakest on laboratories~2 and~5 relative to Copenhagen: Bern contributes six mice (${\sim}73$\,h) with a four-electrode implant and wider EEG bandpass (0--30\,Hz), Lyon four mice (${\sim}144$\,h, one very long recording), whereas Copenhagen contributes ten mice (${\sim}236$\,h) on the shared two-EEG montage (\nameref{S8_Table}).
-Smaller cohorts, shorter per-mouse coverage, and site-specific hardware therefore leave less stable population structure for zero-shot transfer than at laboratory~3.
-Decoder-only subject embeddings index mice, not laboratories. They absorb nuisance amplitude during reconstruction but do not fully disentangle equipment and scoring context from identity, which partly explains why explicit lab-conditioning ablations did not improve joint holdout (\nameref{S3_Appendix}).
-On laboratory~5, HMMGMVAE without subject embeddings matches or exceeds cHMM-GMVAE within-lab, suggesting montage-specific gains from temporal priors rather than subject conditioning alone.
-Under joint training on laboratory~2, HMMGMVAE prior NMI collapses (0.039 mean), consistent with a sequence prior without subject embeddings failing on the Bern montage when pooled across sites.
-Holdout NMI in Table~\ref{table2} remains below incohort ceiling NMI in \nameref{S7_Table} because leave-mice-out validation is strictly harder than pooling all laboratory mice during tuning.
-HMM (raw) on time-domain EEG/EMG remains near chance under joint training (mean prior NMI 0.054 across four folds; folds 1--3 $\leq 0.003$, fold~4 0.21), underscoring the representation mismatch between raw voltages and stage-discriminative spectral structure on this protocol (cf.\ thesis Ch.~5).
+Within-lab training exceeds joint training at every site.
+On held-out Bern mice, cGMVAE prior NMI averages 0.22 under joint training versus 0.55 within-laboratory on the same animals.
+The pattern is consistent with residual covariate shift when pooling heterogeneous spectral profiles across sites.
+Decoder-only subject embeddings absorb amplitude nuisance during reconstruction but do not fully remove equipment and scoring context.
 
-\subsection*{Beyond Wake, NREM, and REM: substage resolution}
+\papersubsection{Substage resolution and physiology}
 
-Expert Wake, NREM, and REM are treated here as a \emph{reference} partition for NMI, not as the hypothesis that sleep contains only three dynamical regimes.
-The scientific question is whether unsupervised models trained under the same cross-laboratory holdout constraints recover finer substages with interpretable physiology, as in mcRBM and in single-laboratory cGMVAE work~\cite{katsageorgiou2018mcRBM,elmgreen2026thesis}, rather than collapsing to three macro-like blobs.
-
-On joint holdout fold~4 we swept $K \in \{3,4,\ldots,15\}$ (Fig~\ref{fig2}).
-At the ladder default $K{=}6$, holdout prior log-likelihood for the three model families is tabulated in \nameref{S14_Table} (with the sequence-length caveat noted there).
-Mean validation NMI is similar between $K{=}3$ and $K{=}4$ (0.581 vs.\ 0.563 across five and four seeds, respectively) and falls beyond $K{=}6$ (mean 0.516), so agreement with expert \emph{macros} does not keep rising when more substates are allowed. That mismatch is itself evidence that NMI against Wake/NREM/REM under-rewards genuine finer structure.
-At $K{=}4$, two states dominate occupancy (${\sim}52\%$ Wake-dominant, ${\sim}48\%$ NREM-dominant) while two rare REM-dominated clusters remain (${\sim}0.3\%$ and ${\sim}0.2\%$, \nameref{S3_Table}). This is a modest split of the macro grid under strict holdout, not yet the rich transition taxonomy seen at higher $K$ in less stringent settings.
-The dominant off-diagonal transition at $K{=}4$ is NREM$\to$Wake ($p{=}0.95$, \nameref{S5_Fig}), consistent with brief arousals at NREM boundaries.
-At $K{=}13$ on the same fold, transition structure diversifies (0.525 NMI, \nameref{S6_Fig}), paralleling the thesis finding that higher mixture counts expose boundary-like and transition-dominant substates even when macro NMI plateaus~\cite{elmgreen2026thesis}.
-Complementarily, a population-level sweep trains on all 20 cohort mice (incohort, not leave-mice-out) to support substage-resolved physiology and transition panels analogous to thesis Figs~27--30~\cite{elmgreen2026thesis}. Holdout fold~4 remains the generalisation benchmark.
-$K$ for the holdout panels below was chosen on fold~4 only (\nameref{sec:limitations}).
-
-\begin{paperfigure}
-\paperfig[0.46\linewidth]{figures/main/S3_k_sweep.pdf}
-\caption{\textbf{Substage resolution sweep (joint holdout fold~4).}
-Mean validation prior NMI (blue) and mean log prior density $\log p(\mathbf{z}_{1:T})/(T\cdot L)$ with $T{=}64$ latent time steps and $L{=}6$ latent dimensions (orange) versus mixture count $K$. Shaded bands: mean $\pm$ SD across seeds. Dashed line: chosen $K{=}4$.}
-\label{fig2}
-\end{paperfigure}
-
-\subsection*{Dynamics and transitions}
-
-Interpretation follows the thesis substage workflow~\cite{elmgreen2026thesis}: (i)~substage-resolved physiology (thesis Fig~27), (ii)~transition structure between substates (Fig~28), (iii)~temporal sequencing on hypnograms (Fig~29), and (iv)~grouping into stable and boundary-like roles (Fig~30).
-Here we apply the same logic on cross-laboratory holdout at $K{=}4$.
-
-Fig~\ref{fig3} pairs a transition taxonomy (\textbf{A}) with the substage physiology grid (\textbf{B}; fold~4 holdout, best seed).
-Panel~\textbf{A} places substates at latent PCA centroids with thresholded transition edges~\cite{stevner2019human}.
-Panel~\textbf{B} summarises per-substage spectra, $\theta/\delta$, bout length, expert macro composition, and subject mix. These are the quantities a sleep biologist uses to judge whether a discovered state is meaningful beyond its macro label.
-Wake- and NREM-dominant substates show separated spectral profiles. Rare REM-dominated components carry $<1\%$ occupancy yet occupy distinct regions of latent space (Fig~\ref{fig4}), supporting the view that expert REM epochs are heterogeneous and that a single REM bin merges physiologies that unsupervised models separate~\cite{katsageorgiou2018mcRBM,elmgreen2026thesis}.
-Encoder means at $K{=}4$ form separated clusters rather than a single mixed cloud, indicating that the VAE prior discovers structure not reducible to plotting Wake, NREM, and REM alone.
-Hypnogram exemplars (\nameref{S5_Fig}) show bout-consistent predicted trajectories on held-out mice. Population-level sweeps at higher $K$ are intended to extend these panels with fuller transition taxonomies under biological review.
+Expert Wake, NREM, and REM are a post-hoc reference for NMI, not a claim that sleep contains only three dynamical regimes.
+On holdout fold~4, macro NMI peaks near $K{=}3$--$4$ and falls at higher $K$, while prior log-likelihood continues to rise (Fig~\ref{fig2}A).
+The same trade-off appears on the full cohort (Fig~\ref{fig2}B).
+Fold~4 alone is under-powered for stable substage naming at $K \geq 6$.
 
 \begin{paperfigure}
 \noindent
-\begin{minipage}[t]{0.24\linewidth}
-\paperfig[\linewidth]{figures/main/Fig3_taxonomy_K04.pdf}
+\begin{minipage}[t]{0.48\linewidth}
+\paperfig[\linewidth]{figures/main/S3_k_sweep.pdf}
+\centerline{\small A Holdout fold~4}
 \end{minipage}\hfill
-\begin{minipage}[t]{0.74\linewidth}
-\paperfig[\linewidth]{figures/main/Fig3_physiology_K04.png}
+\begin{minipage}[t]{0.48\linewidth}
+\paperfig[\linewidth]{figures/supplementary/S15_population_k_sweep.pdf}
+\centerline{\small B All 20 mice (population)}
 \end{minipage}
-\caption{\textbf{Substage organisation and physiology (fold~4 holdout, $K{=}4$).}
-\textbf{A,} Transition taxonomy: latent PCA layout and significant edges between substates.
-\textbf{B,} Physiology grid (best seed): EEG/EMG spectra, features, true macro mix, and subject mix per discovered substate.}
+\caption{Substage resolution sweeps.
+Mean validation prior NMI (blue) and mean normalised prior log-density (orange) versus mixture count $K$. Shaded bands: mean $\pm$ standard deviation (SD) across seeds.
+A, Joint leave-mice-out holdout on fold~4 (six mice).
+B, Population sweep on the full cohort (same locked recipe).
+Macro NMI and prior density diverge once $K$ exceeds the expert three-class grid.}
+\label{fig2}
+\end{paperfigure}
+
+We therefore interpret substage maps from a population sweep on all twenty mice under the locked recipe.
+Expert labels enter only for post-hoc NMI and physiology review.
+Fig~\ref{fig3} shows clearer latent separation at $K{=}6$ and $K{=}9$ than at $K{=}12$, with brief boundary excursions visible on the hypnogram.
+State distinctness in \nameref{S12_Table} provides a label-free backup when macro NMI falls.
+At population $K{=}6$, all six components are active with $p_{\mathrm{perm}} = 0.02$, Cram\'{e}r's $V = 0.61$, and energy distance (ED) $= 2.49$ despite macro NMI $= 0.46$.
+Latent substates therefore remain separated even when macro agreement falls.
+
+\begin{paperfigure}
+\paperfig[\linewidth]{figures/main/Fig_population_pca_2x2.png}
+\caption{Latent separation and temporal structure (population sweep, best seed).
+A--B, principal component analysis (PCA) of encoder means: expert Wake/NREM/REM versus predicted substates at $K{=}6$ and $K{=}9$.
+C, Finer latent substructure at $K{=}12$.
+D, Example 30\,min hypnogram at $K{=}12$ with macro-group background bands.}
 \label{fig3}
 \end{paperfigure}
 
+Fig~\ref{fig4} summarises substage physiology at $K{=}6$.
+\textbf{S2} is core quiet Wake with long bouts and about 98\% expert Wake.
+\textbf{S5} and \textbf{S6} are dominant NREM substates with separated depth in spectra.
+\textbf{S3} consolidates REM at about 66\% expert REM and does not split further even at $K{=}12$~\cite{katsageorgiou2018mcRBM,elmgreen2026thesis}.
+\textbf{S1} and \textbf{S4} are short-bout boundary substates between Wake and NREM.
+Transition structure at $K{=}6$ is in \nameref{fig5}.
+Together, these panels support a Wake/NREM-plus map near six substates rather than choosing $K$ from the macro-NMI peak alone.
+
 \begin{paperfigure}
-\paperfig[0.72\linewidth]{figures/supplementary/S7_latent_embedding.pdf}
-\caption{\textbf{Latent embedding ($K{=}4$, fold~4 holdout, best seed).}
-PCA of encoder means $\boldsymbol{\mu}_t$, coloured by predicted substate on held-out mice.}
+\paperfig[0.95\linewidth]{figures/main/Fig4_K6_frequency.png}
+\caption{Substage physiology at $K{=}6$ (population sweep, best seed).
+Per-substage EEG/EMG power spectra, $\theta/\delta$, bout length, expert macro composition, and subject mix.
+Wake and NREM split into substates with distinct spectra; REM remains a single consolidated class.}
 \label{fig4}
 \end{paperfigure}
 
-\subsection*{Methodological implications}
-
-The intellectual arc differs from staging papers that optimise accuracy against Wake/NREM/REM alone. Cross-laboratory holdout first establishes that the representation is usable without labels or calibration. The substage panels then ask what structure those latents encode when mixture resolution increases~\cite{elmgreen2026thesis,katsageorgiou2018mcRBM}.
-Low or flat macro NMI at $K>4$ should not be read as failure if substates remain physiologically separated. Expert macros are a noisy, coarse map of a finer landscape~\cite{rose2026consensus}.
-The evaluation ladder mirrors the thesis progression from controlled validation to population transfer, but shifts the primary metric to cross-laboratory leave-mice-out holdout on spectral CNN inputs rather than in-laboratory leave-one-subject-out on expert features~\cite{elmgreen2026thesis}.
-Decoder-only conditioning was favoured over encoder+decoder paths in incohort ablations on all three sites (\nameref{S3_Appendix}), trading in-laboratory NMI for latents that remain usable without subject identifiers at inference.
-Temporal mixture priors help where montages and cohort size support sequence modelling (folds 3--4, Copenhagen within-lab). They do not uniformly dominate. Static or unconditioned sequence baselines can match cHMM-GMVAE when subject embeddings are unavailable and montage heterogeneity is high (laboratory~5 within-lab, laboratory~2 joint HMMGMVAE collapse).
-Complementary MSSV work on cross-species alignment (QSLP-AE) targets human--mouse representation matching rather than zero-shot cross-laboratory mouse holdout~\cite{ciudad2026qslp}. The present framework is intended for label-free comparison of vigilance structure across acquisition sites without harmonised expert scoring.
-
-\subsection*{Limitations}
+\papersubsection{Limitations}
 \label{sec:limitations}
 
-Agreement is quantified by NMI against expert macro labels, which inherit cross-laboratory disagreement~\cite{rose2026consensus}. High NMI therefore measures discovery of shared structure, not mimicry of a single rater.
-Appendix macro accuracy can read higher than NMI implies because dominant-label mapping rewards macro-pure clusters even when cluster boundaries differ from expert scoring.
-REM recall on fold~4 remains near 3\% despite strong Wake/NREM alignment. Temporal context alone does not close the REM gap under strict holdout.
-Cross-laboratory holdout remains harder than within-laboratory training on the same mice (Table~\ref{table2}), and seed or fold variance (fold~2, \nameref{S11_Table}) indicates remaining fragility.
-Inferential tests use only four paired folds and therefore have limited power (Wilcoxon $p = 0.063$ for the primary comparison despite $\Delta > 0$ on every fold).
-The substage sweep and $K{=}4$ selection use held-out fold~4 only. $K$ may not generalise to other folds without train-only model selection.
-Reported NMI uses best-of-three seeds per fold, which is optimistic relative to seed means. Seed-mean sensitivity in \nameref{S12_Table} preserves the same direction.
-Fixed spectral front-end locks control laboratory nuisance but do not replace per-mouse calibration. Raw-signal CNN encoders and lab-aware conditioning are outlined in \nameref{S13_Appendix_future}.
+Agreement is quantified by NMI against expert macro labels, which inherit cross-laboratory disagreement~\cite{rose2026consensus}.
+REM recall on fold~4 remains near 3\% despite temporal context.
+Cross-laboratory holdout is harder than within-laboratory training on the same mice (Table~\ref{table2}).
+The holdout substage sweep uses fold~4 only.
+Population $K{=}6$ panels train on all twenty mice and support physiology, not leave-mice-out generalisation claims.
+Reported NMI uses best-of-three seeds per fold, which is optimistic relative to seed means.
+The method is not yet accurate enough to replace supervised staging, especially for REM.
 
-\section*{Conclusion}
+\papersection{Conclusion}
 
-Wake, NREM, and REM remain indispensable for comparing studies, but they are an incomplete description of mouse sleep dynamics. Unsupervised models trained on MSSV recover substates with distinct physiology and latent organisation that the three-class grid does not explicitly represent~\cite{katsageorgiou2018mcRBM,elmgreen2026thesis}.
-This report shows that claim can be pursued under strict cross-laboratory leave-mice-out holdout, not only within a single laboratory.
-Decoder-only cHMM-GMVAE improves zero-shot alignment with expert macros relative to matched cGMVAE (mean prior NMI 0.575 vs.\ 0.282; paired $\Delta = +0.29$ across four folds), establishing a label-free staging pathway across sites. Temporal priors and subject embeddings at training support that transfer without identity at inference.
-The substage-resolution sweep and physiology panels (Figs~\ref{fig2}--\ref{fig4}) carry the main scientific payoff. Mixture count should be chosen for interpretable structure and transitions, not only macro NMI.
-Holdout at $K{=}4$ yields a modest macro-plus split. Richer transition substages appear at higher $K$ (\nameref{S6_Fig}) and in population-level analyses in the thesis tradition.
-The framework does not yet replace supervised staging or recover REM reliably on strict holdout (REM recall ${\sim}3\%$). Biological interpretation of higher-$K$ population sweeps will further test whether MSSV supports the same profound substage structure found in single-laboratory cGMVAE work~\cite{elmgreen2026thesis}.
+Cross-laboratory mouse sleep can be staged without labels or per-mouse calibration, but only coarsely today.
+Temporal mixture priors improve Wake/NREM alignment on held-out mice relative to a static mixture prior, with mean prior NMI 0.575 versus 0.282 (+0.29 over folds).
+On the full cohort, finer structure appears at $K{=}6$, with six active substates separating Wake and NREM components.
+State distinctness remains high at $K{=}6$ even as macro NMI falls, which supports reading low NMI as label mismatch rather than collapsed mixtures.
+The approach can support comparison across acquisition sites before expert labels are harmonised.
+It does not yet replace supervised scoring.
 
-\section*{Acknowledgments}
-This report extends an MSc thesis co-authored with Andreas Holmer Bigom. Thank you to Javier García Ciudad and Alberte Wollesen Jürgensen-Breum for sleep-biology guidance at the Kornum laboratory.
+\paperacksection
+This report extends an MSc thesis co-authored with Andreas Holmer Bigom. Thank you to Javier Garc\'ia Ciudad and Alberte Wollesen J\"urgensen-Breum for machine-learning and sleep-biology guidance.
 
 \nolinenumbers
 
-\bibliography{assets/references}
+\paperreferences
 
 \clearpage
 \appendix
+\justifying
 
 \section{Data and cohort}
 \label{app:data}
@@ -596,20 +612,9 @@ The marginal log-likelihood of a latent window is
 \label{eq:forward}
 \log p(\mathbf{z}_{1:T}) = \log \sum_{s_{1:T}} \pi_{s_1} \prod_{t=2}^{T} A_{s_{t-1}, s_t} \prod_{t=1}^{T} b_{s_t}(\mathbf{z}_t),
 \end{equation}
-and the sequence KL term averaged over time is
-\begin{equation}
-\label{eq:kl_hmm}
-\mathcal{L}_{\mathrm{KL}} = \frac{1}{T}\sum_{t=1}^{T}\left[\log q_{\boldsymbol{\phi}}(\mathbf{z}_t \mid \mathbf{x}_t) - \log p(\mathbf{z}_{1:T})\right].
-\end{equation}
-Training schedule, warm-start phases, and CNN widths are in \nameref{S1_Appendix_methods}.
-
-\subsection{Raw time-domain HMM failure}
-\label{S2_Appendix}
-
-\textbf{Raw time-domain HMM failure.}
-The MSc thesis showed that classical HMMs on raw MSSV EEG/EMG voltages do not generalise across subjects: population prior NMI collapses while expert-feature inputs remain usable (thesis Ch.~5).
-On the locked cross-lab protocol, joint HMM (raw) prior NMI is near chance (mean 0.054; fold~4 peak 0.21), motivating the spectral CNN front-end used throughout this report.
-End-to-end CNN encoders on filtered raw traces are discussed in \nameref{S13_Appendix_future}.
+which enters the training KL term $\mathcal{L}_{\mathrm{KL}}$ in Eq.~\eqref{eq:kl_hmm}.
+Warm-start phases and CNN widths are in \apdx{app:methods:warmstart} and \apdx{app:methods:hyper}.
+Controlled synthetic datasets in the MSc thesis validated MAR-HMM optimisation before MSSV experiments (thesis Ch.~3); that validation is not repeated here.
 
 \subsection{Decoder-only vs encoder+decoder conditioning}
 \label{S3_Appendix}
@@ -621,118 +626,103 @@ Holdout fold-level encoder+decoder comparisons were not run under the locked pap
 
 \input{assets/appendix/incohort_ceiling.tex}
 
-\subsection{Synthetic HMM validation}
-\label{S1_Appendix_synth}
-
-Controlled synthetic datasets confirmed that MAR-HMM recovers temporal structure when discriminative information is dynamic rather than marginal (thesis Ch.~3, Table~7 therein).
-That step validated optimisation and inference before MSSV experiments; it is not repeated here.
-
 \section{Supplementary figures}
 \label{app:figures}
 
-\subsection{S1 Fig.}
-\label{S1_Fig}
-\suppfig[\linewidth]{figures/supplementary/Fig3_substage_panels_full.pdf}
-\textbf{Substage physiology ($K{=}4$, fold~4 holdout).} EEG/EMG power spectra, $\theta/\delta$ and bout-length distributions, and expert macro composition per discovered state.
+\subsection{Model architecture}
+\label{app:figures:arch}
+\suppfig[0.92\linewidth]{figures/main/Fig_architecture.pdf}
+\appfigdesc{Conditional Gaussian mixture variational autoencoder (GMVAE) architecture.
+Encoder: spectral EEG/EMG maps pass through CNN ($K{=}[7,5,5,3]$) and MLP blocks. Subject ID feeds a subject embedder used only in the decoder.
+Latent: diagonal Gaussian posterior with dimension $d{=}6$ feeds a GMM (cGMVAE) or HMM--GMM (cHMM--GMVAE) prior.
+Decoder: latent vector concatenated with subject embedding, then CNN reconstruction. Training minimises mean squared error (MSE) reconstruction plus $\beta \times$ prior KL.
+At holdout, only the encoder and prior are used for staging.}
+\label{fig_arch}
 
 \subsection{S2 Fig.}
 \label{S2_Fig}
 \suppfig[0.48\linewidth]{figures/supplementary/S4_per_mouse_nmi.pdf}
-\textbf{Per-mouse prior NMI on fold~4.} Paired bars for cGMVAE and cHMM-GMVAE on each held-out mouse.
+\appfigdesc{Per-mouse prior NMI on fold~4. Paired bars for cGMVAE and cHMM-GMVAE on each held-out mouse.}
 
 \subsection{S3 Fig.}
 \label{S3_Fig}
 \suppfig[0.44\linewidth]{figures/supplementary/S3_confusion.pdf}
-\textbf{Macro confusion (fold~4, $K{=}3$, cHMM-GMVAE, best seed).}
-Row-normalised $3 \times 3$ matrix: expert Wake/NREM/REM (rows) vs.\ predicted macro after Hungarian alignment (columns). REM row shows low recall (${\sim}3\%$) on this holdout fold.
+\appfigdesc{Macro confusion (fold~4, $K{=}3$, cHMM-GMVAE, best seed).
+Row-normalised $3 \times 3$ matrix: expert Wake/NREM/REM (rows) vs.\ predicted macro after Hungarian alignment (columns). REM row shows low recall (${\sim}3\%$) on this holdout fold.}
 
-\subsection{S5 Fig.}
-\label{S5_Fig}
-\suppfig[\linewidth]{figures/supplementary/S5_hypnogram_K04.pdf}
-\textbf{Hypnogram exemplar (fold~4 holdout, $K{=}4$, best seed).}
-Thesis-style dual track: expert Wake/NREM/REM annotation (top) versus predicted substages (bottom) on a 2\,h excerpt.
+\subsection{Substage transitions at $K{=}6$}
+\suppfig[0.72\linewidth]{figures/main/Fig5_K6_transition.pdf}
+\appfigdesc{Substage dynamics at $K{=}6$ (population sweep, best seed).
+Change-only transition matrix $P(\mathrm{next} \mid \mathrm{current})$ between mixture components.
+Stable within-macro micro-cycles in Wake S2 and NREM S5/S6; short-lived boundary substates S1 and S4 mediate Wake--NREM switches.}
+\label{fig5}
 
-\subsection{S6 Fig.}
-\label{S6_Fig}
-\suppfig[0.55\linewidth]{figures/supplementary/S6_taxonomy_K13.pdf}
-\textbf{Finer-resolution taxonomy ($K{=}13$, fold~4 holdout).}
-Illustrative transition map at thesis-scale resolution. Holdout NMI 0.525 vs.\ 0.643 at $K{=}4$.
+\subsection{Population substage PCA ($K{=}4$, $7$, $8$)}
+\label{app:population_k}
 
-\subsection{S8 Fig.}
-\label{S8_Fig}
-\suppfig[0.55\linewidth]{figures/supplementary/S8_fold_delta.pdf}
-\textbf{Paired fold-level gain (best-of-three prior NMI).}
-$\Delta\mathrm{NMI} = \mathrm{NMI}_{\mathrm{cHMM-GMVAE}} - \mathrm{NMI}_{\mathrm{cGMVAE}}$ on the same held-out mice per fold.
+\noindent Locked cHMM--GMVAE, all 20 mice (incohort), best seed per $K$.
+Each panel shows PCA of encoder means with expert Wake/NREM/REM versus predicted substates.
+
+\subsection{S17 Fig.}
+\label{S17_Fig}
+\suppfig[0.75\linewidth]{figures/supplementary/population/S_pop_K04_pca.png}
+\appfigdesc{Population $K{=}4$ (best seed, prior NMI 0.517).
+Latent PCA: expert Wake/NREM/REM versus predicted substates.}
+
+\subsection{S18 Fig.}
+\label{S18_Fig}
+\suppfig[0.75\linewidth]{figures/supplementary/population/S_pop_K07_pca.png}
+\appfigdesc{Population $K{=}7$ (best seed, prior NMI 0.468).
+Latent PCA: expert macros versus predicted substates.}
+
+\subsection{S19 Fig.}
+\label{S19_Fig}
+\suppfig[0.75\linewidth]{figures/supplementary/population/S_pop_K08_pca.png}
+\appfigdesc{Population $K{=}8$ (best seed, prior NMI 0.439).
+Latent PCA: expert macros versus predicted substates.}
 
 \section{Supplementary tables}
 \label{app:tables}
 
-\subsection{S2 Table.}
-\label{S2_Table}
-\apptabdesc{\textbf{Per-fold holdout by site (Table~\ref{table2} detail).}
-Each cell is prior NMI\,/\,macro accuracy (best-of-three seeds).
-Joint block: population training, metrics on held-out mice from the listed site only.
-Within block: train and evaluate inside the same site.
-Abbreviations: Raw = HMM (raw), cGM = cGMVAE, HGM = HMMGMVAE, cHMM = cHMM-GMVAE.}
-\apptabular{{\footnotesize\input{assets/tables/S2_within_lab_holdout.tex}}}
-
-\subsection{S3 Table.}
-\label{S3_Table}
-\apptabdesc{\textbf{Substage summary ($K{=}4$, fold~4 holdout).} Physiology labels, dominant expert macro composition, $\theta/\delta$, bout length, and occupancy.}
-\apptabular{\input{assets/tables/S3_substage_summary.tex}}
-\noindent{\small Occupancy-ordered states ($K{=}4$, seed~3).
-Rare REM-dominated clusters (S3, S4) carry $<1\%$ occupancy. Transition-rich structure at higher $K$ is in \nameref{S6_Fig}.}\par\vspace{0.5em}
-
-\subsection{S4 Table.}
-\label{S4_Table}
-\apptabdesc{\textbf{Joint holdout macro accuracy.} Best-of-three-seed NMI and macro-aligned accuracy by fold for cGMVAE and cHMM-GMVAE ($K{=}3$). Clusters mapped to dominant expert macro label when $K>3$.}
-\apptabular{\input{assets/tables/S4_holdout_accuracy.tex}}
-
-\subsection{S5 Table.}
-\label{S5_Table}
-\apptabdesc{\textbf{K-sweep macro accuracy (fold~4).} Best-of-three-seed NMI and macro-aligned accuracy versus substage count $K$. Same mapping rule as S4 Table.}
-\apptabular{\input{assets/tables/S5_k_sweep_accuracy.tex}}
-
-\subsection{S1 Table.}
-\label{S1_Table}
-\apptabdesc{\textbf{Literature comparison.} Supervised ceilings, transductive unsupervised, and static unsupervised methods versus this work.
-Complementary MSSV work includes QSLP-AE cross-species alignment~\cite{ciudad2026qslp} and manual-scoring consensus benchmarks~\cite{rose2026consensus}.}
-\apptabular{\input{assets/tables/S1_literature_comparison.tex}}
-
 \subsection{S10 Table.}
 \label{S10_Table}
-\apptabdesc{\textbf{Per-class classification metrics (fold~4, $K{=}3$, cHMM-GMVAE, best seed).} Cohen's $\kappa$, macro F1, and per-class recall after Hungarian alignment.}
+\apptabdesc{Per-class classification metrics (fold~4, $K{=}3$, cHMM-GMVAE, best seed). Cohen's $\kappa$, macro F1, and per-class recall after Hungarian alignment.}
 \apptabular{\input{assets/tables/S10_per_class_metrics.tex}}
 
 \subsection{S11 Table.}
 \label{S11_Table}
-\apptabdesc{\textbf{Seed stability (joint holdout).} Prior NMI mean, standard deviation, and best-of-three per fold and model.}
+\apptabdesc{Seed stability (joint holdout). Prior NMI mean, standard deviation, and best-of-three per fold and model.}
 \apptabular{\input{assets/tables/S11_seed_stability.tex}}
 
 \subsection{S12 Table.}
 \label{S12_Table}
-\apptabdesc{\textbf{Paired inferential tests (cHMM-GMVAE vs.\ cGMVAE, joint holdout).}
-Primary: best-of-three NMI per fold; sensitivity: seed-mean NMI per fold; fold~4: per-mouse paired test.
-Wilcoxon: one-sided $H_0\!:$\,median $\Delta \le 0$; bootstrap 95\% CI on mean $\Delta$ over resampled folds ($B{=}10\,000$).}
-\apptabular{\input{assets/tables/S12_holdout_statistics.tex}}
+\apptabdesc{Substage validity across mixture resolution (population sweep, best seed per $K$).
+Active: mixture components with $\geq 1$ assigned epoch.
+Min occ.: occupancy of the rarest active substage.
+Latent ED: mean pairwise energy distance between substates in encoder space.
+Fisher: Fisher trace of latent between-state scatter.
+Cram\'{e}r $V$: association between predicted substages and expert macros (post-hoc).
+$p_{\mathrm{perm}}$: permutation test for latent separation (shuffle substage labels; $H_0$: observed ED is label-random).
+Low $p_{\mathrm{perm}}$ supports distinct substates even when macro NMI falls at high $K$.}
+\apptabular{\input{assets/tables/S12_substage_validity_population.tex}}
 
 \subsection{S14 Table.}
 \label{S14_Table}
-\apptabdesc{\textbf{Holdout prior log-likelihood (joint scope, $K{=}6$, best-of-three seed).}
-\textbf{cGMVAE} uses sequence length $T{=}1$: each 4\,s epoch is scored independently with the static GMM prior (mean $\log p(z_t)$ per epoch; \texttt{Likelihood} in run metrics).
-\textbf{HMMGMVAE} and \textbf{cHMM--GMVAE} use $T{=}64$ contiguous epochs per window; the reported value is the HMM forward marginal mean $\log p(z_{1:T})$ per sequence (\texttt{log p(z\_1:T)}).
+\apptabdesc{Holdout prior log-likelihood (joint scope, $K{=}6$, best-of-three seed).
+cGMVAE uses sequence length $T{=}1$: each 4\,s epoch is scored independently with the static GMM prior (mean $\log p(z_t)$ per epoch; \texttt{Likelihood} in run metrics).
+HMMGMVAE and cHMM--GMVAE use $T{=}64$ contiguous epochs per window; the reported value is the HMM forward marginal mean $\log p(z_{1:T})$ per sequence (\texttt{log p(z\_1:T)}).
 Raw totals are \emph{not} comparable across $T{=}1$ and $T{=}64$ models because sequence models accumulate density over 64 steps.
 The normalised column divides cGMVAE by $L{=}6$ and sequence models by $T\cdot L{=}384$, matching the orange axis in Fig~\ref{fig2} for $T{=}64$ runs.
 Higher values indicate better prior density on held-out encoder means; they need not track NMI when mixture structure misaligns with expert macros.
 Fold~4 cGMVAE (seed~2) shows an extreme negative raw value despite moderate NMI---a known case where prior density and clustering quality diverge.}
 \apptabular{\input{assets/tables/S13_holdout_likelihood.tex}}
 
-\section{Thesis context and future directions}
-\label{app:thesis}
-
-\input{assets/appendix/research_arc.tex}
-
-\input{assets/appendix/future_work.tex}
+\subsection{S15 Table.}
+\label{S15_Table}
+\apptabdesc{Exploratory substage map ($K{=}12$, population sweep, seed~2).
+Mixture index S1--S12 with occupancy, dominant expert macro, biological reading, and proposed merges after sleep-biology review (A.\ Wollesen Jürgensen-Breum, B.\ Kornum).
+Dominant macro is post-hoc only; training is fully unsupervised.}
+\apptabular{\input{assets/tables/S15_population_K12_substages.tex}}
 
 \subsection{Supplementary experimental settings}
 \label{S1_File}
