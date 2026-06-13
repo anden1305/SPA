@@ -1,3 +1,7 @@
 K,nmi_mean,nmi_std,nmi_best,nmi_min,n_seeds,log_p_z_mean,run,candidate
+4,0.5120,0.0048,0.5167,0.5072,2,-19.57,population_k_sweep_K4_20260612-084316,yes
+7,0.4606,0.0078,0.4684,0.4528,2,110.57,population_k_sweep_K7_spill_a100_20260612-092304,yes
+8,0.4392,0.0000,0.4392,0.4392,1,217.86,population_k_sweep_K8_20260612-085612,
+9,0.3965,0.0000,0.3965,0.3965,1,219.66,population_k_sweep_K9_spill_l40s_20260612-101504,
 12,0.3889,0.0189,0.4034,0.3622,3,17.20,population_k_sweep_K12_20260612-011734,
 15,0.3701,0.0236,0.4095,0.3488,4,-65.43,population_k_sweep_K15_20260612-005731,

@@ -34,8 +34,8 @@ def _base_cfg(manifest: dict, *, seed: int) -> dict:
     cfg = _patch_lr(_patch_warm_emb8_sticky92(build_population_chmm_base(manifest)), LOCKED_LR)
     cfg["seed"] = seed
     cfg.setdefault("visualizer", {})["save_results_npz"] = True
-    cfg.setdefault("dataloader", {})["batch_size"] = 96
-    cfg["dataloader"]["validation_batch_size"] = 96
+    cfg.setdefault("dataloader", {})["batch_size"] = 64
+    cfg["dataloader"]["validation_batch_size"] = 64
     return cfg
 
 

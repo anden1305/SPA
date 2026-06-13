@@ -1,0 +1,8 @@
+{
+  "K": 8,
+  "best_seed": 1,
+  "nmi": 0.4392,
+  "npz": "results/cv4fold/paper_k_sweep/population/K8/population_k_sweep_K8_20260612-085612/plots/1/results.npz",
+  "run": "population_k_sweep_K8_20260612-085612",
+  "n_active_substages": 8
+}

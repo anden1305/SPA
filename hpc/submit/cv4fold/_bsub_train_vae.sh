@@ -31,6 +31,7 @@ cd /work3/s204070/SPA
 module load cuda/12.8.1
 source .venv/bin/activate
 export PYTHONPATH=/work3/s204070/SPA
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 python3 main.py --method train_vae --config_path ${CONFIG}
 EOF
 

@@ -37,9 +37,9 @@ def _base_cfg(manifest: dict) -> dict:
     cfg = _patch_lr(_patch_warm_emb8_sticky92(build_population_chmm_base(manifest)), LOCKED_LR)
     cfg["seed"] = POPULATION_SEED
     cfg.setdefault("visualizer", {})["save_results_npz"] = True
-    # Slightly smaller batches to reduce GPU peak on marginal nodes
-    cfg.setdefault("dataloader", {})["batch_size"] = 96
-    cfg["dataloader"]["validation_batch_size"] = 96
+    # Smaller batches — full 20-mouse cohort OOMs at 128 on V100 (15 GB)
+    cfg.setdefault("dataloader", {})["batch_size"] = 64
+    cfg["dataloader"]["validation_batch_size"] = 64
     return cfg
 
 
@@ -57,7 +57,7 @@ def main() -> int:
         cfg["run_name"] = f"population_k_sweep_K{k}"
         path = _write_cfg(CONFIG_ROOT / f"chmmgmvae_K{k}.yaml", cfg)
         written.append(path)
-        print(f"Wrote {path} | K={k} runs=5 batch=96")
+        print(f"Wrote {path} | K={k} runs=5 batch=64")
 
     for k, runs in TOPUP_K.items():
         cfg = copy.deepcopy(_patch_k(base, k))
@@ -66,7 +66,7 @@ def main() -> int:
         cfg["run_name"] = f"population_k_sweep_K{k}"
         path = _write_cfg(CONFIG_ROOT / f"chmmgmvae_K{k}.yaml", cfg)
         written.append(path)
-        print(f"Wrote {path} | K={k} runs={runs} (top-up) batch=96")
+        print(f"Wrote {path} | K={k} runs={runs} (top-up) batch=64")
 
     print(f"Generated {len(written)} retry configs → {CONFIG_ROOT}")
     return 0

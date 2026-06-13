@@ -79,6 +79,8 @@ def generate(manifest: dict, *, k_values: list[int], include_artifact: bool = Tr
     base["runs"] = POPULATION_RUNS
     base["seed"] = POPULATION_SEED
     base.setdefault("visualizer", {})["save_results_npz"] = True
+    base.setdefault("dataloader", {})["batch_size"] = 96
+    base["dataloader"]["validation_batch_size"] = 96
 
     for k in k_values:
         cfg = _patch_k(base, k)

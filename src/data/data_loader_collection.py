@@ -108,6 +108,11 @@ class DataLoaderCollection:
             key=len,
             default=[],
         )
+        canonical = ["Awake", "NREM", "REM", "Artifact"]
+        if len(self.state_names) < self.num_states:
+            self.state_names = canonical[: self.num_states]
+        elif len(self.state_names) > self.num_states:
+            self.state_names = self.state_names[: self.num_states]
         assert len(self.state_names) == self.num_states, "Number of state names must match number of states."
      
     def get_transforms(self) -> list[BaseTransform]:

@@ -18,6 +18,7 @@ within_lab,2,lab_5,chmmgmvae_locked,cHMMGMVAE,3,0.5023,0.8988,2,/work3/s204070/S
 within_lab,2,lab_5,hmmgmvae_locked,HMMGMVAE,3,0.5305,0.8793,3,/work3/s204070/SPA/results/cv4fold/unified_holdout/lab_5/fold_2/hmmgmvae_locked/within_ho_f2_lab_5_hmmgmvae_locked_20260610-043512
 within_lab,2,lab_5,cgmvae_locked,cGMVAE,3,0.3944,0.8343,3,/work3/s204070/SPA/results/cv4fold/unified_holdout/lab_5/fold_2/cgmvae_locked/within_ho_f2_lab_5_cgmvae_locked_20260609-065816
 within_lab,3,lab_5,chmmgmvae_locked,cHMMGMVAE,3,0.6049,0.8801,2,/work3/s204070/SPA/results/cv4fold/unified_holdout/lab_5/fold_3/chmmgmvae_locked/within_ho_f3_lab_5_chmmgmvae_locked_20260609-145800
+within_lab,3,lab_5,cgmvae_locked,cGMVAE,3,0.5024,0.8590,1,/work3/s204070/SPA/results/cv4fold/unified_holdout/lab_5/fold_3/cgmvae_locked/within_ho_f3_lab_5_cgmvae_locked_20260612-075216
 within_lab,3,lab_5,hmmgmvae_locked,HMMGMVAE,3,0.6055,0.8643,2,/work3/s204070/SPA/results/cv4fold/unified_holdout/lab_5/fold_3/hmmgmvae_locked/within_ho_f3_lab_5_hmmgmvae_locked_20260610-045452
 within_lab,4,lab_5,cgmvae_locked,cGMVAE,3,0.5336,0.8608,2,/work3/s204070/SPA/results/cv4fold/unified_holdout/lab_5/fold_4/cgmvae_locked/within_ho_f4_lab_5_cgmvae_locked_20260612-034913
 within_lab,4,lab_5,hmmgmvae_locked,HMMGMVAE,3,0.6158,0.8953,3,/work3/s204070/SPA/results/cv4fold/unified_holdout/lab_5/fold_4/hmmgmvae_locked/within_ho_f4_lab_5_hmmgmvae_locked_20260610-070729

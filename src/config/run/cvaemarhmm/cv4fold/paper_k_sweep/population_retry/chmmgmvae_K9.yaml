@@ -32,8 +32,8 @@ visualizer:
   save_results_npz: true
 dataloader:
   num_batches: 64
-  batch_size: 96
-  validation_batch_size: 96
+  batch_size: 64
+  validation_batch_size: 64
   window_size: 512
   stride: 512
   shuffle: true

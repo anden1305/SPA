@@ -1,9 +1,9 @@
 # Population biology — substage K (appendix)
 
-Generated: 2026-06-12T06:15:13.329550+00:00
+Generated: 2026-06-13T08:36:52.762082+00:00
 
 **Model:** cHMM–GMVAE locked, **all 20 mice** (incohort train+val, 5 seeds)
-**Incohort pick:** K=15 (best prior NMI across seeds; appendix only)
+**Incohort pick:** K=4 (best prior NMI across seeds; appendix only)
 
 ## Start here
 
@@ -16,6 +16,8 @@ Generated: 2026-06-12T06:15:13.329550+00:00
 
 | K | Best NMI | Mean ± SD | Biology folder |
 |---|---------|-----------|----------------|
+| 4 | 0.5167 | 0.5120 ± 0.0048 | `K04/` — Best holdout NMI |
+| 7 | 0.4684 | 0.4606 ± 0.0078 | `K07/` — Thesis-like resolution |
 
 ## All K
 

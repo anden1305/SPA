@@ -16,9 +16,9 @@ SPA_ROOT="/work3/s204070/SPA"
 cd "${SPA_ROOT}"
 
 QUEUE="gpuv100"
-MEM="6GB"
+MEM="8GB"
 CPUS="4"
-WALLTIME="2:30"
+WALLTIME="4:00"
 K_VALUES=($(seq 3 15))
 
 mkdir -p hpc/output/cv4fold/paper_k_sweep/population
@@ -48,6 +48,7 @@ cd /work3/s204070/SPA
 module load cuda/12.8.1
 source .venv/bin/activate
 export PYTHONPATH=/work3/s204070/SPA
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 python3 main.py --method train_vae --config_path ${config}
 EOF
 

@@ -32,7 +32,13 @@ bash hpc/submit/cv4fold/submit_chmm_k_sweep_population.sh
 bash hpc/submit/cv4fold/submit_chmm_k_sweep_population_spill.sh
 ```
 
-**OOM retry** (gpuv100, -n 4, 6GB/slot, batch 96, top-up seeds for partial K):
+**OOM retry** (gpua100, -n 4, 8GB/slot, batch 64, top-up seeds for partial K):
+
+Regenerate configs before submit:
+
+```bash
+PYTHONPATH=. python3 scripts/cv4fold/generate_chmm_k_sweep_population_retry.py
+```
 
 ```bash
 bash hpc/submit/cv4fold/submit_chmm_k_sweep_population_retry.sh

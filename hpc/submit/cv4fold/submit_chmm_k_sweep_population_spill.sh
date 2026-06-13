@@ -10,7 +10,7 @@ cd "${SPA_ROOT}"
 # shellcheck source=_bsub_train_vae.sh
 source "${SPA_ROOT}/hpc/submit/cv4fold/_bsub_train_vae.sh"
 
-MEM="6GB"
+MEM="8GB"
 WALLTIME="4:00"
 LOG_DIR="hpc/output/cv4fold/paper_k_sweep/population"
 
