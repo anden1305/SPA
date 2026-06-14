@@ -1,8 +1,0 @@
-{
-  "npz": "/work3/s204070/SPA/results/cv4fold/joint_holdout/fold_3/chmmgmvae_locked/joint_ho_f3_chmmgmvae_locked_20260610-010029/plots/2/results.npz",
-  "start_epoch": 56606,
-  "minutes": 30.0,
-  "n_epochs": 450,
-  "expert_rem_epochs": 48,
-  "predicted_rem_epochs": 138
-}

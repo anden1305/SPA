@@ -209,14 +209,14 @@ __marimo__/
 /data/
 
 .DS_Store
-results/
-
 wandb/
-
 hpc/output/
 
 Master Thesis.pdf
+Master Thesis.md
+Master Thesis.txt
 
-paper/
-docs/
-results/
+# Paper branch: code-only public repo (keep local; do not push these trees)
+/docs/
+/paper/
+/results/
