@@ -95,6 +95,7 @@ def plot_dual_axis(
     title: str = "cHMM–GMVAE (fold 4 holdout)",
     chosen_k: int | None = None,
     ll_norm: str = "none",
+    mask_ll_k: frozenset[int] | None = None,
 ) -> None:
     """Thesis Fig 23 styling: blue circles = NMI (left), orange squares = log p(z₁:T) (right)."""
     div = _ll_norm_divisor(ll_norm)
@@ -103,9 +104,14 @@ def plot_dual_axis(
     nmi_std = np.array([scores[k]["nmi_std"] for k in ks], dtype=float)
     ll = [scores[k]["log_p_z_mean"] for k in ks]
     ll_std = [scores[k].get("log_p_z_std", 0.0) for k in ks]
-    has_ll = any(v is not None for v in ll)
     ll_vals = np.array([(v / div) if v is not None else np.nan for v in ll], dtype=float)
     ll_std_n = np.array([(s / div) if s is not None else 0.0 for s in ll_std], dtype=float)
+    if mask_ll_k:
+        for i, k in enumerate(ks):
+            if k in mask_ll_k:
+                ll_vals[i] = np.nan
+                ll_std_n[i] = np.nan
+    has_ll = np.any(np.isfinite(ll_vals))
     x = np.array(ks, dtype=float)
 
     fig, ax_nmi = plt.subplots(figsize=(4.8, 3.0))
@@ -132,19 +138,19 @@ def plot_dual_axis(
         ax_ll = ax_nmi.twinx()
         ax_ll.set_facecolor("#F0F0F0")
         if ll_norm == "TL":
-            ll_ylabel = f"Predictive likelihood\nlog p(z₁:T) / (T·L), T={SEQUENCE_LENGTH}, L={LATENT_DIM}"
+            ll_ylabel = f"Likelihood\nlog p(z₁:T) / (T·L), T={SEQUENCE_LENGTH}, L={LATENT_DIM}"
         elif ll_norm == "T":
-            ll_ylabel = f"Predictive likelihood\nlog p(z₁:T) / T, T={SEQUENCE_LENGTH}"
+            ll_ylabel = f"Likelihood\nlog p(z₁:T) / T, T={SEQUENCE_LENGTH}"
         else:
-            ll_ylabel = "Predictive likelihood"
+            ll_ylabel = "Likelihood"
         ax_ll.set_ylabel(ll_ylabel, color=color_ll, fontsize=10)
         ax_ll.fill_between(x, ll_vals - ll_std_n, ll_vals + ll_std_n, color=color_ll, alpha=0.18, linewidth=0)
         (line_ll,) = ax_ll.plot(
-            x, ll_vals, "s-", color=color_ll, linewidth=2, markersize=7, label="Predictive Likelihood",
+            x, ll_vals, "s-", color=color_ll, linewidth=2, markersize=7, label="Likelihood",
         )
         ax_ll.tick_params(axis="y", labelcolor=color_ll)
         lines.append(line_ll)
-        labels.append("Predictive Likelihood")
+        labels.append("Likelihood")
 
     if chosen_k is not None and chosen_k in scores:
         ax_nmi.axvline(chosen_k, color="#555555", linestyle="--", lw=1.0, alpha=0.7)
@@ -191,6 +197,22 @@ def main() -> int:
         action="store_true",
         help="Keep collapsed-seed log p(z₁:T) values in likelihood aggregates",
     )
+    parser.add_argument(
+        "--mask-ll-k",
+        type=int,
+        action="append",
+        default=[],
+        metavar="K",
+        help="Omit likelihood (right axis) at these K values; NMI point is kept",
+    )
+    parser.add_argument(
+        "--exclude-k",
+        type=int,
+        action="append",
+        default=[],
+        metavar="K",
+        help="Drop these K values entirely from the plot and summary",
+    )
     args = parser.parse_args()
 
     scores = collect_k_sweep(
@@ -198,11 +220,17 @@ def main() -> int:
         include_extra2=args.include_extra2,
         drop_ll_outliers=not args.no_drop_ll_outliers,
     )
+    if args.exclude_k:
+        for k in args.exclude_k:
+            scores.pop(k, None)
     if not scores:
         raise SystemExit(f"No K-sweep metrics found under {args.root}")
 
     chosen_k = args.chosen_k if args.chosen_k is not None else pick_chosen_k(scores)
-    plot_dual_axis(scores, args.out, title=args.title, chosen_k=chosen_k, ll_norm=args.ll_norm)
+    mask_ll_k = frozenset(args.mask_ll_k) if args.mask_ll_k else None
+    plot_dual_axis(
+        scores, args.out, title=args.title, chosen_k=chosen_k, ll_norm=args.ll_norm, mask_ll_k=mask_ll_k,
+    )
 
     summary_path = args.summary_json or args.out.with_suffix(".json")
     div = _ll_norm_divisor(args.ll_norm)

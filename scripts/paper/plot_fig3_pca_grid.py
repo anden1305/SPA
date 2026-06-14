@@ -14,6 +14,7 @@ from scripts.paper.plot_style import apply_paper_style, save_figure
 
 REPO = Path(__file__).resolve().parents[2]
 BIO_ROOT = REPO / "results/cv4fold/paper_figures/biology_meeting_population"
+POP_ROOT = REPO / "results/cv4fold/paper_k_sweep/population"
 
 
 def _panel_path(k: int, kind: str) -> Path:
@@ -21,16 +22,39 @@ def _panel_path(k: int, kind: str) -> Path:
     if kind == "pca":
         path = kdir / f"K{k}_pca_comparison_true_vs_predicted.png"
     elif kind == "hypnogram":
-        for name in ("hypnogram.tif", "hypnogram.png", "hypnogram.pdf"):
-            path = kdir / name
-            if path.is_file():
-                return path
-        raise FileNotFoundError(f"Missing hypnogram panel under {kdir}")
+        return _ensure_thesis_hypnogram(k)
     else:
         raise ValueError(kind)
     if not path.is_file():
         raise FileNotFoundError(f"Missing {path}")
     return path
+
+
+def _ensure_thesis_hypnogram(k: int) -> Path:
+    """30 min substage hypnogram with macro-group background bands (thesis Fig 29 style)."""
+    from scripts.paper.k_sweep_metrics import best_npz_for_k_merged
+    from scripts.paper.plot_thesis_substage_dynamics import plot_hypnogram_from_npz
+
+    kdir = BIO_ROOT / f"K{k:02d}"
+    out_pdf = kdir / "hypnogram.pdf"
+    hit = best_npz_for_k_merged(POP_ROOT, k)
+    if hit is None:
+        metrics = kdir / "metrics.json"
+        if metrics.is_file():
+            import json
+
+            npz = Path(json.loads(metrics.read_text())["npz"])
+            if not npz.is_file():
+                raise FileNotFoundError(npz)
+        else:
+            raise FileNotFoundError(f"No population NPZ for K={k}")
+    else:
+        npz = hit[0]
+    plot_hypnogram_from_npz(npz, out_pdf, minutes=30.0)
+    out_tif = out_pdf.with_suffix(".tif")
+    if not out_tif.is_file():
+        raise FileNotFoundError(out_tif)
+    return out_tif
 
 
 def _image_aspect(path: Path) -> float:
