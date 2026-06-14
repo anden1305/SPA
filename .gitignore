@@ -212,11 +212,12 @@ __marimo__/
 wandb/
 hpc/output/
 
-Master Thesis.pdf
-Master Thesis.md
-Master Thesis.txt
-
 # Paper branch: code-only public repo (keep local; do not push these trees)
+/.cursor/
+/.github/
 /docs/
 /paper/
 /results/
+/Master Thesis.pdf
+/Master Thesis.md
+/Master Thesis.txt
