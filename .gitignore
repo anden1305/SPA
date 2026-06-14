@@ -216,3 +216,7 @@ wandb/
 hpc/output/
 
 Master Thesis.pdf
+
+paper/
+docs/
+results/
